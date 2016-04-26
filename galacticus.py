@@ -88,11 +88,16 @@ class GalacticusParameters(object):
 
     def set_parameter(self,param,value,parent=None,delim="/"):        
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Convert paramter value to string
+        if np.ndim(value) == 0:
+            value = str(value)
+        else:
+            value = map(str,value)
         if param in self.parent_map.keys():        
             # Update existing parameter
             elem = self.parent_map[param]
             par = elem.find(param)
-            par.set("value",str(value))
+            par.set("value",value)
         else:
             # Insert new parameter
             if parent is None or parent == "parameters":
@@ -100,7 +105,7 @@ class GalacticusParameters(object):
                 parent_set = True
             else:
                 parent_elem = self.create_path(parent,delim=delim)
-            ET.SubElement(parent_elem,param,attrib={"value":str(value)})
+            ET.SubElement(parent_elem,param,attrib={"value":value})
             self.parent_map[param] = parent_elem
         return
 
