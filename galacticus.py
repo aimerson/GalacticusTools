@@ -1,5 +1,6 @@
 #! /usr/bin/env python
 
+import sys
 import numpy as np
 import xml.etree.ElementTree as ET
 
@@ -107,18 +108,6 @@ class GalacticusParameters(object):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         self.tree.write(ofile)
 
-
-
-
-
-GAL = GalacticusParameters("parameters_ref.xml",verbose=True)
-print GAL.get_parameter("sigma_8")
-parent = GAL.get_parent("sigma_8")
-GAL.set_parameter("sigma_10",1.0,parent="parameters/parameters2")
-print GAL.get_parameter("sigma_10")
-GAL.write("test.xml")
-print "done"
-quit()
 
 
 
