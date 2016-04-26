@@ -1,8 +1,10 @@
 #! /usr/bin/env python
 
-import sys
+import os,sys
 import numpy as np
 import xml.etree.ElementTree as ET
+
+print "found this module"
 
 
 class GalacticusParameters(object):
@@ -92,7 +94,7 @@ class GalacticusParameters(object):
         if np.ndim(value) == 0:
             value = str(value)
         else:
-            value = map(str,value)
+            value = ",".join(map(str,value))
         if param in self.parent_map.keys():        
             # Update existing parameter
             elem = self.parent_map[param]
@@ -114,5 +116,9 @@ class GalacticusParameters(object):
         self.tree.write(ofile)
 
 
+def validate_parameters(xmlfile,GALACTICUS_ROOT):
+    script = GALACTICUS_ROOT+"/scripts/aux/validateParameters.pl"
+    os.system(script+" "+xmlfile)
+    return
 
 
