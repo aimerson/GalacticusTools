@@ -61,25 +61,64 @@ def minor_ticks(axObj):
     else:
         axObj =[axObj]
     for ax in axObj:
-        # Determine major tick intervals                                                                                                                                                                                    
+        # Determine major tick intervals
         major_tick_locations = ax.get_majorticklocs()
         major_tick_interval = major_tick_locations[1] - major_tick_locations[0]
-        # Create dummy figure                                                                                                                                                                                               
+        # Create dummy figure
         dummyfig = plt.figure()
         dummyax = dummyfig.add_subplot(111)
-        # Create dummy data over range of major tick interval                                                                                                                                                               
+        # Create dummy data over range of major tick interval
         dummyx = np.arange(0,np.fabs(major_tick_interval) + \
                                np.fabs(major_tick_interval)/10.0, \
                                np.fabs(major_tick_interval)/10.0)
         dummyax.plot(dummyx,dummyx)
-        # Get minor tick interval by using automatically generated                                                                                                                                                          
-        # major tick intervals from dummy plot                                                                                                                                                                              
+        # Get minor tick interval by using automatically generated
+        # major tick intervals from dummy plot
         minor_tick_locations = dummyax.xaxis.get_majorticklocs()
         minor_tick_interval = minor_tick_locations[1] - minor_tick_locations[0]
         plt.close(dummyfig)
         ax.set_minor_locator(MultipleLocator(base=minor_tick_interval))
     return
 
+
+def print_rounded_value(x,dx):
+    return str(Decimal(str(x)).quantize(Decimal(str(dx))))
+
+def sigfig(x,n,latex=True):
+    if n ==0:
+        return 0
+    fmt = "%."+str(n-1)+"E"
+    s = fmt % x
+    s = str(float(s))
+    if "e" in s:
+        s = s.split("e")
+        m = n - len(s[0].replace(".","").replace("-","").lstrip("0"))
+        s[0] = s[0].ljust(len(s[0])+m,"0")
+        if "." in s[0]:
+            if len(s[0].split(".")[1].strip("0")) == 0 and len(s[0].split(".")[0]) >= n:
+                s[0] = s[0].split(".")[0]
+        if latex:
+                s[1] = "$\\times 10^{"+str(int(s[1]))+"}$"
+        else:
+            s[1] = "e" + s[1]
+        s = "".join(s)
+    else:
+        m = n - len(s.replace(".","").replace("-","").lstrip("0"))
+        s = s.ljust(len(s)+m,"0")
+        if "." in s:
+            if len(s.split(".")[1].strip("0")) == 0 and len(s.split(".")[0]) >= n:
+                s = s.split(".")[0]
+    return s
+
+
+def get_position(ax,xfrac,yfrac):
+    xlims = ax.get_xlim()
+    ylims = ax.get_ylim()
+    dx = float(xlims[1]) - float(xlims[0])
+    dy = float(ylims[1]) - float(ylims[0])
+    xpos = float(xlims[0]) + xfrac*dx
+    ypos = float(ylims[0]) + yfrac*dy
+    return xpos,ypos
 
 ###########################################################################
 # GLOBAL HISTORY PLOTS
@@ -92,6 +131,7 @@ def plot_global_history(ifile,ofile=None,SIunits=False,xunit="redshift"):
 
     G = GalacticusHDF5(ifile,'r')
     history = G.global_history(si=SIunits)
+    G.close()
 
     if xunit in ["z","redshift"]:
         x = history.historyRedshift
@@ -120,9 +160,9 @@ def plot_global_history(ifile,ofile=None,SIunits=False,xunit="redshift"):
     minor_ticks(ax.xaxis)
     ax.set_xlabel(xlabel,fontsize=14)
     if SIunits:
-        ax.set_ylabel("$\log_{10}(\\rho/\mathrm{kg}\,\,\mathrm{m}^{-3})$")
+        ax.set_ylabel("$\\rho\,\,[\mathrm{kg}\,\,\mathrm{m}^{-3}]$")
     else:
-        ax.set_ylabel("$\log_{10}(\\rho/\mathrm{M_{\odot}}\,\,\mathrm{Mpc}^{-3})$")
+        ax.set_ylabel("$\\rho\,\,[\mathrm{M_{\odot}}\,\,\mathrm{Mpc}^{-3}]$")
 
     # Stellar density
     ax = fig.add_subplot(132,yscale='log')
@@ -133,9 +173,9 @@ def plot_global_history(ifile,ofile=None,SIunits=False,xunit="redshift"):
     minor_ticks(ax.xaxis)
     ax.set_xlabel(xlabel,fontsize=14)
     if SIunits:
-        ax.set_ylabel("$\log_{10}(\\rho_{\star}/\mathrm{kg}\,\,\mathrm{m}^{-3})$")
+        ax.set_ylabel("$\\rho_{\star}\,\,[\mathrm{kg}\,\,\mathrm{m}^{-3}]$")
     else:
-        ax.set_ylabel("$\log_{10}(\\rho_{\star}/\mathrm{M_{\odot}}\,\,\mathrm{Mpc}^{-3})$")
+        ax.set_ylabel("$\\rho_{\star}\,\,[\mathrm{M_{\odot}}\,\,\mathrm{Mpc}^{-3}]$")
                 
     # Star formation rate
     ax = fig.add_subplot(133,yscale='log')
@@ -146,21 +186,77 @@ def plot_global_history(ifile,ofile=None,SIunits=False,xunit="redshift"):
     minor_ticks(ax.xaxis)
     ax.set_xlabel(xlabel,fontsize=14)
     if SIunits:
-        ax.set_ylabel("$\log_{10}(\dot{\\rho}_{\star}/\mathrm{kg}\,\,\mathrm{s}^{-1}\,\,\mathrm{m}^{-3})$")
+        ax.set_ylabel("$\dot{\\rho}_{\star}\,\,[\mathrm{kg}\,\,\mathrm{s}^{-1}\,\,\mathrm{m}^{-3}]$")
     else:
-        ax.set_ylabel("$\log_{10}(\dot{\\rho}_{\star}/\mathrm{M_{\odot}}\,\,\mathrm{Gyr}^{-1}\,\,\mathrm{Mpc}^{-3})$")
+        ax.set_ylabel("$\dot{\\rho}_{\star}\,\,[\mathrm{M_{\odot}}\,\,\mathrm{Gyr}^{-1}\,\,\mathrm{Mpc}^{-3}]$")
 
     savefig(ofile,bbox_inches='tight')
     print(funcname+"(): Plot output to file: "+ofile)
 
 
 
+###########################################################################
+# MASS & LUMINOSITY FUNCTIONS
+###########################################################################
 
 
+def plot_stellar_mass_function(ifile,z,ofile=None,mbins=None,disks=False,spheroids=False):
+    funcname = sys._getframe().f_code.co_name    
+    if ofile is None:
+        ofile = "/".join(ifile.split("/")[:-1]) + "/stellarMassFunction_z"+str(z).replace(".","p")+".pdf"    
+    
+    # Read galaxies information
+    G = GalacticusHDF5(ifile,'r')
+    props = ["massStellar","weight"]
+    if disks:
+        props.append("diskMassStellar")
+    if spheroids:
+        props.append("spheroidMassStellar")        
+    galaxies = G.galaxies(props=props,z=z)
+    G.close()
 
+    # Set mass bins
+    if mbins is None:
+        mbins = np.arange(8.0,12.0,0.1)
+    dM = mbins[1] - mbins[0]
+    
+    # Create figure
+    fig = figure(figsize=(6,6))
+    ax = fig.add_subplot(111,yscale='log')
+    
+    # Create axis labels
+    fs = 14
+    ax.set_xlabel("$\log_{10}(M_{\star}\,/\,\mathrm{M_{\odot}})$",fontsize=fs)
+    ax.set_ylabel("$\mathrm{d}N(M_{\star})/\mathrm{d}\log_{10}M_{\star}\,\,[\mathrm{Mpc}^{-3}]$",fontsize=fs)
 
+    # Plot mass function for total stellar mass
+    mass = np.log10(galaxies["massStellar"])
+    wgts = galaxies["weight"]
+    mf,bins = np.histogram(mass,bins=mbins,weights=wgts)
+    bins = bins[:-1] + dM/2.0
+    ax.plot(bins,mf,c='k',ls='-',label="Galacticus (Total)")
 
+    # Plot mass function for stellar mass in disks
+    if disks:
+        mass = np.log10(galaxies["diskMassStellar"])
+        wgts = galaxies["weight"]
+        mf,bins = np.histogram(mass,bins=mbins,weights=wgts)
+        bins = bins[:-1] + dM/2.0
+        ax.plot(bins,mf,c='b',ls='--',label="Galacticus (Disks)")
 
+    # Plot mass function for stellar mass in spheroids
+    if spheroids:
+        mass = np.log10(galaxies["spheroidMassStellar"])
+        wgts = galaxies["weight"]
+        mf,bins = np.histogram(mass,bins=mbins,weights=wgts)
+        bins = bins[:-1] + dM/2.0
+        ax.plot(bins,mf,c='r',ls=':',lw=2.5,label="Galacticus (Spheroids)")
+    
+    minor_ticks(ax.xaxis)
+    Legend(ax,loc=0,title="STELLAR MASS\nFUNCTION ($z\,=\,"+sigfig(z,2)+"$)")
+    
+    savefig(ofile,bbox_inches='tight')
+    print(funcname+"(): Plot output to file: "+ofile)    
 
 
 

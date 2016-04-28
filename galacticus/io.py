@@ -134,6 +134,10 @@ class GalacticusHDF5(object):
         for p in props:
             if p in allprops:
                 galaxies[p] = np.copy(np.array(out["nodeData/"+p]))
+                if SIunits:
+                    if "unitsInSI" in out["nodeData/"+p].attrs.keys():
+                        unit = out["nodeData/"+p].attrs["unitsInSI"]
+                        galaxies[p] *= unit
             else:
                 if p.lower() == "weight":
                     cts = np.array(out["mergerTreeCount"])
