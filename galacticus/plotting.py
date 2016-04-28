@@ -32,7 +32,7 @@ mpl.rcParams['ytick.labelsize'] = 12.0
 
 import sys,fnmatch
 import numpy as np
-from utils_io import *
+from .io import GalacticusHDF5
 
 ###########################################################################
 # MISC. FUNCTIONS
