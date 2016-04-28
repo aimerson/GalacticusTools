@@ -86,7 +86,7 @@ def minor_ticks(axObj):
 ###########################################################################
 
 def plot_global_history(ifile,ofile=None,SIunits=False,xunit="redshift"):
-    
+    funcname = sys._getframe().f_code.co_name    
     if ofile is None:
         ofile = "/".join(ifile.split("/")[:-1]) + "globalHistory.pdf"
 
@@ -151,7 +151,7 @@ def plot_global_history(ifile,ofile=None,SIunits=False,xunit="redshift"):
         ax.set_ylabel("$\log_{10}(\dot{\\rho}_{\star}/\mathrm{M_{\odot}}\,\,\mathrm{Gyr}^{-1}\,\,\mathrm{Mpc}^{-3})$")
 
     savefig(ofile,bbox_inches='tight')
-
+    print(funcname+"(): Plot output to file: "+ofile)
 
 
 
