@@ -88,7 +88,7 @@ def minor_ticks(axObj):
 def plot_global_history(ifile,ofile=None,SIunits=False,xunit="redshift"):
     funcname = sys._getframe().f_code.co_name    
     if ofile is None:
-        ofile = "/".join(ifile.split("/")[:-1]) + "globalHistory.pdf"
+        ofile = "/".join(ifile.split("/")[:-1]) + "/globalHistory.pdf"
 
     G = GalacticusHDF5(ifile,'r')
     history = G.global_history(si=SIunits)
