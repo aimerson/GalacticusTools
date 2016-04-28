@@ -105,9 +105,41 @@ class GalacticusHDF5(object):
         return history.view(np.recarray)
 
 
-    def galaxies(self,props=None,z=None):
-        iselect = np.argmin(np.fabs(outputs.z-kwargs["z"]))
-        out = Outputs["Output"+str(outputs["iout"][iselect])]
-        return
+    def galaxies(self,props=None,z=None,SIunits=False):                
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Select epoch closest to specified redshift
+        iselect = np.argmin(np.fabs(self.outputs.z-z))
+        outstr = "Output"+str(self.outputs["iout"][iselect])
+        out = self.fileObj["Outputs/"+outstr]
+        if self._verbose:
+            print(funcname+"(): Reading "+outstr+" (redshift = "+str(self.outputs.z[iselect])+")")
+        # Set list of all available properties
+        allprops = out["nodeData"].keys()
+        # Get number of galaxies
+        ngals = len(np.array(out["nodeData/"+allprops[0]]))
+        if self._verbose:
+            print(funcname+"(): Number of galaxies = "+str(ngals))
+        # Construct datatype for galaxy properties to read
+        if props is None:
+            props = allprops        
+        dtype = []
+        for p in props:
+            if p in allprops:
+                dtype.append((p,out["nodeData/"+p].dtype))
+            else:
+                if p.lower() == "weight":
+                    dtype.append((p.lower(),float))
+        galaxies = np.zeros(ngals,dtype=dtype)
+        # Extract galaxy properties
+        for p in props:
+            if p in allprops:
+                galaxies[p] = np.copy(np.array(out["nodeData/"+p]))
+            else:
+                if p.lower() == "weight":
+                    cts = np.array(out["mergerTreeCount"])
+                    wgt = np.array(out["mergerTreeWeight"])
+                    galaxies[p.lower()] = np.copy(np.repeat(wgt,cts))
+                    del cts,wgt            
+        return galaxies
 
 
