@@ -33,6 +33,7 @@ mpl.rcParams['ytick.labelsize'] = 12.0
 import sys,fnmatch
 import numpy as np
 from .io import GalacticusHDF5
+from .constants import luminositySolar,erg,massSolar
 
 ###########################################################################
 # MISC. FUNCTIONS
@@ -269,7 +270,7 @@ def plot_halpha_luminosity_function(ifile,z,ofile=None,lbins=None,disks=False,sp
         ofile = "/".join(ifile.split("/")[:-1]) + "/HalphaLuminosityFunction_z"+str(z).replace(".","p")+".pdf"    
     
     # Solar luminosity in erg/s
-    Lsol = 3.828e33 
+    Lsol = luminositySolar/erg
     factor = 40
 
     # Set properties to read
