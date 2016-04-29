@@ -104,17 +104,26 @@ class GalacticusHDF5(object):
                         history[p] = history[p]*unit
         return history.view(np.recarray)
 
+    def selectOutput(self,z):
+        # Select epoch closest to specified redshift
+        iselect = np.argmin(np.fabs(self.outputs.z-z))
+        outstr = "Output"+str(self.outputs["iout"][iselect])
+        if self._verbose:
+            print(funcname+"(): Nearest output is "+outstr+" (redshift = "+str(self.outputs.z[iselect])+")")
+        return self.fileObj["Outputs/"+outstr]
+        
+    def availableDatasets(self,z):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        out = self.selectOutput(z)
+        return map(str,out["nodeData"].keys())
+        
 
     def galaxies(self,props=None,z=None,SIunits=False):                
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Select epoch closest to specified redshift
-        iselect = np.argmin(np.fabs(self.outputs.z-z))
-        outstr = "Output"+str(self.outputs["iout"][iselect])
-        out = self.fileObj["Outputs/"+outstr]
-        if self._verbose:
-            print(funcname+"(): Reading "+outstr+" (redshift = "+str(self.outputs.z[iselect])+")")
+        out = self.selectOutput(z)
         # Set list of all available properties
-        allprops = out["nodeData"].keys()
+        allprops = self.availableDatasets(z)
         # Get number of galaxies
         ngals = len(np.array(out["nodeData/"+allprops[0]]))
         if self._verbose:

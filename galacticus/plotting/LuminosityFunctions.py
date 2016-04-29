@@ -5,6 +5,7 @@ import numpy as np
 from .utils import *
 from ..io import GalacticusHDF5
 from ..constants import luminositySolar,erg
+from ..EmissionLines import getLatexName
 
 class LuminosityFunction(object):
 
@@ -40,7 +41,6 @@ class LuminosityFunction(object):
         return
 
 
-
 def EmissionLine(ifile,z,line,ofile=None,lumbins=None,dust=False,frame="rest",ergs=False,disks=False,spheroids=False):
     funcname = sys._getframe().f_code.co_name    
     if ofile is None:
@@ -70,13 +70,13 @@ def EmissionLine(ifile,z,line,ofile=None,lumbins=None,dust=False,frame="rest",er
             lumbins += np.log10(Lsol) - factor
 
     # Create axis labels
-    name = "\mathrm{line}"
+    latex = getLatexName(line)
     fs = 14
     if ergs:
-        xlabel = "$\log_{10}(L_{"+name+"}\,/\,10^{"+str(factor)+"}\,\mathrm{erg}\,\mathrm{s}^{-1})$"        
+        xlabel = "$\log_{10}(L_{"+latex+"}\,/\,10^{"+str(factor)+"}\,\mathrm{erg}\,\mathrm{s}^{-1})$"        
     else:
-        xlabel = "$\log_{10}(L_{"+name+"}\,/\,\mathrm{L_{\odot}})$"
-    ylabel = "$\mathrm{d}\phi(L_{"+name+"})/\mathrm{d}\log_{10}L_{"+name+"+}\,\,[\mathrm{Mpc}^{-3}]$"
+        xlabel = "$\log_{10}(L_{"+latex+"}\,/\,\mathrm{L_{\odot}})$"
+    ylabel = "$\mathrm{d}\phi(L_{"+latex+"})/\mathrm{d}\log_{10}L_{"+latex+"}\,\,[\mathrm{Mpc}^{-3}]$"
         
     # Inititalise LuminosityFunction class
     LF = LuminosityFunction(yscale='log',xlabel=xlabel,ylabel=ylabel,fontsize=fs)
@@ -108,7 +108,7 @@ def EmissionLine(ifile,z,line,ofile=None,lumbins=None,dust=False,frame="rest",er
         LF.addModel(lum,lumbins,weights=wgts,c='r',ls=':',lw=2.5,label="Galacticus (Spheroids)")
     
     # Output plot and return
-    LF.output(ofile,loc=0,title="$\mathrm{H\\alpha}$ LUMINOSITY\nFUNCTION ($z\,=\,"+sigfig(z,2)+"$)")
+    LF.output(ofile,loc=0,title="$"+latex+"$ LUMINOSITY\nFUNCTION ($z\,=\,"+sigfig(z,2)+"$)")
     return    
 
 
