@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-import sys
+import sys,fnmatch
 import numpy as np
 import matplotlib
 from scipy.stats import *
@@ -190,9 +190,10 @@ def plot_global_history(ifile,ofile=None,SIunits=False,xunit="redshift"):
     else:
         ax.set_ylabel("$\dot{\\rho}_{\star}\,\,[\mathrm{M_{\odot}}\,\,\mathrm{Gyr}^{-1}\,\,\mathrm{Mpc}^{-3}]$")
 
+    # Save figure and return
     savefig(ofile,bbox_inches='tight')
     print(funcname+"(): Plot output to file: "+ofile)
-
+    return
 
 
 ###########################################################################
@@ -255,13 +256,102 @@ def plot_stellar_mass_function(ifile,z,ofile=None,mbins=None,disks=False,spheroi
     minor_ticks(ax.xaxis)
     Legend(ax,loc=0,title="STELLAR MASS\nFUNCTION ($z\,=\,"+sigfig(z,2)+"$)")
     
+    # Save figure and return
     savefig(ofile,bbox_inches='tight')
     print(funcname+"(): Plot output to file: "+ofile)    
+    return
 
 
 
+def plot_halpha_luminosity_function(ifile,z,ofile=None,lbins=None,disks=False,spheroids=False,dust=False,frame="rest",ergs=False):    
+    funcname = sys._getframe().f_code.co_name    
+    if ofile is None:
+        ofile = "/".join(ifile.split("/")[:-1]) + "/HalphaLuminosityFunction_z"+str(z).replace(".","p")+".pdf"    
+    
+    # Solar luminosity in erg/s
+    Lsol = 3.828e33 
+    factor = 40
+
+    # Set properties to read
+    search = "totalLineLuminosity:balmerAlpha6563:"
+    if fnmatch.fnmatch(frame.lower(),"r*"):
+        search = search + "rest*"
+    elif fnmatch.fnmatch(frame.lower(),"o*"):
+        search = search + "observed*"
+    if disks or spheroids:
+        search = search.replace("totalLine","*Line")
+
+    # Read galaxies information
+    G = GalacticusHDF5(ifile,'r')
+    props = ["weight",search]
+    galaxies = G.galaxies(props=props,z=z)
+    G.close()    
+
+    # Set luminosity bins
+    if lbins is None:
+        lbins = np.arange(-1.0,8.0,0.5)
+        if ergs:
+            lbins += np.log10(Lsol) - factor
+    dL = lbins[1] - lbins[0]
+
+    # Create figure
+    fig = figure(figsize=(6,6))
+    ax = fig.add_subplot(111,yscale='log')
+
+    # Create axis labels
+    fs = 14
+    if ergs:
+        xlabel = "$\log_{10}(L_{\mathrm{H\\alpha}}\,/\,10^{"+str(factor)+"}\,\mathrm{erg}\,\mathrm{s}^{-1})$"        
+    else:
+        xlabel = "$\log_{10}(L_{\mathrm{H\\alpha}}\,/\,\mathrm{L_{\odot}})$"
+    ax.set_xlabel(xlabel,fontsize=fs)
+    ylabel = "$\mathrm{d}\phi(L_{\mathrm{H\\alpha}})/\mathrm{d}\log_{10}L_{\mathrm{H\\alpha}}\,\,[\mathrm{Mpc}^{-3}]$"
+    ax.set_ylabel(ylabel,fontsize=fs)
+
+    # Plot luminosity function for total Halpha luminosity
+    name = fnmatch.filter(galaxies.dtype.names,"totalLine*")[0]    
+    lum = np.log10(galaxies[name])
+    if ergs:
+        lum += np.log10(Lsol) - factor
+    wgts = galaxies["weight"]
+    lf,bins = np.histogram(lum,bins=lbins,weights=wgts)
+    bins = bins[:-1] + dL/2.0
+    ax.plot(bins,lf,c='k',ls='-',label="Galacticus (Total)")
+    
+    # Plot luminosity function for disk Halpha luminosity
+    if disks:
+        name = fnmatch.filter(galaxies.dtype.names,"diskLine*")[0]    
+        lum = np.log10(galaxies[name])
+        if ergs:
+            lum += np.log10(Lsol) - factor
+        wgts = galaxies["weight"]
+        lf,bins = np.histogram(lum,bins=lbins,weights=wgts)
+        bins = bins[:-1] + dL/2.0
+        ax.plot(bins,lf,c='b',ls='--',label="Galacticus (Disks)")
+    
+
+    # Plot luminosity function for spheroid Halpha luminosity
+    if spheroids:
+        name = fnmatch.filter(galaxies.dtype.names,"spheroidLine*")[0]    
+        lum = np.log10(galaxies[name])
+        if ergs:
+            lum += np.log10(Lsol) - factor
+        wgts = galaxies["weight"]
+        lf,bins = np.histogram(lum,bins=lbins,weights=wgts)
+        bins = bins[:-1] + dL/2.0
+        ax.plot(bins,lf,c='r',ls=':',lw=2.5,label="Galacticus (Spheroids)")
+
+    
+    
+    minor_ticks(ax.xaxis)
+    Legend(ax,loc=0,title="$\mathrm{H\\alpha}$ LUMINOSITY\nFUNCTION ($z\,=\,"+sigfig(z,2)+"$)")
+    
 
 
+    # Save figure and return
+    savefig(ofile,bbox_inches='tight')
+    print(funcname+"(): Plot output to file: "+ofile)    
+    return
 
 
 

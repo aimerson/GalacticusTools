@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-import os,sys
+import os,sys,fnmatch
 import numpy as np
 import h5py
 
@@ -124,14 +124,15 @@ class GalacticusHDF5(object):
             props = allprops        
         dtype = []
         for p in props:
-            if p in allprops:
-                dtype.append((p,out["nodeData/"+p].dtype))
+            if len(fnmatch.filter(allprops,p))>0:
+                matches = fnmatch.filter(allprops,p)
+                dtype = dtype + [ (str(m),out["nodeData/"+m].dtype) for m in matches ]                
             else:
                 if p.lower() == "weight":
                     dtype.append((p.lower(),float))
         galaxies = np.zeros(ngals,dtype=dtype)
         # Extract galaxy properties
-        for p in props:
+        for p in galaxies.dtype.names:
             if p in allprops:
                 galaxies[p] = np.copy(np.array(out["nodeData/"+p]))
                 if SIunits:
