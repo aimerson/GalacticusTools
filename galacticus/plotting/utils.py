@@ -30,17 +30,10 @@ mpl.rcParams['axes.labelsize'] = 12.0
 mpl.rcParams['xtick.labelsize'] = 12.0
 mpl.rcParams['ytick.labelsize'] = 12.0
 
+
 ####################################################################################
-
-
-def Legend(ax,ec='none',fc='none',fontcolor="k",**kwargs):
-    leg = ax.legend(**kwargs)
-    frame = leg.get_frame()
-    frame.set_edgecolor(ec)
-    frame.set_facecolor(fc)
-    for text in leg.get_texts():
-        text.set_color(fontcolor)
-    return
+# AXIS FUNCTIONS
+####################################################################################
 
 def minor_ticks(axObj):
     """ 
@@ -76,6 +69,88 @@ def minor_ticks(axObj):
     return
 
 
+def get_position(ax,xfrac,yfrac):
+    xlims = ax.get_xlim()
+    ylims = ax.get_ylim()
+    dx = float(xlims[1]) - float(xlims[0])
+    dy = float(ylims[1]) - float(ylims[0])
+    xpos = float(xlims[0]) + xfrac*dx
+    ypos = float(ylims[0]) + yfrac*dy
+    return xpos,ypos
+
+
+####################################################################################
+# COLOURS FUNCTIONS
+####################################################################################
+
+def colour_array(n=1,i=None,cmap="jet"):
+    cm = plt.get_cmap(cmap)
+    if cm is None:
+        print "*** ERROR: colour_array(): colour map ",cmap," not found!"
+        sys.exit(3)
+    if n == 1:
+        return "k"
+    else:
+        colarr = np.arange(float(n))/float(n)
+        colarr = cm(colarr)
+        if i is not None:
+            if i in range(n):
+                colarr = colarr[i]
+        return colarr
+
+
+def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=100):
+    import matplotlib.colors as colors
+    new_cmap = colors.LinearSegmentedColormap.from_list(
+        'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap.name, a=minval, b=maxval),
+        cmap(np.linspace(minval, maxval, n)))
+    return new_cmap
+
+
+def get_color(color):
+    for hue in range(color):
+        hue = 1. * hue / color
+        col = [int(x) for x in colorsys.hsv_to_rgb(hue, 1.0, 230)]
+        yield "#{0:02x}{1:02x}{2:02x}".format(*col)
+
+
+def make_colourmap(seq):
+    """
+    make_colourmap(): Return a LinearSegmentedColormap.
+
+    USAGE: cmap = make_colourmap(seq)
+
+           seq: A sequence of floats and RGB-tuples. The floats should
+                be increasing and be in the interval [0,1].
+
+    e.g.  
+    import matplotlib.colors as mcolors 
+    c = mcolors.ColorConverter().to_rgb
+    rvb = make_colormap([c('red'), c('violet'), c('blue')])
+    rvb = make_colormap([c('red'), c('violet'), 0.33, c('violet'),\
+                         c('blue'), 0.66, c('blue')])
+    
+    (From answer in
+    http://stackoverflow.com/questions/16834861/create-own-colormap-using-matplotlib-and-plot-color-scale)
+    """
+    import matplotlib.colors as mcolors
+    seq = [(None,) * 3, 0.0] + list(seq) + [1.0, (None,) * 3]
+    cdict = {'red': [], 'green': [], 'blue': []}
+    for i, item in enumerate(seq):
+        if isinstance(item, float):
+            r1, g1, b1 = seq[i - 1]
+            r2, g2, b2 = seq[i + 1]
+            cdict['red'].append([item, r1, r2])
+            cdict['green'].append([item, g1, g2])
+            cdict['blue'].append([item, b1, b2])
+    return mcolors.LinearSegmentedColormap('CustomMap', cdict)
+
+
+
+####################################################################################
+# LABEL FUNCTIONS
+####################################################################################
+
 def print_rounded_value(x,dx):
     return str(Decimal(str(x)).quantize(Decimal(str(dx))))
 
@@ -105,13 +180,15 @@ def sigfig(x,n,latex=True):
                 s = s.split(".")[0]
     return s
 
+####################################################################################
+# LEGEND FUNCTIONS
+####################################################################################
 
-def get_position(ax,xfrac,yfrac):
-    xlims = ax.get_xlim()
-    ylims = ax.get_ylim()
-    dx = float(xlims[1]) - float(xlims[0])
-    dy = float(ylims[1]) - float(ylims[0])
-    xpos = float(xlims[0]) + xfrac*dx
-    ypos = float(ylims[0]) + yfrac*dy
-    return xpos,ypos
-
+def Legend(ax,ec='none',fc='none',fontcolor="k",**kwargs):
+    leg = ax.legend(**kwargs)
+    frame = leg.get_frame()
+    frame.set_edgecolor(ec)
+    frame.set_facecolor(fc)
+    for text in leg.get_texts():
+        text.set_color(fontcolor)
+    return
