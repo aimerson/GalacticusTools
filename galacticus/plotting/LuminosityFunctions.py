@@ -44,7 +44,9 @@ class LuminosityFunction(object):
 def EmissionLine(ifile,z,line,ofile=None,lumbins=None,dust=False,frame="rest",ergs=False,disks=False,spheroids=False):
     funcname = sys._getframe().f_code.co_name    
     if ofile is None:
-        ofile = "/".join(ifile.split("/")[:-1]) + "/EmLineLuminosityFunction_z"+str(z).replace(".","p")+".pdf"    
+        ofile = ifile.split("/")
+        ofile[-1] = "globalHistory.pdf"
+        ofile ="/".join(ofile)
         
     # Solar luminosity in erg/s
     Lsol = luminositySolar/erg

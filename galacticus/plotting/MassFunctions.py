@@ -44,7 +44,9 @@ class MassFunction(object):
 def StellarMassFunction(ifile,z,ofile=None,massbins=None,disks=False,spheroids=False):
     funcname = sys._getframe().f_code.co_name    
     if ofile is None:
-        ofile = "/".join(ifile.split("/")[:-1]) + "/stellarMassFunction_z"+str(z).replace(".","p")+".pdf"    
+        ofile = ifile.split("/")
+        ofile[-1] = "globalHistory.pdf"
+        ofile ="/".join(ofile)
     
     # Read galaxies information
     G = GalacticusHDF5(ifile,'r')

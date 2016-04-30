@@ -14,8 +14,9 @@ from ..constants import luminositySolar,erg,massSolar
 def GlobalHistory(ifile,ofile=None,SIunits=False,xunit="redshift"):
     funcname = sys._getframe().f_code.co_name    
     if ofile is None:
-        ofile = "/".join(ifile.split("/")[:-1]) + "/globalHistory.pdf"
-
+        ofile = ifile.split("/")
+        ofile[-1] = "globalHistory.pdf"
+        ofile = "/".join(ofile)
     G = GalacticusHDF5(ifile,'r')
     history = G.global_history(si=SIunits)
     G.close()
