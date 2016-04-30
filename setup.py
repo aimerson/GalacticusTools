@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(name='galacticus',
       version='0.1',
@@ -9,6 +9,6 @@ setup(name='galacticus',
       author='Alex Merson',
       author_email='alex.i.merson@gmail.com',
       license='MIT',
-      packages=['galacticus'],
+      packages=find_packages(),
       zip_safe=False)
 
