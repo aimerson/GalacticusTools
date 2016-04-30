@@ -65,7 +65,7 @@ def EmissionLine(ifile,z,line,ofile=None,lumbins=None,dust=False,frame="rest",er
 
     # Set luminosity bins
     if lumbins is None:
-        lumbins = np.arange(-1.0,8.0,0.5)
+        lumbins = np.arange(0.0,8.0,0.1)
         if ergs:
             lumbins += np.log10(Lsol) - factor
 
