@@ -11,7 +11,7 @@ from ..constants import luminositySolar,erg,massSolar
 # GLOBAL HISTORY PLOTS
 ###########################################################################
 
-def plotGlobalHistory(ifile,ofile=None,SIunits=False,xunit="redshift"):
+def globalHistory(ifile,ofile=None,SIunits=False,xunit="redshift"):
     funcname = sys._getframe().f_code.co_name    
     if ofile is None:
         ofile = ifile.split("/")
