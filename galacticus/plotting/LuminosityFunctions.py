@@ -45,7 +45,7 @@ def EmissionLine(ifile,z,line,ofile=None,lumbins=None,dust=False,frame="rest",er
     funcname = sys._getframe().f_code.co_name    
     if ofile is None:
         ofile = ifile.split("/")
-        ofile[-1] = "globalHistory.pdf"
+        ofile[-1] = "LuminosityFunction_"+line+".pdf"
         ofile ="/".join(ofile)
         
     # Solar luminosity in erg/s
