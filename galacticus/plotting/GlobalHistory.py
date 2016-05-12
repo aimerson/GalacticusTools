@@ -18,7 +18,7 @@ def globalHistory(ifile,ofile=None,SIunits=False,xunit="redshift"):
         ofile[-1] = "globalHistory.pdf"
         ofile = "/".join(ofile)
     G = GalacticusHDF5(ifile,'r')
-    history = G.global_history(si=SIunits)
+    history = G.globalHistory(si=SIunits)
     G.close()
 
     if xunit in ["z","redshift"]:
