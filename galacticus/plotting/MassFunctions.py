@@ -55,7 +55,7 @@ def StellarMassFunction(ifile,z,ofile=None,massbins=None,disks=False,spheroids=F
         props.append("diskMassStellar")
     if spheroids:
         props.append("spheroidMassStellar")        
-    galaxies = G.galaxies(props=props,z=z)
+    galaxies = G.readGalaxies(props=props,z=z)
     G.close()
     
     # Set mass bins

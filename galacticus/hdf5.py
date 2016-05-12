@@ -22,16 +22,21 @@ class HDF5(object):
     def __init__(self,*args,**kwargs):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+
         self.fileObj = h5py.File(*args)
-        self.filename = self.fileObj.filename
-        if self.fileObj.mode == "r":
-            self.read_only = True
-        elif self.fileObj.mode == "r+":
-            self.read_only = False
         if "verbose" in kwargs.keys():
             self._verbose = kwargs["verbose"]
         else:
             self._verbose = False
+        self.filename = self.fileObj.filename        
+        if self._verbose:
+            print(classname+"(): HDF5 file = "+self.filename)
+        if self.fileObj.mode == "r":
+            self.read_only = True
+            if self._verbose:
+                print(classname+"(): HDF5 opened in READ-ONLY mode")
+        elif self.fileObj.mode == "r+":
+            self.read_only = False
         return
     
     def close(self):

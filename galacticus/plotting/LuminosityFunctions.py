@@ -62,7 +62,7 @@ def EmissionLine(ifile,z,line,ofile=None,lumbins=None,dust=False,frame="rest",er
     # Read galaxies information
     G = GalacticusHDF5(ifile,'r')
     props = ["weight",search]
-    galaxies = G.galaxies(props=props,z=z)
+    galaxies = G.readGalaxies(props=props,z=z)
     G.close()    
 
     # Set luminosity bins
