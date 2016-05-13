@@ -4,9 +4,6 @@ import sys
 import h5py
 import numpy as np
 
-
-
-
 def readonlyWrapper(func):
     def wrapper(self,*args,**kwargs):               
         funcname = self.__class__.__name__+"."+func.__name__
@@ -14,8 +11,6 @@ def readonlyWrapper(func):
             raise IOError(funcname+"(): HDF5 file "+self.filename+" is READ ONLY!")        
         return func(self,*args,**kwargs)
     return wrapper
-
-
 
 class HDF5(object):
     
@@ -225,7 +220,7 @@ class HDF5(object):
                             
     
     ##############################################################################
-    # DATASETS
+    # ATTRIBUTES
     ##############################################################################
     
     def readAttributes(self,hdfdir,required=None):
