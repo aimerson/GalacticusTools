@@ -86,7 +86,7 @@ class GalacticusHDF5(HDF5):
         out = self.selectOutput(z)
         return map(str,out["nodeData"].keys())
 
-    def readGalaxies(self,props=None,z=None,SIunits=False):                
+    def readGalaxies(self,z,props=None,SIunits=False):                
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Select epoch closest to specified redshift
         out = self.selectOutput(z)
