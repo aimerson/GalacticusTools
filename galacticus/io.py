@@ -96,9 +96,13 @@ class GalacticusHDF5(HDF5):
         ngals = len(np.array(out["nodeData/"+allprops[0]]))
         if self._verbose:
             print(funcname+"(): Number of galaxies = "+str(ngals))
-        # Construct datatype for galaxy properties to read
+        # Rad all properties if not specified
         if props is None:
             props = allprops        
+        # Check for properties not already calculated
+        if len(list((set(props).difference(allprops))))>0:
+            self.calculateProperties(list(set(props).diffference(allprops)),z,overwrite=False)
+        # Construct datatype for galaxy properties to read        
         dtype = []
         for p in props:
             if len(fnmatch.filter(allprops,p))>0:
@@ -123,4 +127,34 @@ class GalacticusHDF5(HDF5):
                     galaxies[p.lower()] = np.copy(np.repeat(wgt,cts))
                     del cts,wgt            
         return galaxies
+
+        
+    def calculateProperties(self,galaxyProperties,z,overwrite=False):        
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+
+        # Galaxy inclination
+        if "inclination" in galaxyProperties:            
+            from .Inclination import Get_Inclination
+            if self._verbose:
+                print(funcname+"(): calculating inclination (z="+str(z)+")")
+            data = Get_Inclination(self,z,overwrite=overwrite)
+            del data
+        # Total stellar mass
+        if "massStellar" in galaxyProperties:
+            from .StellarMass import Get_StellarMass
+            if self._verbose:
+                print(funcname+"(): calculating massStellar (z="+str(z)+")")
+            data = Get_StellarMass(self,z,overwrite=overwrite)
+            del data
+        # Total star formation rate
+        if "starFormationRate" in galaxyProperties:
+            from .StellarMass import Get_StarFormationRate
+            data = Get_StarFormationRate(self,z,overwrite=overwrite)
+            if self._verbose:
+                print(funcname+"(): calculating starFormationRate (z="+str(z)+")")
+            del data
+        
+        return
+
+
 
