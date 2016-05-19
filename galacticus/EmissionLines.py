@@ -4,7 +4,7 @@ import sys,re
 import fnmatch
 import numpy as np
 from .io import GalacticusHDF5
-from .Luminosities import Get_Luminosity,Get_Total_Luminosity
+from .Luminosities import Get_Luminosity
 from .constants import speedOfLight,luminositySolar,luminosityAB,angstrom
 
 
@@ -130,7 +130,7 @@ def Get_Equivalent_Width(galHDF5Obj,z,datasetName,overwrite=False):
     if len(allFilters) < 3 and datasetName.startswith("total"):
         allFilters = fnmatch.filter(galHDF5Obj.availableDatasets(z),filterSearch.replace("total","disk"))
         for filter in allFilters:
-            luminosity = Get_Total_Luminosity(galHDF5Obj,z,filter)
+            luminosity = Get_Luminosity(galHDF5Obj,z,filter)
             del luminosity
         allFilters = fnmatch.filter(galHDF5Obj.availableDatasets(z),filterSearch)
 
