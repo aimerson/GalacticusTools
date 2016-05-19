@@ -13,7 +13,7 @@ from .constants import speedOfLight,luminositySolar,luminosityAB,angstrom
 ##########################################################
 
 def getLineNames():
-    lines = ["balmerAlpha6563"."balmerBeta4861",\
+    lines = ["balmerAlpha6563","balmerBeta4861",\
                  "oxygenII3726","oxygenII3729",\
                  "oxygenIII4959","oxygenIII5007",\
                  "nitrogenII6584",\
