@@ -161,6 +161,13 @@ class HDF5(object):
                                  compression_opts=compression_opts,**kwargs)
         return
 
+    @readonlyWrapper
+    def rmDataset(self,hdfdir,dataset):
+        g = self.fileObj[hdfdir]
+        if dataset in g.keys():
+            del g[dataset]
+        return
+
     def lsDatasets(self,hdfdir):
         objs = self.lsdir(hdfdir,recursive=False)             
         dsets = []
