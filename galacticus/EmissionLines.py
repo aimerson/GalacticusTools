@@ -20,10 +20,6 @@ def getLineNames():
                  "sulfurII6731","sulfurII6716"]
     return lines
 
-
-
-
-
 def availableLines(galHDF5Obj,z,frame=None,component=None,dust=None):    
     # Extract list of all emission line luminosities
     allLines = fnmatch.filter(galHDF5Obj.availableDatasets(z),"*LineLuminosity:*")
@@ -125,6 +121,10 @@ def Get_Equivalent_Width(galHDF5Obj,z,datasetName,overwrite=False):
 
     # Locate names for three appropriate top-hat filters
     filterSearch = datasetName.replace("EmissionLineEW","LuminositiesStellar:emissionLineEW")
+    if "_1band" in filterSearch:
+       filterSearch = filterSearch.replace("_1band","")
+    if "_2band" in filterSearch:
+       filterSearch = filterSearch.replace("_2band","")       
     filterSearch = filterSearch.replace(lineName,lineName+"_*")
     allFilters = fnmatch.filter(galHDF5Obj.availableDatasets(z),filterSearch)
     if len(allFilters) < 3 and datasetName.startswith("total"):
@@ -137,6 +137,7 @@ def Get_Equivalent_Width(galHDF5Obj,z,datasetName,overwrite=False):
     # Locate side band filters
     wavelengthCentral = [float(name.split(":")[1].split("_")[2]) for name in allFilters]
     mask = np.fabs(float(lineWavelength)-np.array(wavelengthCentral))>1.0
+    centralBandName = list(np.array(allFilters)[np.invert(mask)])[0]
     sideBandNames = list(np.array(allFilters)[mask])
     sideBandNames.sort(key=natural_sort_key)
         
@@ -145,16 +146,20 @@ def Get_Equivalent_Width(galHDF5Obj,z,datasetName,overwrite=False):
     # Create array to store equivalent widths
     equivalentWidth = np.zeros(ngals)
 
-    # Compute continuum luminosity
-    lowWavelength = float(sideBandNames[0].split(":")[1].split("_")[2])*np.ones(ngals)
-    uppWavelength = float(sideBandNames[1].split(":")[1].split("_")[2])*np.ones(ngals)
-    lowContinuum = np.array(out["nodeData/"+sideBandNames[0]])
-    uppContinuum = np.array(out["nodeData/"+sideBandNames[1]])
-    continuum = (float(lineWavelength)-lowWavelength)/(uppWavelength-lowWavelength)
-    continuum *= (uppContinuum-lowContinuum)
-    continuum += lowContinuum
-    continuum *= luminosityAB*speedOfLight/(float(lineWavelength)**2)
-
+    # Compute continuum luminosity according to desired method:    
+    if "_2band" in filterSearch:
+        lowWavelength = float(sideBandNames[0].split(":")[1].split("_")[2])*np.ones(ngals)
+        uppWavelength = float(sideBandNames[1].split(":")[1].split("_")[2])*np.ones(ngals)
+        lowContinuum = np.array(out["nodeData/"+sideBandNames[0]])
+        uppContinuum = np.array(out["nodeData/"+sideBandNames[1]])
+        continuum = (float(lineWavelength)-lowWavelength)/(uppWavelength-lowWavelength)
+        continuum *= (uppContinuum-lowContinuum)
+        continuum += lowContinuum
+        continuum *= luminosityAB*speedOfLight/(float(lineWavelength)**2)
+    elif "_1band" in filterSearch:
+        continuum = np.array(out["nodeData/"+centralBandName])        
+        continuum *= luminosityAB*speedOfLight/(float(lineWavelength)**2)
+        
     # Compute emission line luminosity
     lineDatasetName = component+"LineLuminosity:"+lineName+":"+frame+":z"+redshift
     lineLuminosity = Get_Line_Luminosity(galHDF5Obj,z,lineDatasetName)     
