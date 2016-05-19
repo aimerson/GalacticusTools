@@ -12,6 +12,18 @@ from .constants import speedOfLight,luminositySolar,luminosityAB,angstrom
 # MISC. FUNCTIONS
 ##########################################################
 
+def getLineNames():
+    lines = ["balmerAlpha6563"."balmerBeta4861",\
+                 "oxygenII3726","oxygenII3729",\
+                 "oxygenIII4959","oxygenIII5007",\
+                 "nitrogenII6584",\
+                 "sulfurII6731","sulfurII6716"]
+    return lines
+
+
+
+
+
 def availableLines(galHDF5Obj,z,frame=None,component=None,dust=None):    
     # Extract list of all emission line luminosities
     allLines = fnmatch.filter(galHDF5Obj.availableDatasets(z),"*LineLuminosity:*")
