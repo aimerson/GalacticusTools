@@ -136,11 +136,12 @@ def Get_Equivalent_Width(galHDF5Obj,z,datasetName,overwrite=False):
     # Compute continuum luminosity
     lowWavelength = float(sideBandNames[0].split(":")[1].split("_")[2])*np.ones(ngals)
     uppWavelength = float(sideBandNames[1].split(":")[1].split("_")[2])*np.ones(ngals)
-    lowContinuum = np.array(out["nodeData/"+sideBandNames[0]])*luminosityAB
-    uppContinuum = np.array(out["nodeData/"+sideBandNames[1]])*luminosityAB
+    lowContinuum = np.array(out["nodeData/"+sideBandNames[0]])
+    uppContinuum = np.array(out["nodeData/"+sideBandNames[1]])
     continuum = (float(lineWavelength)-lowWavelength)/(uppWavelength-lowWavelength)
     continuum *= (uppContinuum-lowContinuum)
     continuum += lowContinuum
+    continuum *= luminosityAB*speedOfLight/(float(lineWavelength)**2)
 
     # Compute emission line luminosity
     lineDatasetName = component+"LineLuminosity:"+lineName+":"+frame+":z"+redshift
@@ -153,7 +154,7 @@ def Get_Equivalent_Width(galHDF5Obj,z,datasetName,overwrite=False):
     nonZero = np.logical_and(nonZeroContinuum,nonZeroEmissionLine)
     continuum = continuum[nonZero]
     lineLuminosity = lineLuminosity[nonZero]
-    width = speedOfLight*angstrom/(lineLuminosity/continuum)
+    width = (lineLuminosity/continuum)/angstrom
     np.place(equivalentWidth,nonZero,width)
     # Write equivalent width to file
     galHDF5Obj.addDataset(out.name+"/nodeData/",datasetName,equivalentWidth)
