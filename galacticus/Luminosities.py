@@ -30,3 +30,22 @@ def Get_Luminosity(galHDF5Obj,z,datasetName,overwrite=False):
     galHDF5Obj.addAttributes(out.name+"/nodeData/"+datasetName,attr)
     return totalLuminosity
 
+
+def Get_BulgeToTotal(galHDF5Obj,z,datasetName,overwrite=False):
+    funcname = sys._getframe().f_code.co_name
+    # Check dataset name correspnds to a bulge-to-total luminosity
+    if not fnmatch.fnmatch(datasetName,"bulgeToTotalLuminosities:*:z*"):
+        raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
+    # Get nearest redshift output
+    out = galHDF5Obj.selectOutput(z)
+    # Check if bulge-to-total luminosity already calculated
+    if datasetName in galHDF5Obj.availableDatasets(z) and not overwrite:
+        return np.array(out["nodeData/"+datasetName])
+    # Compute bulge-to-total luminosity 
+    diskName = datasetName.replace("bulgeToTotalLuminosities","diskLuminositiesStellar")
+    spheroidName = datasetName.replace("bulgeToTotalLuminosities","spheroidLuminositiesStellar")
+    ratio = np.array(out["nodeData/"+spheroidName])/ \
+        (np.array(out["nodeData/"+diskName])+np.array(out["nodeData/"+spheroidName]))
+    # Write luminosity to file
+    galHDF5Obj.addDataset(out.name+"/nodeData/",datasetName,ratio)
+    return ratio
