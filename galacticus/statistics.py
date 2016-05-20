@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-
+import numpy as np
 
 def binstats(X,Y,Xbins,statistic="median",weights=None,mask=None):
     if weights is None:
