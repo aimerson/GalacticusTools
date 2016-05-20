@@ -96,7 +96,7 @@ class GalacticusHDF5(HDF5):
         ngals = len(np.array(out["nodeData/"+allprops[0]]))
         if self._verbose:
             print(funcname+"(): Number of galaxies = "+str(ngals))
-        # Rad all properties if not specified
+        # Read all properties if not specified
         if props is None:
             props = allprops        
         # Check for properties not already calculated

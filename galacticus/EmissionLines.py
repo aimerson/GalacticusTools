@@ -6,7 +6,7 @@ import numpy as np
 from .io import GalacticusHDF5
 from .Luminosities import Get_Luminosity
 from .constants import speedOfLight,luminositySolar,luminosityAB,angstrom
-
+from .utils import natural_sort_key
 
 ##########################################################
 # MISC. FUNCTIONS
@@ -147,7 +147,8 @@ def Get_Equivalent_Width(galHDF5Obj,z,datasetName,overwrite=False):
     equivalentWidth = np.zeros(ngals)
 
     # Compute continuum luminosity according to desired method:    
-    if "_2band" in filterSearch:
+    wavelengthMetres = float(lineWavelength)*angstrom
+    if "_2band" in datasetName:
         lowWavelength = float(sideBandNames[0].split(":")[1].split("_")[2])*np.ones(ngals)
         uppWavelength = float(sideBandNames[1].split(":")[1].split("_")[2])*np.ones(ngals)
         lowContinuum = np.array(out["nodeData/"+sideBandNames[0]])
@@ -155,10 +156,9 @@ def Get_Equivalent_Width(galHDF5Obj,z,datasetName,overwrite=False):
         continuum = (float(lineWavelength)-lowWavelength)/(uppWavelength-lowWavelength)
         continuum *= (uppContinuum-lowContinuum)
         continuum += lowContinuum
-        continuum *= luminosityAB*speedOfLight/(float(lineWavelength)**2)
-    elif "_1band" in filterSearch:
+    elif "_1band" in datasetName:
         continuum = np.array(out["nodeData/"+centralBandName])        
-        continuum *= luminosityAB*speedOfLight/(float(lineWavelength)**2)
+    continuum *= luminosityAB*speedOfLight/(wavelengthMetres**2)
         
     # Compute emission line luminosity
     lineDatasetName = component+"LineLuminosity:"+lineName+":"+frame+":z"+redshift
