@@ -130,7 +130,7 @@ def Get_Equivalent_Width(galHDF5Obj,z,datasetName,overwrite=False):
     if len(allFilters) < 3 and datasetName.startswith("total"):
         allFilters = fnmatch.filter(galHDF5Obj.availableDatasets(z),filterSearch.replace("total","disk"))
         for filter in allFilters:
-            luminosity = Get_Luminosity(galHDF5Obj,z,filter)
+            luminosity = Get_Luminosity(galHDF5Obj,z,filter.replace("disk","total"))
             del luminosity
         allFilters = fnmatch.filter(galHDF5Obj.availableDatasets(z),filterSearch)
 
