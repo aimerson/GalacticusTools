@@ -192,3 +192,36 @@ def Legend(ax,ec='none',fc='none',fontcolor="k",**kwargs):
     for text in leg.get_texts():
         text.set_color(fontcolor)
     return
+
+
+####################################################################################
+# PLOTTING FUNCTIONS
+####################################################################################
+
+
+def ImageStats2D(ax,X,Y,Xbins,Ybins,Z=None,statistic="count",\
+                           weights=None,func=None,**kwargs):
+    from ..statistics import binstats2D
+    """                                                                                                                                                                                                                     
+    statistic can be: mean,median,sum,product,std,var,percentile,avg,max,min,mode                                                                                                                                           
+    NB 'avg' is weighted average                                                                                                                                                                                            
+    """
+    # Calculate statistic in 2-dimension bins                                                                                                                                                                               
+    data,xedges,yedges,numb = binstats2D(X,Y,Xbins,Ybins=Ybins,Z=Z,\
+                                             statistic=statistic,weights=weights)
+    if func is not None:
+        data = func(data)
+    if np.any(np.isinf(data)):
+        np.place(data,np.isinf(data),np.NaN)
+    extent = [xedges[0],xedges[-1],yedges[0],yedges[-1]]
+    # Set default preferences for selected keyword arguments                                                                                                                                                                
+    if "extent" not in kwargs.keys():
+        kwargs["extent"] = extent
+    if "interpolation" not in kwargs.keys():
+        kwargs["interpolation"] = "nearest"
+    if "aspect" not in kwargs.keys():
+        kwargs["aspect"] = "auto"
+    if "origin" not in kwargs.keys():
+        kwargs["origin"] = "lower"
+    axim = ax.imshow(np.transpose(data),**kwargs)
+    return axim
