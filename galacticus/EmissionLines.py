@@ -173,8 +173,9 @@ def Get_Equivalent_Width(galHDF5Obj,z,datasetName,overwrite=False):
     lineLuminosity = lineLuminosity[nonZero]
     width = (lineLuminosity/continuum)/angstrom
     np.place(equivalentWidth,nonZero,width)
+
     # Write equivalent width to file
-    galHDF5Obj.addDataset(out.name+"/nodeData/",datasetName,equivalentWidth)
+    galHDF5Obj.addDataset(out.name+"/nodeData/",datasetName,equivalentWidth,overwrite=overwrite)
     attr = {"unitsInSI":angstrom}
     galHDF5Obj.addAttributes(out.name+"/nodeData/"+datasetName,attr)
 

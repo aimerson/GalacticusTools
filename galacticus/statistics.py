@@ -1,5 +1,7 @@
 #! /usr/bin/env python
 
+import math
+from scipy.stats import *
 import numpy as np
 
 def binstats(X,Y,Xbins,statistic="median",weights=None,mask=None):
@@ -102,5 +104,6 @@ def binstats2D(X,Y,Xbins,Ybins=None,Z=None,statistic="median",weights=None):
             stat = stat*100.0
     else:
         stat,xedges,yedges,numb = binned_statistic_2d(X,Y,Z,statistic=statistic,bins=bins)
-    stat = Inf2NaN2D(stat)
+    mask = np.isinf(stat)
+    np.place(stat,mask,np.NaN)
     return stat,xedges,yedges,numb
