@@ -1,8 +1,9 @@
 #! /usr/bin/env python
 
+import sys,fnmatch
 import numpy as np
 from .io import GalacticusHDF5
-
+from .GalacticusErrors import ParseError
 
 def Get_StellarMass(galHDF5Obj,z,overwrite=False):    
     """
@@ -23,6 +24,7 @@ def Get_StellarMass(galHDF5Obj,z,overwrite=False):
                  mass       : Numpy array of total stellar masses.                    
 
     """
+    funcname = sys._getframe().f_code.co_name
     # Get nearest redshift output
     out = galHDF5Obj.selectOutput(z)
     # Check if total stellar mass already calculated
@@ -32,7 +34,7 @@ def Get_StellarMass(galHDF5Obj,z,overwrite=False):
     data = galHDF5Obj.readGalaxies(z,props=["spheroidMassStellar","diskMassStellar"])        
     totalStellarMass = data["diskMassStellar"] + data["spheroidMassStellar"]
     # Write dataset to file
-    galHDF5Obj.addDataset(out.name+"/nodeData/","massStellar",totalStellarMass)
+    galHDF5Obj.addDataset(out.name+"/nodeData/","massStellar",totalStellarMass,overwrite=overwrite)
     # Extract appropriate attributes and write to new dataset
     attr = out["nodeData/diskMassStellar"].attrs
     galHDF5Obj.addAttributes(out.name+"/nodeData/massStellar",attr)
@@ -59,6 +61,7 @@ def Get_StarFormationRate(galHDF5Obj,z,overwrite=False):
                  sfr        : Numpy array of total star formation rates.                    
 
     """
+    funcname = sys._getframe().f_code.co_name
     # Get nearest redshift output
     out = galHDF5Obj.selectOutput(z)
     # Check if total SFR already calculated
@@ -68,7 +71,7 @@ def Get_StarFormationRate(galHDF5Obj,z,overwrite=False):
     data = galHDF5Obj.readGalaxies(z,props=["spheroidStarFormationRate","diskStarFormationRate"])        
     totalStellarMass = data["diskStarFormationRate"] + data["spheroidStarFormationRate"]
     # Write dataset to file
-    galHDF5Obj.addDataset(out.name+"/nodeData/","massStellar",totalStellarMass)
+    galHDF5Obj.addDataset(out.name+"/nodeData/","starFormationRate",totalStellarMass,overwrite=overwrite)
     # Extract appropriate attributes and write to new dataset
     attr = out["nodeData/diskStarFormationRate"].attrs
     galHDF5Obj.addAttributes(out.name+"/nodeData/starFormationRate",attr)

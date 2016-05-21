@@ -101,7 +101,7 @@ class GalacticusHDF5(HDF5):
             props = allprops        
         # Check for properties not already calculated
         if len(list((set(props).difference(allprops))))>0:
-            self.calculateProperties(list(set(props).diffference(allprops)),z,overwrite=False)
+            self.calculateProperties(list(set(props).difference(allprops)),z,overwrite=False)
         # Construct datatype for galaxy properties to read        
         dtype = []
         for p in props:
