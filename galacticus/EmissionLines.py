@@ -38,12 +38,13 @@ class emissionLines(HDF5):
 # MISC. FUNCTIONS
 ##########################################################
 
-def getLineNames():
-    lines = ["balmerAlpha6563","balmerBeta4861",\
-                 "oxygenII3726","oxygenII3729",\
-                 "oxygenIII4959","oxygenIII5007",\
-                 "nitrogenII6584",\
-                 "sulfurII6731","sulfurII6716"]
+def getLineNames():    
+    #lines = ["balmerAlpha6563","balmerBeta4861",\
+    #             "oxygenII3726","oxygenII3729",\
+    #             "oxygenIII4959","oxygenIII5007",\
+    #             "nitrogenII6584",\
+    #             "sulfurII6731","sulfurII6716"]
+    lines = emissionLines().lines
     return lines
 
 def availableLines(galHDF5Obj,z,frame=None,component=None,dust=None):    
