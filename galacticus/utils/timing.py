@@ -34,7 +34,7 @@ class STOPWATCH:
         classname = self.__class__.__name__
         dt = time.time() - self.t
         if dt < 1.00:
-            result = 'time elapsed = {0:0.3f} ms'.format(dt*1000.0)
+            value = 'time elapsed = {0:0.3f} ms'.format(dt*1000.0)
         elif dt >= 1.00  and dt < 60.0:
             value = 'time elapsed = {0:0.3f} s'.format(dt)
         elif dt >= 60.0 and dt <= 3600.0:
@@ -43,5 +43,5 @@ class STOPWATCH:
         else:
             dt = dt/(60.0*60.0)
             value =  'time elapsed = {0:0.3f} hr'.format(dt)
-        print(classname+"(): "+result)
+        print(classname+"(): "+value)
         return
