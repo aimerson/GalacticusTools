@@ -3,10 +3,36 @@
 import sys,re
 import fnmatch
 import numpy as np
+from .hdf5 import HDF5
 from .io import GalacticusHDF5
 from .Luminosities import Get_Luminosity
 from .constants import speedOfLight,luminositySolar,luminosityAB,angstrom
 from .utils import natural_sort_key
+from .config import *
+
+##########################################################
+# EMISSION LINES CLASS
+##########################################################
+
+
+class emissionLines(HDF5):
+    
+    def __init__(self):
+        
+        classname = self.__class__.__name__
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        
+        # Initalise HDF5 class and open emissionLines.hdf5 file
+        super(emissionLines, self).__init__(galacticusPath+"/data/hiiRegions/emissionLines.hdf5",'r')
+        
+        # Extract names and properties of lines
+        self.lines = map(str,self.fileObj["lines"].keys())        
+        self.wavelengths = {}
+        for l in self.lines:
+            self.wavelengths[l] = self.readAttributes("lines/"+l,required=["wavelength"])["wavelength"]
+        
+        return
+
 
 ##########################################################
 # MISC. FUNCTIONS
