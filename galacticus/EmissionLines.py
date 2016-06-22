@@ -7,7 +7,7 @@ from .hdf5 import HDF5
 from .io import GalacticusHDF5
 from .Luminosities import Get_Luminosity
 from .constants import speedOfLight,luminositySolar,luminosityAB,angstrom
-from .utils import natural_sort_key
+from .utils.sorting import natural_sort_key
 from .config import *
 
 ##########################################################
