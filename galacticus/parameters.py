@@ -112,13 +112,32 @@ class GalacticusParameters(object):
             self.parent_map[param] = parent_elem
         return
 
-    def write(self,ofile):
+    def write(self,ofile,format=True):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         self.tree.write(ofile)
+        if format:
+            formatParametersFile(ifile)
+        return
 
+####################################################################            
 
 def validate_parameters(xmlfile,GALACTICUS_ROOT):
     script = GALACTICUS_ROOT+"/scripts/aux/validateParameters.pl"
     os.system(script+" "+xmlfile)
     return
 
+
+def formatParametersFile(ifile,ofile=None):    
+    import shutil
+    tmpfile = ifile.replace(".xml","_copy.xml")
+    if ofile is not None:
+        cmd = "xmllint --format "+ifile+" > "+ofile
+    else:
+        cmd = "xmllint --format "+ifile+" > "+tmpfile
+    os.system(cmd)
+    if ofile is None:
+        shutil.move(tmpfile,ifile)        
+    return
+
+
+####################################################################
