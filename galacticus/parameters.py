@@ -116,7 +116,7 @@ class GalacticusParameters(object):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         self.tree.write(ofile)
         if format:
-            formatParametersFile(ifile)
+            formatParametersFile(ofile)
         return
 
 ####################################################################            
