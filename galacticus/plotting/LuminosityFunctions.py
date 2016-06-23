@@ -41,7 +41,7 @@ class LuminosityFunction(object):
         return
 
 
-def EmissionLine(ifile,z,line,ofile=None,lumbins=None,dust=False,frame="rest",ergs=False,disks=False,spheroids=False):
+def EmissionLine(ifile,z,line,ofile=None,lumbins=None,dust=None,frame="rest",ergs=False,disks=False,spheroids=False):
     funcname = sys._getframe().f_code.co_name    
     if ofile is None:
         ofile = ifile.split("/")
@@ -58,6 +58,8 @@ def EmissionLine(ifile,z,line,ofile=None,lumbins=None,dust=False,frame="rest",er
         search = search + "rest*"
     elif fnmatch.fnmatch(frame.lower(),"o*"):
         search = search + "observed*"
+    if dust is not None:
+        search = search + ":"+dust+"*"
 
     # Read galaxies information
     G = GalacticusHDF5(ifile,'r')
@@ -67,9 +69,11 @@ def EmissionLine(ifile,z,line,ofile=None,lumbins=None,dust=False,frame="rest",er
 
     # Set luminosity bins
     if lumbins is None:
-        lumbins = np.arange(0.0,8.0,0.1)
+        lumbins = np.arange(6.0,8.0,0.1)
         if ergs:
             lumbins += np.log10(Lsol) - factor
+
+
 
     # Create axis labels
     latex = getLatexName(line)
