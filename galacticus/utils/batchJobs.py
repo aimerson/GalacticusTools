@@ -26,7 +26,7 @@ class SLURMjob(object):
         self.manager = "SLURM"                
         # Get job name and ID and identify whether job array
         self.jobName = getBatchVariable("SLURM_JOB_NAME",verbose=verbose,manager=self.manager)
-        if self.jobName == "sh":
+        if self.jobName is None or self.jobName == "sh":
             self.interactive = True
         else:
             self.interactive = False
@@ -84,7 +84,7 @@ class PBSjob(object):
 
         # Get job name and ID and identify whether job array
         self.jobName = getBatchVariable("PBS_JOBNAME",verbose=verbose,manager=self.manager)
-        if self.jobName == "STDIN":
+        if self.jobName is None or self.jobName == "STDIN":
             self.interactive = True
         else:
             self.interactive = False
