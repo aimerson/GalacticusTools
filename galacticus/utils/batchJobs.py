@@ -63,9 +63,16 @@ class SLURMjob(object):
             self.minTaskID = None
             self.maxTaskID = None
         # Get nodes information
-        self.nodes = int(getBatchVariable("SLURM_JOB_NUM_NODES",verbose=verbose,manager=self.manager))
-        self.ppn = int(getBatchVariable("SLURM_JOB_CPUS_PER_NODE",verbose=verbose,manager=self.manager))
-        self.cpus = int(self.nodes)*int(self.ppn)
+        self.nodes = getBatchVariable("SLURM_JOB_NUM_NODES",verbose=verbose,manager=self.manager)
+        self.ppn = getBatchVariable("SLURM_JOB_CPUS_PER_NODE",verbose=verbose,manager=self.manager)
+        if self.nodes is not None:
+            self.nodes = int(self.nodes)
+        if self.ppn is not None:            
+            self.ppn = int(self.ppn)
+        if self.nodes is not None and self.ppn is not None:            
+            self.cpus = self.nodes*self.ppn
+        else:
+            self.cpus = None
         return
 
 
@@ -113,12 +120,17 @@ class PBSjob(object):
             self.minTaskID = None
             self.maxTaskID = None
         # Get nodes information
-        nodes = np.loadtxt(os.environ["PBS_NODEFILE"],dtype=str)
-        self.nodes = len(np.unique(nodes))        
-        self.ppn = len(nodes[nodes==nodes[0]])
-        self.cpus = len(nodes)        
-        del nodes
-               
+        nodefile = getBatchVariable("PBS_NODEFILE",verbose=False,manager=self.manager)
+        if nodefile is not None:
+            nodes = np.loadtxt(nodefile,dtype=str)
+            self.nodes = len(np.unique(nodes))        
+            self.ppn = len(nodes[nodes==nodes[0]])
+            self.cpus = len(nodes)        
+            del nodes
+        else:
+            self.nodes = None
+            self.ppn = None
+            self.cpus = None
         return
 
 
