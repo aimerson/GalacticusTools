@@ -135,6 +135,53 @@ class PBSjob(object):
 
 
 
+def submitSLURM(script,args=None,PARTITION=None,QOS=None,WALLTIME=None,JOBNAME=None,LOGDIR=None,RUNS=None,\
+                    NODES=1,TASKS=None,CPUS=None,ACCOUNT=None,WORKDIR=None,LICENSE=None,verbose=False,submit=True):
+    import sys,os,getpass,fnmatch,subprocess,glob
+    sjob = "sbatch "
+    if PARTITION is not None:
+        sjob = sjob + " -p "+PARTITION
+    if QOS is not None:
+        sjob = sjob + " --qos="+QOS
+    if JOBNAME is not None:
+        sjob = sjob + " -J "+JOBNAME
+    if LOGDIR is None:
+        pwd = subprocess.check_output(["pwd"]).replace("\n","")
+        LOGDIR = pwd + "/logs"
+        subprocess.call(["mkdir","-p",logdir])
+    sjob = sjob + " -o "+LOGDIR + " -i "
+    if WALLTIME is not None:
+        sjob = sjob + " -t " + WALLTIME
+    if ACCOUNT is not None:
+        sjob = sjob + "-A " + ACCOUNT
+    if NODES is None:
+        NODES = 1
+    sjob = sjob + " -N " + str(NODES)
+    if TASKS is not None:
+        sjob = sjob + " --ntasks-per-node="+str(TASKS)
+    if CPUS is not None:
+        sjob = sjob + " --cpus-per-task="+str(CPUS)
+    if WORKDIR is not None:
+        sjob = sjob + " --workdir="+WORKDIR
+    if LICENSE is not None:
+        sjob = sjob + " -L "+LICENSE
+    if args is not None:
+        for k in args.keys():
+            sjob = sjob + " --export="+k+"="+str(args[k])
+    sjob = sjob + " "+script
+    if verbose:
+        print(" Submitting SLURM job: "+sjob)
+    if submit:
+        os.system(sjob)
+    return
+
+
+
+
+
+
+
+
 
 
 
