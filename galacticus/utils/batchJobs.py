@@ -18,7 +18,9 @@ def getBatchVariable(variable,verbose=False,manager=None):
             print(variable+" = "+str(value))                
     return value    
     
-
+########################################################################################################
+#   SLURM classes/functions
+########################################################################################################
 
 class SLURMjob(object):
     
@@ -78,6 +80,65 @@ class SLURMjob(object):
         return
 
 
+
+def submitSLURM(script,args=None,PARTITION=None,QOS=None,WALLTIME=None,JOBNAME=None,LOGDIR=None,RUNS=None,\
+                    NODES=1,TASKS=None,CPUS=None,ACCOUNT=None,WORKDIR=None,LICENSE=None,mergeOE=False,verbose=False,submit=True):
+    import sys,os,getpass,fnmatch,subprocess,glob
+    sjob = "sbatch "
+    if PARTITION is not None:
+        sjob = sjob + " -p "+PARTITION
+    if QOS is not None:
+        sjob = sjob + " --qos="+QOS
+    if WALLTIME is not None:
+        sjob = sjob + " --time " + WALLTIME
+    if JOBNAME is not None:
+        sjob = sjob + " -J "+JOBNAME
+    if LOGDIR is not None:
+        subprocess.call(["mkdir","-p",LOGDIR])        
+        if JOBNAME is None:
+            filename = 'slurm'
+        else:
+            filename = JOBNAME   
+        filename = filename +'-%J'
+        out = LOGDIR+"/"+filename+'.out'
+        out.encode()
+        err = LOGDIR+"/"+filename+'.err'
+        err.encode()        
+        joint = LOGDIR+"/"+filename+'.out'
+        joint.encode()
+        if mergeOE:
+            sjob = sjob + " -i "+joint
+        else:
+            sjob = sjob + " --output "+out + " --error "+ err
+    if ACCOUNT is not None:
+        sjob = sjob + "-A " + ACCOUNT
+    if NODES is None:
+        NODES = 1
+    sjob = sjob + " -N " + str(NODES)
+    if TASKS is not None:
+        sjob = sjob + " --ntasks-per-node="+str(TASKS)
+    if CPUS is not None:
+        sjob = sjob + " --cpus-per-task="+str(CPUS)
+    if WORKDIR is not None:
+        sjob = sjob + " --workdir="+WORKDIR
+    if LICENSE is not None:
+        sjob = sjob + " -L "+LICENSE
+    if args is not None:
+        for k in args.keys():
+            sjob = sjob + " --export="+k+"="+str(args[k])
+    sjob = sjob + " "+script
+    if verbose:
+        print(" Submitting SLURM job: "+sjob)
+    if submit:
+        os.system(sjob)
+    return
+
+
+
+
+########################################################################################################
+#   PBS classes/functions
+########################################################################################################
 
 class PBSjob(object):
     
@@ -141,58 +202,52 @@ class PBSjob(object):
         return
 
 
-
-def submitSLURM(script,args=None,PARTITION=None,QOS=None,WALLTIME=None,JOBNAME=None,LOGDIR=None,RUNS=None,\
-                    NODES=1,TASKS=None,CPUS=None,ACCOUNT=None,WORKDIR=None,LICENSE=None,mergeOE=False,verbose=False,submit=True):
+def submitPBS(script,args=None,QUEUE=None,PRIORITY=None,WALLTIME=None,JOBNAME=None,LOGDIR=None,RUNS=None,SHELL="/bin/tcsh",\
+                    NODES=None,PPN=None,ACCOUNT=None,WORKDIR=None,LICENSE=None,mergeOE=False,verbose=False,submit=True):
     import sys,os,getpass,fnmatch,subprocess,glob
-    sjob = "sbatch "
-    if PARTITION is not None:
-        sjob = sjob + " -p "+PARTITION
-    if QOS is not None:
-        sjob = sjob + " --qos="+QOS
-    if WALLTIME is not None:
-        sjob = sjob + " --time " + WALLTIME
+    job = "qsub -V "
+    if QUEUE is not None:
+        job = job + " -q "+QUEUE
+    if RUNS is not None:
+        if type(RUNS) is list:
+            RUNS = ",".join(map(str,RUNS))
+        job = job + " -J " + str(RUNS)
+    job = job + " -S "+SHELL
     if JOBNAME is not None:
-        sjob = sjob + " -J "+JOBNAME
-    if LOGDIR is not None:
-        subprocess.call(["mkdir","-p",LOGDIR])        
-        if JOBNAME is None:
-            filename = 'slurm'
-        else:
-            filename = JOBNAME   
-        filename = filename +'-%J'
-        out = LOGDIR+"/"+filename+'.out'
-        out.encode()
-        err = LOGDIR+"/"+filename+'.err'
-        err.encode()        
-        joint = LOGDIR+"/"+filename+'.out'
-        joint.encode()
-        if mergeOE:
-            sjob = sjob + " -i "+joint
-        else:
-            sjob = sjob + " --output "+out + " --error "+ err
+        job = job + " -N "+JOBNAME
     if ACCOUNT is not None:
-        sjob = sjob + "-A " + ACCOUNT
-    if NODES is None:
-        NODES = 1
-    sjob = sjob + " -N " + str(NODES)
-    if TASKS is not None:
-        sjob = sjob + " --ntasks-per-node="+str(TASKS)
-    if CPUS is not None:
-        sjob = sjob + " --cpus-per-task="+str(CPUS)
+        job = job + "-A " + ACCOUNT        
+    if WALLTIME is not None:
+        job = job + " -l walltime=" + str(WALLTIME)
     if WORKDIR is not None:
-        sjob = sjob + " --workdir="+WORKDIR
-    if LICENSE is not None:
-        sjob = sjob + " -L "+LICENSE
+        job = job + " -d "+WORKDIR
+    if LOGDIR is not None:
+        subprocess.call(["mkdir","-p",LOGDIR])                
+        out = LOGDIR
+        err = LOGDIR
+        job = job + " -o "+out + " -e "+ err
+        if mergeOE:
+            job = job + " -j oe "
+    if PRIORITY is not None:
+        job = job + " -p "+str(PRIORITY)
+    if NODES is not None and PPN is not None:
+        job = job + " -l nodes=" + str(NODES) + ":ppn=" + str(PPN)
     if args is not None:
+        job = job + " -v "
+        firstArg = True
         for k in args.keys():
-            sjob = sjob + " --export="+k+"="+str(args[k])
-    sjob = sjob + " "+script
+            if firstArg:
+                job = job + k+"="+str(args[k])
+                firstArg = False
+            else:
+                job = job + ","+k+"="+str(args[k])
+    job = job + " "+script
     if verbose:
-        print(" Submitting SLURM job: "+sjob)
+        print(" Submitting PBS job: "+job)
     if submit:
-        os.system(sjob)
+        os.system(job)
     return
+
 
 
 
