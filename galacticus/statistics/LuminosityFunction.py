@@ -136,7 +136,7 @@ class EuclidModel2(object):
 
 class EuclidModel3(object):
 
-    def __init__(self,alpha=-1.45,beta=31.8,gamma=0.86,phistar=10.0**-2.62,lstarinf=10**42.44,lstarhalf=10**41.56)
+    def __init__(self,alpha=-1.45,beta=31.8,gamma=0.86,phistar=10.0**-2.62,lstarinf=10**42.44,lstarhalf=10**41.56):
         self.number = 3
         self.name = "Hirata"
         self.alpha = alpha

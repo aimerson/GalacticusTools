@@ -67,7 +67,9 @@ class SLURMjob(object):
         self.ppn = getBatchVariable("SLURM_JOB_CPUS_PER_NODE",verbose=verbose,manager=self.manager)
         if self.nodes is not None:
             self.nodes = int(self.nodes)
-        if self.ppn is not None:            
+        if self.ppn is not None:                        
+            if not self.ppn.isdigit():
+                self.ppn = self.ppn.split("(")[0]
             self.ppn = int(self.ppn)
         if self.nodes is not None and self.ppn is not None:            
             self.cpus = self.nodes*self.ppn
