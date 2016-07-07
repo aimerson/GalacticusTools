@@ -136,22 +136,34 @@ class PBSjob(object):
 
 
 def submitSLURM(script,args=None,PARTITION=None,QOS=None,WALLTIME=None,JOBNAME=None,LOGDIR=None,RUNS=None,\
-                    NODES=1,TASKS=None,CPUS=None,ACCOUNT=None,WORKDIR=None,LICENSE=None,verbose=False,submit=True):
+                    NODES=1,TASKS=None,CPUS=None,ACCOUNT=None,WORKDIR=None,LICENSE=None,mergeOE=False,verbose=False,submit=True):
     import sys,os,getpass,fnmatch,subprocess,glob
     sjob = "sbatch "
     if PARTITION is not None:
         sjob = sjob + " -p "+PARTITION
     if QOS is not None:
         sjob = sjob + " --qos="+QOS
+    if WALLTIME is not None:
+        sjob = sjob + " --time " + WALLTIME
     if JOBNAME is not None:
         sjob = sjob + " -J "+JOBNAME
-    if LOGDIR is None:
-        pwd = subprocess.check_output(["pwd"]).replace("\n","")
-        LOGDIR = pwd + "/logs"
-        subprocess.call(["mkdir","-p",logdir])
-    sjob = sjob + " -o "+LOGDIR + " -i "
-    if WALLTIME is not None:
-        sjob = sjob + " -t " + WALLTIME
+    if LOGDIR is not None:
+        subprocess.call(["mkdir","-p",LOGDIR])        
+        if JOBNAME is None:
+            filename = 'slurm'
+        else:
+            filename = JOBNAME   
+        filename = filename +'-%J'
+        out = LOGDIR+"/"+filename+'.out'
+        out.encode()
+        err = LOGDIR+"/"+filename+'.err'
+        err.encode()        
+        joint = LOGDIR+"/"+filename+'.out'
+        joint.encode()
+        if mergeOE:
+            sjob = sjob + " -i "+joint
+        else:
+            sjob = sjob + " --output "+out + " --error "+ err
     if ACCOUNT is not None:
         sjob = sjob + "-A " + ACCOUNT
     if NODES is None:
