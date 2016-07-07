@@ -125,9 +125,14 @@ class PBSjob(object):
         nodefile = getBatchVariable("PBS_NODEFILE",verbose=False,manager=self.manager)
         if nodefile is not None:
             nodes = np.loadtxt(nodefile,dtype=str)
-            self.nodes = len(np.unique(nodes))        
-            self.ppn = len(nodes[nodes==nodes[0]])
-            self.cpus = len(nodes)        
+            if np.ndim(nodes) == 0:
+                self.nodes = 1
+                self.ppn = 1
+                self.cpus = 1
+            else:
+                self.nodes = len(np.unique(nodes))        
+                self.ppn = len(nodes[nodes==nodes[0]])
+                self.cpus = len(nodes)        
             del nodes
         else:
             self.nodes = None
