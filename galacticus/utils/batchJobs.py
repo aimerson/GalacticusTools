@@ -203,7 +203,7 @@ class PBSjob(object):
 
 
 def submitPBS(script,args=None,QUEUE=None,PRIORITY=None,WALLTIME=None,JOBNAME=None,LOGDIR=None,RUNS=None,SHELL="/bin/tcsh",\
-                    NODES=None,PPN=None,ACCOUNT=None,WORKDIR=None,LICENSE=None,mergeOE=False,verbose=False,submit=True):
+                    NODES=None,PPN=None,ACCOUNT=None,mergeOE=True,verbose=False,submit=True):
     import sys,os,getpass,fnmatch,subprocess,glob
     job = "qsub -V "
     if QUEUE is not None:
@@ -219,8 +219,6 @@ def submitPBS(script,args=None,QUEUE=None,PRIORITY=None,WALLTIME=None,JOBNAME=No
         job = job + "-A " + ACCOUNT        
     if WALLTIME is not None:
         job = job + " -l walltime=" + str(WALLTIME)
-    if WORKDIR is not None:
-        job = job + " -d "+WORKDIR
     if LOGDIR is not None:
         subprocess.call(["mkdir","-p",LOGDIR])                
         out = LOGDIR
