@@ -5,7 +5,7 @@ import numpy as np
 from .utils import *
 from ..io import GalacticusHDF5
 from ..constants import luminositySolar,erg
-from ..emlines import getLatexName
+from ..EmissionLines import getLatexName
 
 class LuminosityFunction(object):
 
