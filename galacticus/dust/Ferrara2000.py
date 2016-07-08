@@ -8,7 +8,6 @@ from ..config import *
 from ..utils.progress import Progress
 
 
-
 def loadDiskAttenuation(component,verbose=False):               
     data = {}
     data["attenuation"] = None       
@@ -79,12 +78,6 @@ def loadSpheroidAttenuation(component,verbose=False):
 
 
 
-
-
-
-
-
-
 class dustAtlas(object):
     
     def __init__(self,verbose=False):
@@ -92,8 +85,7 @@ class dustAtlas(object):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Set verbosity
-        self.verbose = verbose
-        
+        self.verbose = verbose        
         # Load dust atlas file
         self.dustFile = galacticusPath + "data/dust/atlasFerrara2000/attenuations_MilkyWay_dustHeightRatio1.0.xml"
         if not os.path.exists(self.dustFile):
@@ -108,16 +100,17 @@ class dustAtlas(object):
         # Load wavelengths
         if self.verbose:
             print(classname+"(): extracting wavelengths...")
-        self.wavelengths = np.copy([ float(lam.text) for lam in self.dustMap["wavelengths"].iter("lambda")])
-        
+        self.wavelengths = np.copy([ float(lam.text) for lam in self.dustMap["wavelengths"].iter("lambda")])        
         # Load attenuations for components
+        self.diskAttenuation = None
+        self.spheroidAttenuation = None
         for comp in self.dustData.iter("components"):
             if comp.find("name").text == "bulge":                
                 if self.verbose:
                     print(classname+"(): loading spheroid attenuations...")
-                self.spheroidAttenuations = loadSpheroidAttenuation(comp,verbose=self.verbose)
+                self.spheroidAttenuation = loadSpheroidAttenuation(comp,verbose=self.verbose)
             else:
                 if self.verbose:
                     print(classname+"(): loading disk attenuations...")
                 self.diskAttenuation = loadDiskAttenuation(comp,verbose=self.verbose)
-                
+        
