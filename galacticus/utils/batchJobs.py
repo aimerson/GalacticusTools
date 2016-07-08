@@ -18,7 +18,9 @@ def getBatchVariable(variable,verbose=False,manager=None):
             print(variable+" = "+str(value))                
     return value    
     
-
+########################################################################################################
+#   SLURM classes/functions
+########################################################################################################
 
 class SLURMjob(object):
     
@@ -79,64 +81,6 @@ class SLURMjob(object):
 
 
 
-class PBSjob(object):
-    
-    def __init__(self,verbose=False):
-        self.manager = "PBS"
-
-        # Get job name and ID and identify whether job array
-        self.jobName = getBatchVariable("PBS_JOBNAME",verbose=verbose,manager=self.manager)
-        if self.jobName is None or self.jobName == "STDIN":
-            self.interactive = True
-        else:
-            self.interactive = False
-        try:
-            jobID = os.environ["PBS_ARRAYID"]
-        except KeyError:
-            self.jobID = getBatchVariable("PBS_JOBID",verbose=verbose,manager=self.manager)
-            self.jobArray = False
-        else:
-            jobID = getBatchVariable("PBS_ARRAY_ID",verbose=verbose,manager=self.manager)
-            self.jobArray = True
-        # Get user ID
-        self.userID = getBatchVariable("PBS_O_LOGNAME",verbose=verbose,manager=self.manager)
-        # Get machine and queue
-        self.machine = getBatchVariable("PBS_O_HOST",verbose=verbose,manager=self.manager)
-        self.queue = getBatchVariable("PBS_QUEUE",verbose=verbose,manager=self.manager)
-        # Get submission dir
-        self.submitDir = getBatchVariable("PBS_O_WORKDIR",verbose=verbose,manager=self.manager)
-        self.workDir = getBatchVariable("PBS_O_WORKDIR",verbose=verbose,manager=self.manager)
-        # Store variables for job array
-        if self.jobArray:
-            self.jobArrayID = getBatchVariable("PBS_ARRAY_INDEX",verbose=verbose,manager=self.manager)
-            self.taskID = self.jobArrayID
-            self.minJobArrayID = None
-            self.minTaskID = None
-            self.maxJobArrayID = None
-            self.maxTaskID = None
-        else:
-            self.jobArrayID = None
-            self.taskID = None
-            self.minJobArrayID = None
-            self.maxJobArrayID = None
-            self.minTaskID = None
-            self.maxTaskID = None
-        # Get nodes information
-        nodefile = getBatchVariable("PBS_NODEFILE",verbose=False,manager=self.manager)
-        if nodefile is not None:
-            nodes = np.loadtxt(nodefile,dtype=str)
-            self.nodes = len(np.unique(nodes))        
-            self.ppn = len(nodes[nodes==nodes[0]])
-            self.cpus = len(nodes)        
-            del nodes
-        else:
-            self.nodes = None
-            self.ppn = None
-            self.cpus = None
-        return
-
-
-
 def submitSLURM(script,args=None,PARTITION=None,QOS=None,WALLTIME=None,JOBNAME=None,LOGDIR=None,RUNS=None,\
                     NODES=1,TASKS=None,CPUS=None,ACCOUNT=None,WORKDIR=None,LICENSE=None,mergeOE=False,verbose=False,submit=True):
     import sys,os,getpass,fnmatch,subprocess,glob
@@ -188,6 +132,120 @@ def submitSLURM(script,args=None,PARTITION=None,QOS=None,WALLTIME=None,JOBNAME=N
     if submit:
         os.system(sjob)
     return
+
+
+
+
+########################################################################################################
+#   PBS classes/functions
+########################################################################################################
+
+class PBSjob(object):
+    
+    def __init__(self,verbose=False):
+        self.manager = "PBS"
+
+        # Get job name and ID and identify whether job array
+        self.jobName = getBatchVariable("PBS_JOBNAME",verbose=verbose,manager=self.manager)
+        if self.jobName is None or self.jobName == "STDIN":
+            self.interactive = True
+        else:
+            self.interactive = False
+        try:
+            jobID = os.environ["PBS_ARRAYID"]
+        except KeyError:
+            self.jobID = getBatchVariable("PBS_JOBID",verbose=verbose,manager=self.manager)
+            self.jobArray = False
+        else:
+            jobID = getBatchVariable("PBS_ARRAY_ID",verbose=verbose,manager=self.manager)
+            self.jobArray = True
+        # Get user ID
+        self.userID = getBatchVariable("PBS_O_LOGNAME",verbose=verbose,manager=self.manager)
+        # Get machine and queue
+        self.machine = getBatchVariable("PBS_O_HOST",verbose=verbose,manager=self.manager)
+        self.queue = getBatchVariable("PBS_QUEUE",verbose=verbose,manager=self.manager)
+        # Get submission dir
+        self.submitDir = getBatchVariable("PBS_O_WORKDIR",verbose=verbose,manager=self.manager)
+        self.workDir = getBatchVariable("PBS_O_WORKDIR",verbose=verbose,manager=self.manager)
+        # Store variables for job array
+        if self.jobArray:
+            self.jobArrayID = getBatchVariable("PBS_ARRAY_INDEX",verbose=verbose,manager=self.manager)
+            self.taskID = self.jobArrayID
+            self.minJobArrayID = None
+            self.minTaskID = None
+            self.maxJobArrayID = None
+            self.maxTaskID = None
+        else:
+            self.jobArrayID = None
+            self.taskID = None
+            self.minJobArrayID = None
+            self.maxJobArrayID = None
+            self.minTaskID = None
+            self.maxTaskID = None
+        # Get nodes information
+        nodefile = getBatchVariable("PBS_NODEFILE",verbose=False,manager=self.manager)
+        if nodefile is not None:
+            nodes = np.loadtxt(nodefile,dtype=str)
+            if np.ndim(nodes) == 0:
+                self.nodes = 1
+                self.ppn = 1
+                self.cpus = 1
+            else:
+                self.nodes = len(np.unique(nodes))        
+                self.ppn = len(nodes[nodes==nodes[0]])
+                self.cpus = len(nodes)        
+            del nodes
+        else:
+            self.nodes = None
+            self.ppn = None
+            self.cpus = None
+        return
+
+
+def submitPBS(script,args=None,QUEUE=None,PRIORITY=None,WALLTIME=None,JOBNAME=None,LOGDIR=None,RUNS=None,SHELL="/bin/tcsh",\
+                    NODES=None,PPN=None,ACCOUNT=None,mergeOE=True,verbose=False,submit=True):
+    import sys,os,getpass,fnmatch,subprocess,glob
+    job = "qsub -V "
+    if QUEUE is not None:
+        job = job + " -q "+QUEUE
+    if RUNS is not None:
+        if type(RUNS) is list:
+            RUNS = ",".join(map(str,RUNS))
+        job = job + " -J " + str(RUNS)
+    job = job + " -S "+SHELL
+    if JOBNAME is not None:
+        job = job + " -N "+JOBNAME
+    if ACCOUNT is not None:
+        job = job + "-A " + ACCOUNT        
+    if WALLTIME is not None:
+        job = job + " -l walltime=" + str(WALLTIME)
+    if LOGDIR is not None:
+        subprocess.call(["mkdir","-p",LOGDIR])                
+        out = LOGDIR
+        err = LOGDIR
+        job = job + " -o "+out + " -e "+ err
+        if mergeOE:
+            job = job + " -j oe "
+    if PRIORITY is not None:
+        job = job + " -p "+str(PRIORITY)
+    if NODES is not None and PPN is not None:
+        job = job + " -l nodes=" + str(NODES) + ":ppn=" + str(PPN)
+    if args is not None:
+        job = job + " -v "
+        firstArg = True
+        for k in args.keys():
+            if firstArg:
+                job = job + k+"="+str(args[k])
+                firstArg = False
+            else:
+                job = job + ","+k+"="+str(args[k])
+    job = job + " "+script
+    if verbose:
+        print(" Submitting PBS job: "+job)
+    if submit:
+        os.system(job)
+    return
+
 
 
 

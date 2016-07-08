@@ -7,53 +7,47 @@ import datetime
 import numpy as np
 user = getpass.getuser()
 
-try:
-    pwd = os.environ["PBS_O_WORKDIR"]
-except KeyError:
-    pwd = subprocess.check_output(["pwd"]).replace("\n","")   
 
-sys.path.append(pwd)
-from parameter_options import *
 from galacticus.parameters import validate_parameters
 from galacticus.utils.timing import STOPWATCH
+from galacticus.utils.batchJobs import SLURMjob,PBSjob
 
+print("#########################################")
+print("#         GALACTICUS LOG FILE           #")
+print("#########################################")
+print("START TIME = "+str(datetime.datetime.now()))
+print("----------------------------------------")
+print("Batch job variables:")
+if len(fnmatch.filter(os.environ.keys(),"PBS*"))>0:
+    JOB = PBSjob(verbose=True)
+else:
+    JOB = SLURMjob(verbose=True)
+print("----------------------------------------")
+pwd = JOB.workDir
+if pwd is None:
+    pwd = subprocess.check_output(["pwd"]).replace("\n","")
+sys.path.append(pwd)
+from parameter_options import *
 
 #################################################################
 # BATCH JOB VARIABLES
 #################################################################
 
-# i) job name
-try:
-    jobID = os.environ["PBS_JOBNAME"]
-    print("JOB NAME = "+jobID)
-    batchjob = True
-    interactive = False
-except KeyError:
-    jobID = None
+if JOB.jobName is None:
     batchjob = False
-    interactive = True
-# ii) job array ID
-try:
-    jobArrayID = int(os.environ["PBS_ARRAY_INDEX"])
-    print("JOB INDEX = "+str(jobArrayID))
-except KeyError:
+jobArrayID = JOB.taskID
+if jobArrayID is None:
     jobArrayID = -1
-# iii) Job environment
-if batchjob:
-    environment = os.environ["PBS_ENVIRONMENT"]
-    print("JOB ENVIRONMENT = "+str(environment))
-    if fnmatch.fnmatch(environment,"*_INTERACTIVE"):
-        interactive = True
+if JOB.cpus is None:
+    NPROC = 1
+    NTOT = 1
+else:
+    NPROC = JOB.ppn
+    NTOT = JOB.cpus
+    print("Number of nodes = "+str(JOB.nodes))
+    print("Processors per nodes = "+str(JOB.ppn))
+    print("Total number of CPUS = "+str(JOB.cpus))
 sys.stdout.flush()
-
-# Get number of nodes
-if batchjob:
-    nodefile = os.environ["PBS_NODEFILE"]
-    nodes = np.loadtxt(nodefile,usecols=[0],dtype=str)
-    NPROC = nodes.size
-    print("Using "+str(NPROC)+" processors...")
-    sys.stdout.flush()
-
 
 #################################################################
 # INPUT ARGUMENTS
@@ -63,7 +57,7 @@ outdir = None
 compile = False
 PARAM = None
 JOB_ARRAY_SIZE = 1
-if not interactive:
+if not JOB.interactive:
     try:
         compile = bool(int(os.environ["compile"]))
     except KeyError:
@@ -96,9 +90,10 @@ else:
 #################################################################
 
 # Compile Galacticus?
-EXE = "Galacticus.exe"    
+EXE = "Galacticus.exe"
 GALACTICUS_ROOT = os.environ["GALACTICUS_ROOT_V094"]
 if compile:
+    print("----------------------------------------")
     print("WARNING! Compiling Galacticus!")
     S = STOPWATCH()
     print("GALACTICUS SOURCE DIRECTORY = "+GALACTICUS_ROOT)
@@ -107,13 +102,15 @@ if compile:
     sys.stdout.flush()
     os.system("make clean")
     os.system("make clean")
-    os.system("make "+EXE)
+    os.system("make -k -j "+str(NTOT)+" "+EXE)
     if not os.path.exists(EXE):
         print("*** ERROR! No Galacticus executable found!")
         sys.exit(1)
     else:
         print("COMPILATION COMPLETED SUCCESSFULLY!")
         S.stop()
+    print("----------------------------------------")
+    sys.stdout.flush()
 
 # Check parameter file specified
 if PARAM is None or PARAM == "None":
@@ -129,7 +126,7 @@ version = pwd.split("/")[-1]
 
 # Make output directory if not already provided
 if outdir is None:
-    outdir = "/nobackup0/sunglass/"+user+"/Galacticus_Out/"+version+"/"
+    outdir = "/nobackupNFS/sunglass/"+user+"/Galacticus_Out/"+version+"/"
     datestr = str(datetime.datetime.now()).split()[0].replace("-","")
     outdir = outdir + PARAM.replace(".xml","") + "/" + datestr
     subprocess.call(["mkdir","-p",outdir])
@@ -154,13 +151,15 @@ else:
 if os.path.exists(outdir+"/"+ofile):
     os.remove(outdir+"/"+ofile)
 
-
 # Run Galacticus
 os.chdir(outdir)
 print("Running "+EXE+"...")
 S = STOPWATCH()
 sys.stdout.flush()
-os.system(EXE+" "+PARAM)
+if JOB.manager.upper() == "SLURM":
+    os.system("srun -n 1 -c "+NPROC+" "+EXE+" "+PARAM)
+else:
+    os.system(EXE+" "+PARAM)
 sys.stdout.flush()
 print("COMPLETE (run_galacticus.py)")
 S.stop()
