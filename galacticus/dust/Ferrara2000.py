@@ -4,6 +4,8 @@ import sys,os
 import numpy as np
 import xml.etree.ElementTree as ET
 
+from ..io import GalacticusHDF5
+from ..GalacticusErrors import ParseError
 from ..config import *
 from ..utils.progress import Progress
 
@@ -80,8 +82,7 @@ def loadSpheroidAttenuation(component,verbose=False):
 
 class dustAtlas(object):
     
-    def __init__(self,verbose=False):
-        
+    def __init__(self,verbose=False):        
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Set verbosity
@@ -89,17 +90,17 @@ class dustAtlas(object):
         # Load dust atlas file
         self.dustFile = galacticusPath + "data/dust/atlasFerrara2000/attenuations_MilkyWay_dustHeightRatio1.0.xml"
         if not os.path.exists(self.dustFile):
-            raise IOError(classname+"(): cannot find Ferrara et al. (2000) dust atlas file!")
+            raise IOError(classname+"(): Cannot find Ferrara et al. (2000) dust atlas file!")
         else:
             if self.verbose:
-                print(classname+"(): loading Ferrara et al. (2000) dust atlas file...")
+                print(classname+"(): Loading Ferrara et al. (2000) dust atlas file...")
         self.dustData = ET.parse(self.dustFile)
         # Construct map of XML parents/descendents
         self.dustRoot = self.dustData.getroot()
         self.dustMap = {c.tag:p for p in self.dustRoot.iter() for c in p}        
         # Load wavelengths
         if self.verbose:
-            print(classname+"(): extracting wavelengths...")
+            print(classname+"(): Extracting wavelengths...")
         self.wavelengths = np.copy([ float(lam.text) for lam in self.dustMap["wavelengths"].iter("lambda")])        
         # Load attenuations for components
         self.diskAttenuation = None
@@ -107,10 +108,22 @@ class dustAtlas(object):
         for comp in self.dustData.iter("components"):
             if comp.find("name").text == "bulge":                
                 if self.verbose:
-                    print(classname+"(): loading spheroid attenuations...")
+                    print(classname+"(): Loading spheroid attenuations...")
                 self.spheroidAttenuation = loadSpheroidAttenuation(comp,verbose=self.verbose)
             else:
                 if self.verbose:
-                    print(classname+"(): loading disk attenuations...")
+                    print(classname+"(): Loading disk attenuations...")
                 self.diskAttenuation = loadDiskAttenuation(comp,verbose=self.verbose)
+        return
+
+    
         
+
+    def attenuation(self,galHDF5Obj,z,datasetName,overwrite=False):        
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        
+        # Get nearest redshift output
+        out = galHDF5Obj.selectOutput(z)
+        # Check if dust attenuated luminosity already calculated
+        if datasetName in galHDF5Obj.availableDatasets(z) and not overwrite:
+            return np.array(out["nodeData/"+datasetName])
