@@ -117,13 +117,12 @@ class dustAtlas(object):
         return
 
     
-        
-
-    def attenuation(self,galHDF5Obj,z,datasetName,overwrite=False):        
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        
+    def attenuate(self,galHDF5Obj,z,datasetName,overwrite=False):        
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         # Get nearest redshift output
         out = galHDF5Obj.selectOutput(z)
         # Check if dust attenuated luminosity already calculated
         if datasetName in galHDF5Obj.availableDatasets(z) and not overwrite:
             return np.array(out["nodeData/"+datasetName])
+        # Compute attenuation
+        pass # Still to do!

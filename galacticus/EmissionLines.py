@@ -17,21 +17,22 @@ from .config import *
 
 class emissionLines(HDF5):
     
-    def __init__(self):
-        
+    def __init__(self):        
         classname = self.__class__.__name__
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         # Initalise HDF5 class and open emissionLines.hdf5 file
-        super(emissionLines, self).__init__(galacticusPath+"/data/hiiRegions/emissionLines.hdf5",'r')
-        
+        super(emissionLines, self).__init__(galacticusPath+"/data/hiiRegions/emissionLines.hdf5",'r')        
         # Extract names and properties of lines
-        self.lines = map(str,self.fileObj["lines"].keys())        
+        self.lines = list(map(str,self.fileObj["lines"].keys()))
         self.wavelengths = {}
         for l in self.lines:
-            self.wavelengths[l] = self.readAttributes("lines/"+l,required=["wavelength"])["wavelength"]
-        
+            self.wavelengths[l] = self.readAttributes("lines/"+l,required=["wavelength"])["wavelength"]        
         return
+
+    def getWavelength(self,line):
+        index = self.lines.index(line)
+        return self.wavelengths[index]
+
 
 
 ##########################################################
