@@ -471,7 +471,7 @@ class ProgressDisplay:
 	if self.display == SINGLE_LINE:
 	    self.progress.print_status_line()
 	else:
-	    print self.progress.status_line()
+	    print(self.progress.status_line())
 	return self.iterator.next()
 
 def _test():
@@ -492,7 +492,7 @@ def _demo_walk():
 	    file = os.path.join(root, f)
 	    if os.path.exists(file):
 		size += os.path.getsize(file)
-    print size, "bytes in", top_dir
+    print(str(size)+" bytes in "+top_dir)
 
 def _demo_file():
     import os
@@ -532,9 +532,9 @@ def _demo_file():
     for type in types:
 	results.append((types[type], type))
     results.sort(reverse=True)
-    print "top 10 file types in %s:" % top_dir
+    print("top 10 file types in {0:s}:".format(top_dir))
     for result in results[:10]:
-	print "%d: %s" % (result)
+	print("{0:d}: {1:s}".format(result[0],result[1]))
 
 if __name__ == "__main__":
     failures = _test()[0]
