@@ -4,7 +4,7 @@ import sys,fnmatch
 import numpy as np
 import xml.etree.ElementTree as ET
 from .config import *
-
+from .EmissionLines import emissionLines
 
 def getTopHatLimits(wavelengthCentral,resolution,verbose=False):        
     funcname = sys._getframe().f_code.co_name
@@ -87,6 +87,7 @@ class GalacticusFilters(object):
             self.filtersDirectory = filtersDirectory
         self.effectiveWavelengths = {}
         self.filters = {}
+        self.emissionLinesClass = emissionLines()
         return
 
     def load(self,filterName,path=None,store=False,verbose=False):                
@@ -116,8 +117,13 @@ class GalacticusFilters(object):
                     wavelength = filterInfo[1]
                     resolution = filterInfo[2]
                 else:
-                    wavelength = filterInfo[2]
-                    resolution = filterInfo[3]
+                    if fnmatch.fnmatch(filterName,"*emissionLineContinuumCentral*"):
+                        wavelenght = self.emissionLinesClass.getWavelength(filterInfo[1])
+                        resolution = filterInfo[2]
+                        pass
+                    elif fnmatch.fnmatch(filterName,"*emissionLineContinuumOffset*"):
+                        wavelength = filterInfo[3]
+                        resolution = filterInfo[4]
                 if verbose:
                     infoLine = "filter={0:s}  wavelength={1:s}  resolution={2:s}".format(filter,wavelength,resolution)
                     print(funcname+"(): Top hat filter information:\n        "+infoLine)
