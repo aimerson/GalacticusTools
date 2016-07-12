@@ -2,6 +2,8 @@
 
 import sys,fnmatch
 import numpy as np
+from scipy.interpolate import interp1d
+from scipy.integrate import romb
 import xml.etree.ElementTree as ET
 from .config import *
 
@@ -23,14 +25,100 @@ def getTopHatLimits(wavelengthCentral,resolution,verbose=False):
 
 
 
+def getVegaSpectrum(specfile=None):
+    if specfile is None:
+        specfile = galacticusPath+"/data/stellarAstrophysics/vega/A0V_Castelli.xml"
+    # Load Vega spectrum
+    xmlStruct = ET.parse(specFile)
+    xmlRoot = xmlStruct.getroot()
+    xmlMap = {c.tag:p for p in xmlRoot.iter() for c in p} 
+    data = response.findall("datum")
+    spectrum = np.zeros(len(data),dtype=[("wavelength",float),("flux",float)])
+    for i,datum in enumerate(data):
+        spectrum["wavelength"][i] = float(datum.text.split()[0])
+        spectrum["flux"][i] = float(datum.text.split()[1])
+    isort = np.argsort(spectrum["wavelength"])
+    spectrum["wavelength"] = spectrum["wavelength"][isort]
+    spectrum["flux"] = spectrum["flux"][isort]
+    return spectrum.view(np.recarray)
+
+
+
+
 def computeEffectiveWavelength(wavelength,transmission):
     return np.sum(wavelength*transmission)/np.sum(transmission)
 
+
+def getFilterTransmission(filterFile):
+    # Open xml file and load structure
+    xmlStruct = ET.parse(filterFile)
+    xmlRoot = xmlStruct.getroot()
+    xmlMap = {c.tag:p for p in xmlRoot.iter() for c in p}
+    # Read filter transmission
+    response = xmlRoot.find("response")
+    data = response.findall("datum")
+    transmission = np.zeros(len(data),dtype=[("wavelength",float),("transmission",float)])
+    for i,datum in enumerate(data):
+        transmission["wavelength"][i] = float(datum.text.split()[0])
+        transmission["transmission"][i] = float(datum.text.split()[1])
+    return transmission.view(np.recarray)
+
+
+
+
+
+
+class VegaOffset(object):
+    
+    def __init__(self,VbandFilterFile=None):
+        if VbandFilterFile is None:
+            VbandFilterFile = galacticusPath+"/data/filters/Buser_V.xml"
+        self.transmissionV = getFilterTransmission(VbandFilterFile)
+        self.vegaSpectrum = getVegaSpectrum()
+        self.fluxVegaV = None
+        self.fluxABV = None
+        return
+
+    def computeFluxes(self,wavelength,transmission,kRomberg=100,**kwargs):        
+        # Interpolate spectrum and transmission data
+        wavelengthJoint = np.linspace(wavelength.min(),wavelength.max(),2*kRomberg+1)
+        deltaWavelength = wavelengthJoint[1] - wavelengthJoint[0]
+        interpolateTransmission = interp1d(wavelength,transmission,**kwargs)
+        interpolateFlux = interp1d(self.vegaSpectrum.wavelength,self.vegaSpectrum.flux,**kwargs)
+        transmissionJoint = interpolateTransmission(wavelengthJoint)
+        spectrumJoint = interpolateFlux(wavelengthJoint)
+        # Get AB spectrum
+        spectrumAB = 1.0/wavelengthJoint**2
+        # Get the filtered spectrum
+        filteredSpectrum = transmissionJoint*$spectrumJoint;
+        filteredSpectrumAB = transmissionJoint*$spectrumAB;
+        # Compute the integrated flux.        
+        fluxVega = romb(filteredSpectrum,dx=deltaWavelength)
+        fluxAB = romb(filteredSpectrumAB,dx=deltaWavelength)
+        return (fluxAB,fluxVega)
+
+    def computeOffset(self,wavelength,transmission,kRomberg=100,**kwargs):                
+        # Compute fluxes for V-band magnitude if not already computed
+        if self.fluxABV is None or self.fluxVegaV is None:
+            wavelengthV = self.transmissionV.wavelength
+            transmissionV = self.transmissionV.transmission
+            (ABV,VegaV) = self.computeFluxes(wavelengthV,transmissionV,\
+                                                 kRomberg=kRomberg,**kwargs)
+            self.fluxABV = ABV
+            self.fluxVegaV = VegaV
+            del wavelengthV,transmissionV
+        # Compute fluxes for specified filter
+        (fluxAB,fluxVega) = self.computeFluxes(wavelength,transmission,\
+                                                   kRomberg=kRomberg,**kwargs)
+        # Return Vega offset
+        return 2.5*np.log10(fluxVega*self.fluxABV/self.fluxVegaV/fluxAB)
+    
+        
 class Filter(object):    
-    def __init__(self,filterFile,verbose=False):
+    def __init__(self,filterFile,verbose=False,VegaObj=None,VbandFilterFile=None,kRomberg=100,**kwargs):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        self.file = filterFile
+        self.file = filterFile        
         if verbose:
             print(classname+"(): Reading filter file '"+self.file+"'...")
         # Open xml file and load structure
@@ -52,7 +140,13 @@ class Filter(object):
             self.effectiveWavelength = float(xmlRoot.find("effectiveWavelength").text)
         else:
             self.effectiveWavelength = computeEffectiveWavelength(self.transmission.wavelength,self.transmission.transmission)
-        self.vegaOffset = float(xmlRoot.find("vegaOffset").text)
+        if "vegaOffset" in xmlMap.keys():
+            self.vegaOffset = float(xmlRoot.find("vegaOffset").text)
+        else:
+            if VegaObj is None:
+                VegaObj = VegaOffset(VbandFilterFile=VbandFilterFile)
+            self.vegaOffset = VegaObj.computeOffset(self.transmission.wavelength,self.transmission.transmission,\
+                                                        kRomberg=kRomberg,**kwargs)
         if "url" in xmlMap.keys():
             self.url = xmlRoot.find("url").text
         else:
@@ -75,6 +169,7 @@ class Filter(object):
             print("".join(infoLine))
         return
             
+
         
 class GalacticusFilters(object):
     
