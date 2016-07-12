@@ -14,6 +14,8 @@ def select_parameters(paramfile,jobArrayID=-1,jobArraySize=1):
     reffile = "parameters_ref.xml"    
     GP = GalacticusParameters(reffile)    
     params = []
+    #params.append(("verbosityLevel",2))
+
 
     if fnmatch.fnmatch(paramfile.lower(),"emline_mc*.xml"):
         SDSS = "u g r i z".split()
@@ -27,8 +29,10 @@ def select_parameters(paramfile,jobArrayID=-1,jobArraySize=1):
             filters = filters + ["emissionLineContinuumPair_"+line+"_"+str(i) for i in resolutions]            
             filters = filters + ["emissionLineContinuumCentral_"+line+"_"+str(i) for i in resolutions]
         filters_type = ["rest"]*len(filters) +  ["observed"]*len(filters)        
-        params.append(("luminosityFilter",filters+filters))
-        params.append(("luminosityRedshift",["all"]*len(filters)+["all"]*len(filters)))
+        filters = filters + filters        
+        filters_postprocess = ["default", "recent"]
+        params.append(("luminosityFilter",filters))
+        params.append(("luminosityRedshift",["all"]*len(filters)))
         params.append(("luminosityType",filters_type))
         params.append(("spheroidOutputStarFormationRate","true"))
         params.append(("diskOutputStarFormationRate","true"))
@@ -39,7 +43,7 @@ def select_parameters(paramfile,jobArrayID=-1,jobArraySize=1):
 
         params.append(("outputDensityContrastData","true"))
         params.append(("outputDensityContrastValues",[200,500,1500])) # relative to background
-        params.append(("outputDensityContrastDarkOnly","false")) # 200,500,etc. relative to DM only or all matter
+        params.append(("outputDensityContrastDataDarkOnly","false")) # 200,500,etc. relative to DM only or all matter
         params.append(("outputDensityContrastHaloLoaded","true")) # include adiabatic contraction?        
         params.append(("outputVirialData","true")) # includes concentration, virial radius and velocity
         params.append(("hotHaloOutputCooling","true"))
@@ -64,7 +68,7 @@ def select_parameters(paramfile,jobArrayID=-1,jobArraySize=1):
         params.append(("outputHalfMassData","true"))
 
         params.append(("mergerTreeBuildHaloMassMinimum",1.0e12))
-        params.append(("mergerTreeBuildHaloMassMaximum",1.0e15))
+        params.append(("mergerTreeBuildHaloMassMaximum",2.0e15))
         params.append(("haloMassFunctionSamplingAbundanceMinimum",1.0e-3))
         params.append(("haloMassFunctionSamplingAbundanceMaximum",1.0e-6))
         params.append(("mergerTreeBuildTreesPerDecade",re.sub("[^0-9]", "",paramfile)))

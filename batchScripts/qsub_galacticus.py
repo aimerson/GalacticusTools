@@ -4,17 +4,19 @@ import sys,os,getpass,fnmatch,subprocess,glob
 import numpy as np
 import datetime
 
+from galacticus.utils.batchJobs import submitPBS
+
 user = getpass.getuser()
 pwd = subprocess.check_output(["pwd"]).replace("\n","")
 
 #######################################
 # PBS envinronment variables
 SHELL = "/bin/tcsh"
-QUEUE = "longq"  
+QUEUE = "shortq"  
 NODES = 1
 PROCS = 12
-RUNS = "1-2"
-WALLTIME = None
+RUNS = None # e.g. "1-100"
+WALLTIME = None # e.g. "08:00:00"
 #######################################
 
 compile = False
@@ -35,9 +37,18 @@ while iarg < len(sys.argv):
 if compile:
     RUNS = None
 
+# Set storage directory depending on system
+HOST = os.environ["HOST"]
+if HOST.lower == "zodiac":
+    # JPL
+    storeDir = "/nobackupNFS/sunglass/"
+else:
+    # NERSC
+    storeDir = "/global/projects/projectdir/hacc/"
+
 # Construct logs directory
 jobname = "galacticus"
-logdir = "/nobackup0/sunglass/"+user+"/logs/galacticus/"
+logdir = storeDir+user+"/logs/galacticus/"
 subprocess.call(["mkdir","-p",logdir])
 logfile = logdir + jobname
 if clrlogs:
@@ -49,38 +60,15 @@ if clrlogs:
 # Make output directory ofr array jobs
 if RUNS is not None:
     version = pwd.split("/")[-1]
-    outdir = "/nobackup0/sunglass/"+user+"/Galacticus_Out/"+version+"/"
+    outdir = storeDir+user+"/Galacticus_Out/"+version+"/"
     datestr = str(datetime.datetime.now()).split()[0].replace("-","")
     outdir = outdir + paramfile.replace(".xml","") + "/" + datestr
     subprocess.call(["mkdir","-p",outdir])
     print("OUTPUT DIRECTORY = "+outdir)    
     if not compile:
-        os.system("cp galacticus.exe "+outdir)
-else:
-    outdir = None
-
-# Submit job
-print("Submitting Galacticus job...")
-job = "qsub -V"
-if QUEUE is not None:
-    job = job + " -q " + QUEUE
-if RUNS is not None:
-    if type(RUNS) is list:
-        RUNS = ",".join(map(str,RUNS))
-    job = job + " -J " + str(RUNS)
-if NODES is not None and PROCS is not None:
-    job = job + " -l nodes=" + str(NODES) + ":ppn=" + str(PROCS)
-if WALLTIME is not None:
-    job = job + " -l walltime=" + str(WALLTIME)
-job = job + " -S "+SHELL
-#job = job + " -d " + pwd 
-job = job + " -N "+ jobname + " -o " + logdir + " -j oe"
-job = job + " -v compile=" + str(int(compile))+",paramfile="+str(paramfile)
-if outdir is not None:
-    job = job + ",outdir="+outdir
-if RUNS is not None:
-    if type(RUNS) == list:        
-        size = len(RUNS)
+        os.system("cp Galacticus.exe "+outdir)
+        if type(RUNS) == list:        
+            size = len(RUNS)
     else:
         size = 0
         allruns = RUNS.split(",")
@@ -91,10 +79,21 @@ if RUNS is not None:
                 size += (maxjob+1-minjob)
             else:
                 size += 1
-    job = job + ",JOB_ARRAY_SIZE="+str(size)
-job = job + " ./run_galacticus.py"
-print job
-os.system(job)
+    JOB_ARRAY_SIZE = size
+else:
+    outdir = None
+    JOB_ARRAY_SIZE = None
+
+
+# Submit job
+print("Submitting Galacticus job...")
+args = {"compile":str(int(compile)),"paramfile":paramfile}
+if outdir is not None:
+    args["outdir"] = outdir
+if JOB_ARRAY_SIZE is not None:
+    args["JOB_ARRAY_SIZE"] = JOB_ARRAY_SIZE
+submitPBS("run_galacticus.py",args=args,QUEUE=QUEUE,RUNS=RUNS,NODES=NODES,PPN=PROCS,WALLTIME=WALLTIME,\
+              SHELL=SHELL,JOBNAME=jobname,LOGDIR=logdir,verbose=True,submit=True)
 
 
 
