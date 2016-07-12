@@ -90,8 +90,8 @@ class VegaOffset(object):
         # Get AB spectrum
         spectrumAB = 1.0/wavelengthJoint**2
         # Get the filtered spectrum
-        filteredSpectrum = transmissionJoint*$spectrumJoint;
-        filteredSpectrumAB = transmissionJoint*$spectrumAB;
+        filteredSpectrum = transmissionJoint*spectrumJoint;
+        filteredSpectrumAB = transmissionJoint*spectrumAB;
         # Compute the integrated flux.        
         fluxVega = romb(filteredSpectrum,dx=deltaWavelength)
         fluxAB = romb(filteredSpectrumAB,dx=deltaWavelength)
