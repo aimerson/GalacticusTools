@@ -82,11 +82,12 @@ def loadSpheroidAttenuation(component,verbose=False):
 
 class dustAtlas(object):
     
-    def __init__(self,verbose=False):        
+    def __init__(self,verbose=False,debug=False):        
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Set verbosity
         self.verbose = verbose        
+        self.debug = debug
         # Load dust atlas file
         self.dustFile = galacticusPath + "data/dust/atlasFerrara2000/attenuations_MilkyWay_dustHeightRatio1.0.xml"
         if not os.path.exists(self.dustFile):
@@ -114,15 +115,71 @@ class dustAtlas(object):
                 if self.verbose:
                     print(classname+"(): Loading disk attenuations...")
                 self.diskAttenuation = loadDiskAttenuation(comp,verbose=self.verbose)
+        # Initialise classes for emission lines and filters
+        self.emissionLinesClass = emissionLines()
+        self.filtersDatabase = GalacticusFilters()
         return
 
     
-    def attenuate(self,galHDF5Obj,z,datasetName,overwrite=False):        
+    def attenuate(self,galHDF5Obj,z,datasetName,overwrite=False,\
+                      extrapolateInSize=True,extrapolateInTau=True):
+        
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         # Get nearest redshift output
         out = galHDF5Obj.selectOutput(z)
         # Check if dust attenuated luminosity already calculated
         if datasetName in galHDF5Obj.availableDatasets(z) and not overwrite:
             return np.array(out["nodeData/"+datasetName])
+        
+        ####################################################################
         # Compute attenuation
-        pass # Still to do!
+        if self.debug:
+            print(funcname+"(): Processing dataset '"+datasetName+"'")
+        if not fnmatch.fnmatch(datasetName,"*:dustAtlas*"):
+            raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
+        # Check if computing face on attenuation
+        dustExtension = ":dustAltas"
+        faceOn = False
+        if "faceOn" in datasetName:
+            dustExtension = dustExtension+"faceOn"
+            faceOn = True
+        # Get name of unattenuated dataset
+        luminosityDataset = datasetName.replace(dustExtension,"")
+        # Get component of dataset (disk or spheroid)
+        if luminosityDataset.startswith("disk"):
+            component = "disk"
+        elif luminosityDataset.startswith("spheroid"):
+            component = "spheroid"
+        else:
+            raise ParseError(funcname+"(): Cannot identify if '"+datasetName+"' corresponds to disk or spheroid!")
+        # Extract dataset information
+        datasetInfo = luminosityDataset.split(":")
+        opticalDepthOrLuminosity = datasetInfo[0].replace(component,"")
+        if "LineLuminosity" in datasetInfo[0]:
+            emissionLineFlag = True
+        else:
+            emissionLineFlag = False
+        filter = datasetInfo[1]
+        frame = datasetInfo[2]
+        redshift = datasetInfo[3].replace("z","")
+        if self.debug:
+            infoLine = "filter={0:s}  frame={1:s}  redshift={2:s}".format(filter,frame,redshift)
+            print(funcname+"(): Filter information:\n        "+infoLine)
+        # Construct filter label
+        filterLabel = filter+":"+frame+":z"+redshift
+        # Compute effective wavelength for filter/line
+        if emissionLineFlag:
+            # i) emission lines
+            effectiveWavelength = self.emissionLinesClass.getWavelength(filter)
+            if debug:
+                infoLine = "filter={0:s}  effectiveWavelength={1:s}".format(filter,effectiveWavelength)
+                print(funcname+"(): Emission line filter information:\n        "+infoLine)
+        else:
+            # ii) photometric filters
+            effectiveWavelength = self.filtersDatabase.getEffectiveWavelength(filter,verbose=self.debug)
+            if frame == "observed":
+                effectiveWavelength /= (1.0+float(redshift))
+            if self.debug:
+                infoLine = "filter={0:s}  effectiveWavelength={1:s}".format(filter,effectiveWavelength)
+                print(funcname+"(): Photometric filter information:\n        "+infoLine)
+        
