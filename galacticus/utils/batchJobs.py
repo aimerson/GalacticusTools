@@ -152,7 +152,7 @@ class PBSjob(object):
         else:
             self.interactive = False
         try:
-            jobID = os.environ["PBS_ARRAYID"]
+            jobID = os.environ["PBS_ARRAY_ID"]
         except KeyError:
             self.jobID = getBatchVariable("PBS_JOBID",verbose=verbose,manager=self.manager)
             self.jobArray = False
