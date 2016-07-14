@@ -1,13 +1,16 @@
 #! /usr/bin/env python
 
-import sys,os
+import sys,os,fnmatch
 import numpy as np
 import xml.etree.ElementTree as ET
 
 from ..io import GalacticusHDF5
+from ..EmissionLines import emissionLines
 from ..GalacticusErrors import ParseError
+from ..Filters import GalacticusFilters
 from ..config import *
 from ..utils.progress import Progress
+from ..constants import Pi,Parsec,massAtomic,massSolar,massFractionHydrogen
 
 
 def loadDiskAttenuation(component,verbose=False):               
@@ -82,14 +85,15 @@ def loadSpheroidAttenuation(component,verbose=False):
 
 class dustAtlas(object):
     
-    def __init__(self,verbose=False,debug=False):        
+    def __init__(self,verbose=False,debug=False,interpolateBoundsError=False,interpolateFillValue=None):        
+        from scipy.interpolate import RegularGridInterpolator
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Set verbosity
         self.verbose = verbose        
         self.debug = debug
         # Load dust atlas file
-        self.dustFile = galacticusPath + "data/dust/atlasFerrara2000/attenuations_MilkyWay_dustHeightRatio1.0.xml"
+        self.dustFile = galacticusPath + "/data/dust/atlasFerrara2000/attenuations_MilkyWay_dustHeightRatio1.0.xml"
         if not os.path.exists(self.dustFile):
             raise IOError(classname+"(): Cannot find Ferrara et al. (2000) dust atlas file!")
         else:
@@ -110,15 +114,41 @@ class dustAtlas(object):
             if comp.find("name").text == "bulge":                
                 if self.verbose:
                     print(classname+"(): Loading spheroid attenuations...")
-                self.spheroidAttenuation = loadSpheroidAttenuation(comp,verbose=self.verbose)
+                self.spheroidAttenuation = loadSpheroidAttenuation(comp,verbose=self.verbose)                
+                axes = (self.spheroidAttenuation["size"],self.spheroidAttenuation["inclination"],\
+                            self.spheroidAttenuation["opticalDepth"],self.wavelengths)                
+                self.spheroidInterpolator = RegularGridInterpolator(axes,self.spheroidAttenuation["attenuation"],\
+                                                                        bounds_error=interpolateBoundsError,\
+                                                                        fill_value=interpolateFillValue)
             else:
                 if self.verbose:
                     print(classname+"(): Loading disk attenuations...")
                 self.diskAttenuation = loadDiskAttenuation(comp,verbose=self.verbose)
+                axes = (self.diskAttenuation["inclination"],self.diskAttenuation["opticalDepth"],self.wavelengths)
+                self.diskInterpolator = RegularGridInterpolator(axes,self.diskAttenuation["attenuation"],\
+                                                                    bounds_error=interpolateBoundsError,\
+                                                                    fill_value=interpolateFillValue)                                                                
         # Initialise classes for emission lines and filters
         self.emissionLinesClass = emissionLines()
         self.filtersDatabase = GalacticusFilters()
         return
+
+
+    def InterpolateDustTable(self,component,wavelength,inclination,opticalDepth,bulgeSize=None):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        if component.lower() == "disk":
+            attenuation = self.diskInterpolator(zip(inclination,opticalDepth,wavelength))
+        elif component.lower() == "spheroid":
+            if bulgeSize is None:
+                raise TypeError(funcname+"(): For spheroid dust attenuation, need to provide bulge sizes!")
+            attenuation = self.spheroidInterpolator(zip(bulgeSize,inclination,opticalDepth,wavelength))
+        else:
+            raise ValueError(funcname+"(): Value for 'component' not recognised! Must be either 'spheroid' or 'disk'!")
+        #np.place(attenuation,attenuation>1.0,1.0)
+        #np.place(attenuation,attenuation<0.0,0.0)
+        return attenuation
+
+
 
     
     def attenuate(self,galHDF5Obj,z,datasetName,overwrite=False,\
@@ -137,8 +167,11 @@ class dustAtlas(object):
             print(funcname+"(): Processing dataset '"+datasetName+"'")
         if not fnmatch.fnmatch(datasetName,"*:dustAtlas*"):
             raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
-        # Check if computing face on attenuation
-        dustExtension = ":dustAltas"
+        # Set dust extension in dataset name        
+        dustExtension = ":dustAtlas"        
+        if ":dustatlasnoclouds" in datasetName.lower():
+            dustExtension = dustExtension + "noClouds"        
+        # Check if computing face on attenuation        
         faceOn = False
         if "faceOn" in datasetName:
             dustExtension = dustExtension+"faceOn"
@@ -182,4 +215,66 @@ class dustAtlas(object):
             if self.debug:
                 infoLine = "filter={0:s}  effectiveWavelength={1:s}".format(filter,effectiveWavelength)
                 print(funcname+"(): Photometric filter information:\n        "+infoLine)
+        # Get inclinations
+        if faceOn:
+            inclinations = np.zeros_like(np.array(out["nodeData/diskRadius"]))
+        else:
+            inclinations = np.array(out["nodeData/diskRadius"])
+        # Get bulge sizes
+        if fnmatch.fnmatch(component,"spheroid"):
+            spheroidMassDistribution = galHDF5Obj.parameters["spheroidMassDistribution"].lower()
+            if fnmatch.fnmatch(spheroidMassDistribution,"hernquist"):
+                sizes = (1.0+np.sqrt(2.0))*np.array(out["nodeData/spheroidRadius"])/np.array(out["nodeData/diskRadius"])
+            elif fnmatch.fnmatch(spheroidMassDistribution,"sersic"):
+                sizes = np.array(out["nodeData/spheroidRadius"])/np.array(out["nodeData/diskRadius"])
+            else:
+                raise ValueError(funcname+"(): Value for parameter 'spheroidMassDistribution' must be either 'hernquist' or 'sersic'!")
+            np.place(sizes,np.isnan(sizes),1.0)
+            if not extrapolateInSize:
+                sizeMinimum = self.spheroidAttenuation["size"].min()
+                sizeMaximum = self.spheroidAttenuation["size"].max()
+                np.place(sizes,sizes<sizeMinimum,sizeMinimum)
+                np.place(sizes,sizes>sizeMaximum,sizeMaximum)
+        else:
+            sizes = None
+        # Specify required constants for computing optical depth normalisation
+        localISMMetallicity = 0.02  # ... Metallicity in the local ISM.
+        AV_to_EBV = 3.10            # ... (A_V/E(B-V); Savage & Mathis 1979)
+        NH_to_EBV = 5.8e21          # ... (N_H/E(B-V); atoms/cm^2/mag; Savage & Mathis 1979)
+        opticalDepthToMagnitudes = 2.5*np.log10(np.exp(1.0)) # Conversion factor from optical depth to magnitudes of extinction.
+        hecto = 1.0e2
+        opticalDepthNormalization = (1.0/opticalDepthToMagnitudes)*(AV_to_EBV/NH_to_EBV)
+        opticalDepthNormalization *= (massFractionHydrogen/massAtomic)*(massSolar/(Parsec*hecto)**2)/localISMMetallicity
+        # Compute central surface density in M_Solar/pc^2
+        gasMetalMass = np.array(out["nodeData/"+component+"AbundancesGasMetals"])
+        scaleLength = np.array(out["nodeData/diskRadius"])
+        np.place(scaleLength,scaleLength<=0.0,np.nan)
+        mega = 1.0e6
+        gasMetalsSurfaceDensityCentral = gasMetalMass/(2.0*Pi*(mega*scaleLength)**2)
+        np.place(gasMetalsSurfaceDensityCentral,np.isnan(scaleLength),0.0)
+        # Compute central optical depths
+        opticalDepthCentral = opticalDepthNormalization*gasMetalsSurfaceDensityCentral
+        if not extrapolateInTau:
+            if fnmatch.fnmatch(component,"spheroid"):
+                tauMinimum = self.spheroidAttenuation["opticalDepth"].min()
+                tauMaximum = self.spheroidAttenuation["opticalDepth"].max()
+            elif fnmatch.fnmatch(component,"disk"):
+                tauMinimum = self.diskAttenuation["opticalDepth"].min()
+                tauMaximum = self.diskAttenuation["opticalDepth"].max()
+            else:
+                raise ValueError(funcname+"(): Value for 'component' not recognised -- must be 'spheroid' or 'disk'!")
+            np.place(opticalDepthCentral,opticalDepthCentral<tauMinimum,tauMinimum)
+            np.place(opticalDepthCentral,opticalDepthCentral>tauMaximum,tauMaximum)
+        # Interpolate dustAtlas table to get attenuations
+        wavelengths = effectiveWavelength*np.ones_like(inclinations)
+        attenuations = self.InterpolateDustTable(component,wavelengths,inclinations,opticalDepthCentral,bulgeSize=sizes)
+        np.place(attenuations,np.isnan(scaleLength),1.0)
+        if any(attenuations>1.0):
+            print("WARNING! "+funcname+"(): Some attenuations greater than unity! This is not physical!")
+        if any(attenuations<0.0):
+            print("WARNING! "+funcname+"(): Some attenuations less than zero! This is not physical!")            
+        # Apply attenuations and return/store result        
+        result = np.array(out["nodeData/"+luminosityDataset])*attenuations
+        galHDF5Obj.addDataset(out.name+"/nodeData/",datasetName,result)
+        return result
         
