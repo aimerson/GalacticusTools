@@ -85,7 +85,7 @@ class SchechterFunction(object):
 
 class EuclidModel1(object):
 
-    def __init__(self,alpha=-1.35,lstar0=10.**41.5,phistar0=10**-2.,delta=2.0,epsilon=1.0,zbreak=1.3,Az=1.0):
+    def __init__(self,alpha=-1.35,lstar0=10.**41.5,phistar0=10**-2.,delta=2.0,epsilon=1.0,zbreak=1.3):
         self.number = 1
         self.name = "Pozzetti"
         self.alpha = alpha
@@ -94,7 +94,6 @@ class EuclidModel1(object):
         self.delta = delta
         self.epsilon = epsilon
         self.zbreak = zbreak
-        self.az = Az
         return
 
     def phi(self,l,z):
@@ -103,7 +102,7 @@ class EuclidModel1(object):
         if z <= self.zbreak:
             phistar = self.phistar0*((1.0+z)**self.epsilon)
         else:
-            phistar = self.az*((1.0+z)**(-1.0*self.epsilon))
+            phistar = self.phistar0*((1.0+self.zbreak)**(2.0*self.epsilopn))*((1.0+z)**(-1.0*self.epsilon))
         lf = (phistar/lstar)*((l/lstar)**self.alpha)*np.exp(-l/lstar)
         return lf
     
