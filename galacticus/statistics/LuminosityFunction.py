@@ -1,5 +1,6 @@
 #! /usr/bin/env python
 
+import fnmatch
 import numpy as np
 from scipy.integrate import romberg,quad
 import scipy.special as spspec
@@ -85,7 +86,7 @@ class SchechterFunction(object):
 
 class EuclidModel1(object):
 
-    def __init__(self,alpha=-1.35,lstar0=10.**41.5,phistar0=10**-2.,delta=2.0,epsilon=1.0,zbreak=1.3):
+    def __init__(self,alpha=-1.35,lstar0=10.**41.5,phistar0=10**-2.8,delta=2.0,epsilon=1.0,zbreak=1.3):
         self.number = 1
         self.name = "Pozzetti"
         self.alpha = alpha
@@ -96,14 +97,20 @@ class EuclidModel1(object):
         self.zbreak = zbreak
         return
 
-    def phi(self,l,z):
-        # Luminosity function at a redshift, z
-        lstar = self.lstar0*(1.0+z)**self.delta
+    def phistar(self,z):
         if z <= self.zbreak:
             phistar = self.phistar0*((1.0+z)**self.epsilon)
         else:
-            phistar = self.phistar0*((1.0+self.zbreak)**(2.0*self.epsilopn))*((1.0+z)**(-1.0*self.epsilon))
-        lf = (phistar/lstar)*((l/lstar)**self.alpha)*np.exp(-l/lstar)
+            phistar = self.phistar0*((1.0+self.zbreak)**(2.0*self.epsilon))*((1.0+z)**(-1.0*self.epsilon))        
+        return phistar
+
+    def Lstar(self,z):
+        return self.lstar0*(1.0+z)**self.delta
+
+    def phi(self,l,z):
+        # Luminosity function at a redshift, z
+        lstar = self.Lstar(z)        
+        lf = self.phistar(z)*((l/lstar)**(self.alpha+1.0))*np.exp(-l/lstar)
         return lf
     
 class EuclidModel2(object):
@@ -112,8 +119,7 @@ class EuclidModel2(object):
         self.number = 2
         self.name = "Geach"
         self.alpha = alpha
-        self.phistar = phistar0
-        self.delta = delta
+        self.phistar0 = phistar0
         self.epsilon = epsilon
         self.zbreak = zbreak
         self.az = Az
@@ -121,38 +127,66 @@ class EuclidModel2(object):
         self.lstarbreak = lstarbreak
         return
 
-    def phi(self,l,z):
-        # Luminosity function at a redshift, z
+    def Lstar(self,z):
         lstar = -1.0*self.c*((z-self.zbreak)**2) + np.log10(self.lstarbreak)
         lstar = 10**lstar
+        return lstar
+
+    def phistar(self,z):
         if z <= self.zbreak:
             phistar = self.phistar0*((1.0+z)**self.epsilon)
         else:
-            phistar = self.az*((1.0+z)**(-1.0*self.epsilon))
-        lf = (phistar/lstar)*((l/lstar)**alpha)*np.exp(-l/lstar)
+            phistar = self.phistar0*((1.0+self.zbreak)**(2.0*self.epsilon))*((1.0+z)**(-1.0*self.epsilon))        
+        return phistar
+
+    def phi(self,l,z):
+        # Luminosity function at a redshift, z
+        lstar = self.Lstar(z)
+        phistar = self.phistar(z)
+        lf = phistar*((l/lstar)**(self.alpha+1.0))*np.exp(-l/lstar)
         return lf
 
 
 class EuclidModel3(object):
 
-    def __init__(self,alpha=-1.45,beta=31.8,gamma=0.86,phistar=10.0**-2.62,lstarinf=10**42.44,lstarhalf=10**41.56):
+    def __init__(self,alpha=-1.587,beta=1.615,gamma=1.0,delta=2.288,phistar0=10.0**-2.920,lstarinf=10**42.557,\
+                     lstarhalf=10**41.733,method="broken"):
         self.number = 3
-        self.name = "Hirata"
+        self.name = "Hirata"        
         self.alpha = alpha
         self.beta = beta
         self.gamma = gamma
-        self.phistar = phistar
+        self.delta = delta
+        self.phistar0 = phistar0
         self.lstarinf = lstarinf
         self.lstarhalf = lstarhalf
+        if fnmatch.fnmatch(method,"*broken*") or fnmatch.fnmatch(method,"*power*"):
+            self.method = "broken"
+            self.gamma = 1.0
+        elif method.lower() == "hybrid":
+            self.method = "hybrid"
+            self.delta = 2.0
+        else:
+            self.method = "other"        
         return
+
+
+    def Lstar(self,z):
+        logLstar = np.log10(self.lstarinf) + ((1.5/(1.0+z))**self.beta)*np.log10(self.lstarhalf/self.lstarinf)
+        return 10**logLstar
+        
+    def phistar(self,z):
+        return self.phistar0
 
     def phi(self,l,z):
         # Luminosity function at a redshift, z
-        logLstar = np.log10(self.lstarinf) + ((1.5/(1.0+z))**self.beta)*np.log10(self.lstarhalf/self.lstarinf)
-        Lstar = 10**logLstar
-        lf = ((1.0+np.expm1(1.0)*((l/Lstar)**2))**-self.gamma)/Lstar
-        lf *= np.exp(-(1-self.gamma)*(l/Lstar))*self.phistar*((l/Lstar)**self.alpha)
+        Lstar = self.Lstar(z)
+        factor1 = (l/Lstar)**(self.alpha+1.0)
+        factor2 = np.exp(-(1.0-self.gamma)*l/Lstar)
+        factor3 = (1.0 + np.expm1(1.0)*((l/Lstar)**self.delta))**-self.gamma
+        lf = factor1*factor2*factor3*self.phistar(z)
         return lf
+
 
 
 class EuclidLuminosityFunction(object):
@@ -166,6 +200,12 @@ class EuclidLuminosityFunction(object):
         else:
             self.model = EuclidModel3(**kwargs)
         return
+
+    def Lstar(self,z):
+        return self.model.Lstar(z)
+    
+    def phistar(self,z):
+        return self.model.phistar(z)
 
     def phi(self,luminosity,z):
         return self.model.phi(luminosity,z)
