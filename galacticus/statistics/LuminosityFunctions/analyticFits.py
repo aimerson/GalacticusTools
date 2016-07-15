@@ -10,7 +10,7 @@ import scipy.special as spspec
 # Schechter functional form of LF
 ######################################################################################
 
-class SchechterFunction(object):
+class SchechterMagnitudes(object):
 
     def __init__(self,alpha,Mstar,phistar):
         classname = self.__class__.__name__
@@ -22,8 +22,8 @@ class SchechterFunction(object):
 
     def phi(self,mags):
         """
-        phi(): Return Schechter luminosity function for                                                                                                                                                     
-                               specified absolute magnitude(s)
+        phi(): Returnn Schechter luminosity function for specified
+               absolute magnitude(s)
 
         USAGE: lf = SchechterFunction.phi(mags)
 
@@ -80,6 +80,32 @@ class SchechterFunction(object):
             return self.phistar*Lstar*spspec.gamma(self.alpha+2.0)
         else:
             return self.phistar*Lstar*spspec.gammainc(self.alpha+2.0,L_low/Lstar)
+
+
+class SchechterLuminosities(object):
+
+    def __init__(self,alpha,Lstar,phistar):
+        classname = self.__class__.__name__
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        self.alpha = alpha
+        self.Lstar = Lstar
+        self.phistar = phistar
+        return
+
+    def phi(self,lum,perLog10L=True):
+        """
+        phi(): Return Schechter luminosity function for specified
+                               luminosities
+
+        USAGE: lf = SchechterFunction.phi(lum,[perLog10L])
+
+        """
+        factor1 = (lum/self/Lstar)**self.alpha
+        factor2 = np.exp(-lum/self.Lstar)
+        lf = self.phistar*factor1*factor2
+        if perLog10L:
+            lf *= np.log(10.0)*(lum/self.Lstar)
+        return lf
         
 
 
@@ -110,10 +136,14 @@ class EuclidModel1(object):
     def Lstar(self,z):
         return self.lstar0*(1.0+z)**self.delta
 
-    def phi(self,l,z):
+    def phi(self,l,z,perLog10L=True):
         # Luminosity function at a redshift, z
         lstar = self.Lstar(z)        
-        lf = self.phistar(z)*((l/lstar)**(self.alpha+1.0))*np.exp(-l/lstar)
+        factor1 = (l/lstar)**self.alpha
+        factor2 = np.exp(-l/lstar)
+        lf = self.phistar(z)*factor1*factor2
+        if perLog10L:
+            lf *= np.log(10.0)*(l/lstar)
         return lf
     
 class EuclidModel2(object):
@@ -142,11 +172,15 @@ class EuclidModel2(object):
             phistar = self.phistar0*((1.0+self.zbreak)**(2.0*self.epsilon))*((1.0+z)**(-1.0*self.epsilon))        
         return phistar
 
-    def phi(self,l,z):
+    def phi(self,l,z,perLog10L=True):
         # Luminosity function at a redshift, z
-        lstar = self.Lstar(z)
+        lstar = self.Lstar(z)        
+        factor1 = (l/lstar)**self.alpha
+        factor2 = np.exp(-l/lstar)
         phistar = self.phistar(z)
-        lf = phistar*((l/lstar)**(self.alpha+1.0))*np.exp(-l/lstar)
+        lf = phistar*factor1*factor2
+        if perLog10L:
+            lf *= np.log(10.0)*l/lstar
         return lf
 
 
@@ -181,13 +215,15 @@ class EuclidModel3(object):
     def phistar(self,z):
         return self.phistar0
 
-    def phi(self,l,z):
+    def phi(self,l,z,perLog10L=True):
         # Luminosity function at a redshift, z
         Lstar = self.Lstar(z)
-        factor1 = (l/Lstar)**(self.alpha+1.0)
+        factor1 = (l/Lstar)**self.alpha
         factor2 = np.exp(-(1.0-self.gamma)*l/Lstar)
         factor3 = (1.0 + np.expm1(1.0)*((l/Lstar)**self.delta))**-self.gamma
         lf = factor1*factor2*factor3*self.phistar(z)
+        if perLog10L:
+            lf *= np.log(10)*l/Lstar
         return lf
 
 

@@ -20,7 +20,7 @@ class SchechterFunction(object):
         self.phistar = phistar
         return
 
-    def phi(self,mags):
+    def phi(self,x,magnitudes=True):
         """
         phi(): Return Schechter luminosity function for                                                                                                                                                     
                                specified absolute magnitude(s)
