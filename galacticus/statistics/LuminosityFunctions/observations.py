@@ -11,7 +11,7 @@ class Halpha(object):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # List available datasets
-        self.available = ["Gallego95","Colbert13","Sobral13"]
+        self.available = ["Gallego95","Shim09","Colbert13","Sobral13"]
         # Load appropirate dataset
         if fnmatch.fnmatch(dataset.lower(),"*gallego*"):
             self.dataset = "Gallego et al. (1995)"
@@ -20,6 +20,14 @@ class Halpha(object):
             self.data = np.loadtxt(ifile,dtype=dtype,usecols=range(len(dtype))).view(np.recarray)            
             self.data.log10L = np.log10(self.data.log10L*1.0e40)
             self.hubble = 0.5
+        elif fnmatch.fnmatch(dataset.lower(),"*shim*"):
+            self.dataset = "Shim et al. (2009)"
+            ifile = pkg_resources.resource_filename(__name__,"../../data/LuminosityFunctions/Shim09_Halpha.dat")
+            dtype = [("z",float),("log10L",float),("phi",float),("phiErr",float),("number",int)]
+            self.data = np.loadtxt(ifile,dtype=dtype,usecols=range(len(dtype))).view(np.recarray)            
+            self.data.phi *= 1.0e-3
+            self.data.phiErr *= 1.0e-3
+            self.hubble = 0.71
         elif fnmatch.fnmatch(dataset.lower(),"*colbert*"):
             self.dataset = "Colbert et al. (2013)"
             ifile = pkg_resources.resource_filename(__name__,"../../data/LuminosityFunctions/Colbert13_Halpha.dat")
@@ -44,6 +52,13 @@ class Halpha(object):
                 mask = np.zeros(len(self.data.log10L),bool)
             else:
                 mask = np.ones(len(self.data.log10L),bool)
+            data = self.data[mask]            
+        if self.dataset == "Shim et al. (2009)":
+            mask = np.zeros(len(self.data.z),bool)
+            if z > 0.7 and z < 1.4:
+                mask = self.data.z == 1.05
+            if z > 1.4 and z < 1.9:
+                mask = self.data.z == 1.65
             data = self.data[mask]            
         if self.dataset == "Colbert et al. (2013)":
             mask = np.zeros(len(self.data.z),bool)
