@@ -10,5 +10,7 @@ setup(name='galacticus',
       author_email='alex.i.merson@gmail.com',
       license='MIT',
       packages=find_packages(),
+      package_dir={'galacticus':'galacticus'},
+      package_data={'galacticus':['data/LuminosityFunctions/*.dat']},
       zip_safe=False)
 

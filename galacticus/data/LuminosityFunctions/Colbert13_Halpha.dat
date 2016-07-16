@@ -1,0 +1,25 @@
+# Halpha LF data (Colbert et al. 2013, Table 3)
+#
+# Densities in units: Mpc^-3 dlog L^-1
+# Luminosity has been corrected for [N ii] contamination. No extinction correction has been applied.
+# Corrected density is the measured number density with completeness corrections applied.
+#
+# 0.3 < z < 0.9
+# Redshift	 log10(L)      Number    Density	    Corr. Density   Error  		   
+0.6		  40.55		  80	  0.0080		0.0145 	    0.0024
+0.6		  40.85		  97	  0.0063		0.0109 	    0.0016
+0.6		  41.15		  107	  0.0051		0.0080 	    0.0010
+0.6		  41.45		  90	  0.0035		0.0052 	    0.0007
+0.6		  41.75		  46	  0.0017		0.0025 	    0.0004
+0.6		  42.05		  14	  0.0005		0.0007 	    0.0002
+0.6		  42.35		  2	  7.6e-05		8.9e-05     6.5e-05
+# 0.9 < z < 1.5
+# Redshift	 log10(L)      Number    Density	    Corr. Density   Error  		   
+1.2		  41.15		  34   	  0.0087 		0.0148 	    0.0036 
+1.2		  41.45		  143     0.0041 		0.0070 	    0.0010 
+1.2		  41.75		  185	  0.0033 		0.0056 	    0.0008 
+1.2		  42.05		  103	  0.0017 		0.0025 	    0.0003 
+1.2		  42.35		  41	  0.00066     		0.00087     0.00016 
+1.2		  42.65		  7	  0.00011		0.00014     5.5e-05 
+1.2		  42.95		  3	  4.8e-05 		5.8e-05     3.5e-05 
+1.2		  43.25		  1	  1.6e-05 		1.6e-05     1.7e-05 
