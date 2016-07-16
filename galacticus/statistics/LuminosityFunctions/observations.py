@@ -11,9 +11,16 @@ class Halpha(object):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # List available datasets
-        self.available = ["Colbert13","Sobral13"]
+        self.available = ["Gallego95","Colbert13","Sobral13"]
         # Load appropirate dataset
-        if fnmatch.fnmatch(dataset.lower(),"*colbert*"):
+        if fnmatch.fnmatch(dataset.lower(),"*gallego*"):
+            self.dataset = "Gallego et al. (1995)"
+            ifile = pkg_resources.resource_filename(__name__,"../../data/LuminosityFunctions/Gallego95_Halpha.dat")
+            dtype = [("log10L",float),("phi",float),("phiErr",float)]
+            self.data = np.loadtxt(ifile,dtype=dtype,usecols=range(len(dtype))).view(np.recarray)            
+            self.data.log10L = np.log10(self.data.log10L*1.0e40)
+            self.hubble = 0.5
+        elif fnmatch.fnmatch(dataset.lower(),"*colbert*"):
             self.dataset = "Colbert et al. (2013)"
             ifile = pkg_resources.resource_filename(__name__,"../../data/LuminosityFunctions/Colbert13_Halpha.dat")
             dtype = [("z",float),("log10L",float),("number",int),("phi",float),("phiCorr",float),("phiCorrErr",float)]
@@ -32,7 +39,12 @@ class Halpha(object):
         return
 
     def selectRedshift(self,z):
-        data = None
+        if self.dataset == "Gallego et al. (1995)":
+            if z > 0.1:
+                mask = np.zeros(len(self.data.log10L),bool)
+            else:
+                mask = np.ones(len(self.data.log10L),bool)
+            data = self.data[mask]            
         if self.dataset == "Colbert et al. (2013)":
             mask = np.zeros(len(self.data.z),bool)
             if z > 0.3 and z < 0.9:
@@ -50,7 +62,9 @@ class Halpha(object):
                 mask = self.data.z == 1.47
             if z > 1.7 and z < 2.8:
                 mask = self.data.z == 2.23
-            data = self.data[mask]                    
+            data = self.data[mask]                            
+        if len(data.log10L) == 0:
+            data = None
         return data
 
 

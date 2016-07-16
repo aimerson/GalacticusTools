@@ -1,0 +1,23 @@
+# dn/dL(Halpha) (z=0) from Gallego etal (1995, ApJ 455, L1)
+#
+# values read from Table 1, and converted to dn/dlog_10(L(Halpha))
+# L(Halpha) in 10^40 erg/s, dn/dlog_10(L(Halpha)) in Mpc^(-3)
+# fractional errors are 1/sqrt(N)
+#
+# L(Halpha) includes reddening correction
+#
+# Gallego etal assumed H0=50
+# to convert to L in h^(-2) erg/s and n in h^3/Mpc^3, apply the following
+# scaling to the numbers in the table below:
+# [L(Halpha)](us) = 0.25 [L(Halpha)](Gallego)
+# [dn/dlog_10(L(Halpha))](us) = 8 [dn/dlog_10(L(Halpha))](Gallego)
+#
+#       L(Halpha)       dn/dlog_10(L(Halpha))   error
+#
+        3.98e0                  1.04e-3         0.39e-3
+        1.00e1                  3.31e-3         0.65e-3
+        2.51e1                  2.08e-3         0.32e-3
+        6.31e1                  1.19e-3         0.16e-3
+        1.59e2                  5.55e-4         0.92e-4
+        3.98e2                  6.82e-5         2.16e-5
+
