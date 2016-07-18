@@ -20,8 +20,11 @@ class GalacticusHDF5(HDF5):
         # Store version information
         self.version = dict(self.fileObj["Version"].attrs)
         
-        # Store build information
-        self.build = dict(self.fileObj["Build"].attrs)
+        # Store build information if available
+        try:            
+            self.build = dict(self.fileObj["Build"].attrs)
+        except KeyError:
+            self.build = None
 
         # Store parameters
         self.parameters = dict(self.fileObj["Parameters"].attrs)
