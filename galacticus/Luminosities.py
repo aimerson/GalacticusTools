@@ -5,6 +5,11 @@ import numpy as np
 from .io import GalacticusHDF5
 from .constants import luminosityAB
 from .GalacticusErrors import ParseError
+from .constants import luminositySolar,erg
+
+def ergPerSecond(luminosity):
+    return luminosity*luminositySolar/erg
+
 
 def Get_Luminosity(galHDF5Obj,z,datasetName,overwrite=False):
     funcname = sys._getframe().f_code.co_name
