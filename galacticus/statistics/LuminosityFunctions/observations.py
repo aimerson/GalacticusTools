@@ -98,9 +98,11 @@ class PhotometricBand(object):
         if fnmatch.fnmatch(dataset.lower(),"gama") or fnmatch.fnmatch(dataset.lower(),"driver*"):
             self.data = read_GAMA_LF(band)
         elif fnmatch.fnmatch(dataset.lower(),"2df*") or fnmatch.fnmatch(dataset.lower(),"cole*") or \
-                fnmatch.fnmatch(data.lower(),"norberg*"):
+                fnmatch.fnmatch(dataset.lower(),"norberg*"):
             self.data = read_2dFGRS_LF(band)
-        return 
+        elif fnmatch.fnmatch(dataset.lower(),"2mass") or fnmatch.fnmatch(dataset.lower(),"kochanek*"):
+            self.data = read_2MASS_LF(band)
+            return 
         
 
 def read_GAMA_LF(band):
@@ -113,6 +115,17 @@ def read_GAMA_LF(band):
     data = np.loadtxt(ifile,dtype=dtype,usecols=range(len(dtype))).view(np.recarray)
     data.phi /= 0.5
     data.phiErr /= 0.5
+    return data
+
+def read_2MASS_LF(band):
+    funcname = sys._getframe().f_code.co_name
+    available = "K".split()
+    if band.lower() not in list(map(lambda x:x.lower(),available)):
+        raise ValueError(funcname+"(): Band not recognised! Available bands are: "+",".join(available))
+    ifile = pkg_resources.resource_filename(__name__,"../../data/LuminosityFunctions/Kochanek01_"+band+"_z0.dat")
+    dtype = [("mag",float),("logphi",float),("logphiErr",float)]
+    data = np.loadtxt(ifile,dtype=dtype,usecols=range(len(dtype))).view(np.recarray)
+    data.mag += 1.85
     return data
              
 def read_2dFGRS_LF(band):
@@ -128,9 +141,14 @@ def read_2dFGRS_LF(band):
         else:
             usecols = [0,3,4]
         data = np.loadtxt(ifile,dtype=dtype,usecols=usecols).view(np.recarray)
+        if band.lower() == "j":
+            data.mag += 0.91
+        else:
+            data.mag += 1.85        
     else:
         ifile = pkg_resources.resource_filename(__name__,"../../data/LuminosityFunctions/Norberg02_bJ_z0.dat")
         dtype = [("mag",float),("phi",float),("phiErr",float),("sumWeight",float),("meanMag",float)]
         usecols = [1,0,2,3,4]
         data = np.loadtxt(ifile,dtype=dtype,usecols=usecols).view(np.recarray)
+        data.mag -= 0.09
     return data
