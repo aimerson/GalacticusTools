@@ -96,14 +96,14 @@ class PhotometricBand(object):
         self.band = band
         # Load appropriate LF dataset
         if fnmatch.fnmatch(dataset.lower(),"gama") or fnmatch.fnmatch(dataset.lower(),"driver*"):
-            self.data = read_GAMA_LF(band)
+            self.data,self.reference,self.survey = read_GAMA_LF(band)
         elif fnmatch.fnmatch(dataset.lower(),"2df*") or fnmatch.fnmatch(dataset.lower(),"cole*") or \
                 fnmatch.fnmatch(dataset.lower(),"norberg*"):
-            self.data = read_2dFGRS_LF(band)
+            self.data,self.reference,self.survey = read_2dFGRS_LF(band)
         elif fnmatch.fnmatch(dataset.lower(),"2mass") or fnmatch.fnmatch(dataset.lower(),"kochanek*"):
-            self.data = read_2MASS_LF(band)
+            self.data,self.reference,self.survey = read_2MASS_LF(band)
         elif fnmatch.fnmatch(dataset.lower(),"6df*") or fnmatch.fnmatch(dataset.lower(),"jones*"):
-            self.data = read_6dFGS_LF(band)
+            self.data,self.reference,self.survey = read_6dFGS_LF(band)
             return 
         
 
@@ -117,7 +117,7 @@ def read_GAMA_LF(band):
     data = np.loadtxt(ifile,dtype=dtype,usecols=range(len(dtype))).view(np.recarray)
     data.phi /= 0.5
     data.phiErr /= 0.5
-    return data
+    return data,"Driver et al. (2012)","GAMA"
 
 def read_2MASS_LF(band):
     funcname = sys._getframe().f_code.co_name
@@ -128,7 +128,7 @@ def read_2MASS_LF(band):
     dtype = [("mag",float),("logphi",float),("logphiErr",float)]
     data = np.loadtxt(ifile,dtype=dtype,usecols=range(len(dtype))).view(np.recarray)
     data.mag += 1.85
-    return data
+    return data,"Kochanek et al. (2001)","2MASS"
 
 
 def read_6dFGS_LF(band):
@@ -142,7 +142,7 @@ def read_6dFGS_LF(band):
     data.mag += 1.85
     data.logphi -= np.log10(0.25)
     data.logphiNegErr = np.fabs(data.logphiNegErr) 
-    return data
+    return data,"Jones et al. (2006)", "6dFGS"
              
 def read_2dFGRS_LF(band):
     funcname = sys._getframe().f_code.co_name
@@ -161,10 +161,12 @@ def read_2dFGRS_LF(band):
             data.mag += 0.91
         else:
             data.mag += 1.85        
+        reference = "Cole et al. (2001)"
     else:
         ifile = pkg_resources.resource_filename(__name__,"../../data/LuminosityFunctions/Norberg02_bJ_z0.dat")
         dtype = [("mag",float),("phi",float),("phiErr",float),("sumWeight",float),("meanMag",float)]
         usecols = [1,0,2,3,4]
         data = np.loadtxt(ifile,dtype=dtype,usecols=usecols).view(np.recarray)
         data.mag -= 0.09
-    return data
+        reference = "Norberg et al. (2002)"
+    return data,reference,"2dFGRS"
