@@ -102,6 +102,8 @@ class PhotometricBand(object):
             self.data = read_2dFGRS_LF(band)
         elif fnmatch.fnmatch(dataset.lower(),"2mass") or fnmatch.fnmatch(dataset.lower(),"kochanek*"):
             self.data = read_2MASS_LF(band)
+        elif fnmatch.fnmatch(dataset.lower(),"6df*") or fnmatch.fnmatch(dataset.lower(),"jones*"):
+            self.data = read_6dFGS_LF(band)
             return 
         
 
@@ -126,6 +128,20 @@ def read_2MASS_LF(band):
     dtype = [("mag",float),("logphi",float),("logphiErr",float)]
     data = np.loadtxt(ifile,dtype=dtype,usecols=range(len(dtype))).view(np.recarray)
     data.mag += 1.85
+    return data
+
+
+def read_6dFGS_LF(band):
+    funcname = sys._getframe().f_code.co_name
+    available = "K".split()
+    if band.lower() not in list(map(lambda x:x.lower(),available)):
+        raise ValueError(funcname+"(): Band not recognised! Available bands are: "+",".join(available))
+    ifile = pkg_resources.resource_filename(__name__,"../../data/LuminosityFunctions/Jones06_"+band+"_z0.dat")
+    dtype = [("mag",float),("logphi",float),("logphiPosErr",float),("logphiNegErr",float),("number",int)]
+    data = np.loadtxt(ifile,dtype=dtype,usecols=range(len(dtype))).view(np.recarray)
+    data.mag += 1.85
+    data.logphi -= np.log10(0.25)
+    data.logphiNegErr = np.fabs(data.logphiNegErr) 
     return data
              
 def read_2dFGRS_LF(band):
