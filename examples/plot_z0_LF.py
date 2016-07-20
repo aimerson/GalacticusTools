@@ -8,15 +8,15 @@ from galacticus.statistics.LuminosityFunctions.analyticFits import SchechterMagn
 from galacticus.statistics.LuminosityFunctions.observations import PhotometricBand
 
 
-fig = figure(figsize=(20,15))
+fig = figure(figsize=(15,20))
 
 subplots_adjust(wspace=0.02)
 
-bands = "bJ J H K u g r i z Y NUV FUV".split()
+bands = "J H K u g r i z Y bJ NUV FUV".split()
 
 for i,band in enumerate(bands):
     
-    ax = fig.add_subplot(3,4,i+1)
+    ax = fig.add_subplot(4,3,i+1)
     
     if band != "bJ":
         OBS = PhotometricBand("gama",band)
@@ -61,7 +61,7 @@ for i,band in enumerate(bands):
         negErr = OBS.data.logphiNegErr        
         ax.errorbar(mag,phi,yerr=[negErr,posErr],marker='v',c='orange',ls='none',mfc='none',mec='orange',label="6dFGS")
 
-    if i in range(4):
+    if i in range(3) or i in range(9,12):
         ax.set_ylim(bottom=-6.0,top=-0.5)
     else:
         ax.set_ylim(bottom=-5.5,top=-1)        
@@ -99,7 +99,7 @@ for i,band in enumerate(bands):
     else:
         label = band
     ax.set_xlabel("$M_{\mathrm{"+label+"}}\,-\,5\log_{10}(h)$")
-    if i%4 == 0:
+    if i%3 == 0:
         ax.set_ylabel("$\log_{10}(\phi/h^{-3}\,\mathrm{Mpc}^{-3}\,\mathrm{mag}^{-1})$")
     else:
         setp(ax.yaxis.get_ticklabels(),visible=False)
