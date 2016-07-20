@@ -83,3 +83,54 @@ class Halpha(object):
         return data
 
 
+
+
+
+
+class PhotometricBand(object):
+
+    def __init__(self,dataset,band):        
+        classname = self.__class__.__name__
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        self.dataset = dataset
+        self.band = band
+        # Load appropriate LF dataset
+        if fnmatch.fnmatch(dataset.lower(),"gama") or fnmatch.fnmatch(dataset.lower(),"driver*"):
+            self.data = read_GAMA_LF(band)
+        elif fnmatch.fnmatch(dataset.lower(),"2df*") or fnmatch.fnmatch(dataset.lower(),"cole*") or \
+                fnmatch.fnmatch(data.lower(),"norberg*"):
+            self.data = read_2dFGRS_LF(band)
+        return 
+        
+
+def read_GAMA_LF(band):
+    funcname = sys._getframe().f_code.co_name
+    available = "J H K u g r i z Y NUV FUV".split()
+    if band.lower() not in list(map(lambda x:x.lower(),available)):
+        raise ValueError(funcname+"(): Band not recognised! Available bands are: "+",".join(available))
+    ifile = pkg_resources.resource_filename(__name__,"../../data/LuminosityFunctions/Driver12_"+band+"_z0.dat")
+    dtype = [("mag",float),("phi",float),("phiErr",float),("number",float)]
+    data = np.loadtxt(ifile,dtype=dtype,usecols=range(len(dtype))).view(np.recarray)
+    data.phi /= 0.5
+    data.phiErr /= 0.5
+    return data
+             
+def read_2dFGRS_LF(band):
+    funcname = sys._getframe().f_code.co_name
+    available = "J K Ks bJ".split()
+    if band.lower() not in list(map(lambda x:x.lower(),available)):
+        raise ValueError(funcname+"(): Band not recognised! Available bands are: "+",".join(available))
+    if band.lower() in list(map(lambda x:x.lower(),"k ks j".split())):
+        ifile = pkg_resources.resource_filename(__name__,"../../data/LuminosityFunctions/Cole01_JK_z0.dat")
+        dtype = [("mag",float),("phi",float),("phiErr",float)]
+        if band.lower() == "j":
+            usecols = [0,1,2]
+        else:
+            usecols = [0,3,4]
+        data = np.loadtxt(ifile,dtype=dtype,usecols=usecols).view(np.recarray)
+    else:
+        ifile = pkg_resources.resource_filename(__name__,"../../data/LuminosityFunctions/Norberg02_bJ_z0.dat")
+        dtype = [("mag",float),("phi",float),("phiErr",float),("sumWeight",float),("meanMag",float)]
+        usecols = [1,0,2,3,4]
+        data = np.loadtxt(ifile,dtype=dtype,usecols=usecols).view(np.recarray)
+    return data

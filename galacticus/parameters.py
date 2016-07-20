@@ -141,3 +141,27 @@ def formatParametersFile(ifile,ofile=None):
 
 
 ####################################################################
+
+
+def simulationParameters(simulation):
+    
+    params = []
+    if simulation.lower() in ["millennium","milli-millennium"]:
+        params.append(("treeNodeMethodSatellite","preset"))
+        params.append(("treeNodeMethodPosition","preset"))
+        params.append(("mergerTreeConstructMethod","read"))
+        params.append(("allTreesExistAtFinalTime","false"))
+        params.append(("cosmologyParametersMethod","simple"))
+        params.append(("HubbleConstant",73.0,"cosmologyParametersMethod"))
+        params.append(("OmegaMatter",0.25,"cosmologyParametersMethod"))
+        params.append(("OmegaDarkEnergy",0.75,"cosmologyParametersMethod"))
+        params.append(("OmegaBaryon",0.0455,"cosmologyParametersMethod"))
+        params.append(("sigma_8",0.9,"cosmologicalMassVarianceMethod"))
+        params.append(("powerSpectrumPrimordialMethod","powerLaw"))
+        params.append(("index",0.961,"powerSpectrumPrimordialMethod"))
+        params.append(("wavenumberReference",1,"powerSpectrumPrimordialMethod"))
+        params.append(("running",0,"powerSpectrumPrimordialMethod"))
+        params.append(("mergerTreeReadPresetScaleRadiiMinimumMass",2.5e11))
+        params.append(("virialDensityContrastMethod","percolation"))
+        params.append(("virialDensityContrastPercolationLinkingLength","0.2"))
+    return params
