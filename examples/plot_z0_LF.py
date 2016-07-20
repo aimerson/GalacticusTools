@@ -61,7 +61,7 @@ for i,band in enumerate(bands):
         negErr = OBS.data.logphiNegErr        
         ax.errorbar(mag,phi,yerr=[negErr,posErr],marker='v',c='orange',ls='none',mfc='none',mec='orange',label="6dFGS")
 
-    if i in range(3):
+    if i in range(4):
         ax.set_ylim(bottom=-6.0,top=-0.5)
     else:
         ax.set_ylim(bottom=-5.5,top=-1)        
