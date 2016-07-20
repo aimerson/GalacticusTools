@@ -1,0 +1,86 @@
+<?xml version="1.0"?>
+<simulation name="Millennium2">
+  <cosmology>
+    <OmegaM>0.25</OmegaM>
+    <OmegaL>0.75</OmegaL>
+    <OmegaB>0.045</OmegaB>
+    <H0>73</H0>
+    <sigma8>0.9</sigma8>
+    <ns>1.0</ns>
+  </cosmology>
+  <particles>
+    <mass units="Msol/h">6.885e6</mass>
+    <number>10077696000</number>
+  </particles>
+  <boxSize units="Mpc/h">100.0</boxSize>
+  <snapshots>
+    <snapshot number="0">127.0</snapshot>
+    <snapshot number="1">80.0</snapshot>
+    <snapshot number="2">40.0</snapshot>
+    <snapshot number="3">31.253098</snapshot>
+    <snapshot number="4">28.512092</snapshot>
+    <snapshot number="5">26.033655</snapshot>
+    <snapshot number="6">23.790525</snapshot>
+    <snapshot number="7">21.758459</snapshot>
+    <snapshot number="8">19.915882</snapshot>
+    <snapshot number="9">18.243573</snapshot>
+    <snapshot number="10">16.724395</snapshot>
+    <snapshot number="11">15.343058</snapshot>
+    <snapshot number="12">14.085907</snapshot>
+    <snapshot number="13">12.940736</snapshot>
+    <snapshot number="14">11.896629</snapshot>
+    <snapshot number="15">10.943809</snapshot>
+    <snapshot number="16">10.07352</snapshot>
+    <snapshot number="17">9.277909</snapshot>
+    <snapshot number="18">8.549926</snapshot>
+    <snapshot number="19">7.883241</snapshot>
+    <snapshot number="20">7.272162</snapshot>
+    <snapshot number="21">6.711571</snapshot>
+    <snapshot number="22">6.196857</snapshot>
+    <snapshot number="23">5.723866</snapshot>
+    <snapshot number="24">5.288853</snapshot>
+    <snapshot number="25">4.888437</snapshot>
+    <snapshot number="26">4.519564</snapshot>
+    <snapshot number="27">4.179475</snapshot>
+    <snapshot number="28">3.865672</snapshot>
+    <snapshot number="29">3.575897</snapshot>
+    <snapshot number="30">3.308099</snapshot>
+    <snapshot number="31">3.060424</snapshot>
+    <snapshot number="32">2.831187</snapshot>
+    <snapshot number="33">2.618857</snapshot>
+    <snapshot number="34">2.422045</snapshot>
+    <snapshot number="35">2.239487</snapshot>
+    <snapshot number="36">2.070032</snapshot>
+    <snapshot number="37">1.912633</snapshot>
+    <snapshot number="38">1.766335</snapshot>
+    <snapshot number="39">1.630268</snapshot>
+    <snapshot number="40">1.503637</snapshot>
+    <snapshot number="41">1.385718</snapshot>
+    <snapshot number="42">1.275846</snapshot>
+    <snapshot number="43">1.173416</snapshot>
+    <snapshot number="44">1.077873</snapshot>
+    <snapshot number="45">0.98871</snapshot>
+    <snapshot number="46">0.905461</snapshot>
+    <snapshot number="47">0.827699</snapshot>
+    <snapshot number="48">0.755035</snapshot>
+    <snapshot number="49">0.687108</snapshot>
+    <snapshot number="50">0.623589</snapshot>
+    <snapshot number="51">0.564176</snapshot>
+    <snapshot number="52">0.508591</snapshot>
+    <snapshot number="53">0.456577</snapshot>
+    <snapshot number="54">0.407899</snapshot>
+    <snapshot number="55">0.362341</snapshot>
+    <snapshot number="56">0.319703</snapshot>
+    <snapshot number="57">0.279802</snapshot>
+    <snapshot number="58">0.242469</snapshot>
+    <snapshot number="59">0.207549</snapshot>
+    <snapshot number="60">0.174898</snapshot>
+    <snapshot number="61">0.144383</snapshot>
+    <snapshot number="62">0.115884</snapshot>
+    <snapshot number="63">0.089288</snapshot>
+    <snapshot number="64">0.064493</snapshot>
+    <snapshot number="65">0.041404</snapshot>
+    <snapshot number="66">0.019933</snapshot>
+    <snapshot number="67">0.0</snapshot>
+  </snapshots>
+</simulation>
