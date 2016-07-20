@@ -11,6 +11,6 @@ setup(name='galacticus',
       license='MIT',
       packages=find_packages(),
       package_dir={'galacticus':'galacticus'},
-      package_data={'galacticus':['data/LuminosityFunctions/*.dat']},
+      package_data={'galacticus':['data/LuminosityFunctions/*.dat','data/Simulations/*.xml']},
       zip_safe=False)
 
