@@ -4,11 +4,11 @@ import sys,os,fnmatch
 import numpy as np
 import pkg_resources
 import xml.etree.ElementTree as ET
-
+from .cosmology import Cosmology
 
 class Simulation(object):
     
-    def __init__(self,simulation,verbose=False):
+    def __init__(self,simulation,verbose=False,radiation=False):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         self.verbose = verbose
@@ -33,13 +33,15 @@ class Simulation(object):
             self.snapshots["index"][i] = int(snap.attrib["number"])
         self.snapshots = self.snapshots.view(np.recarray)
         cosmologyStruct = xmlRoot.find("cosmology")
-        self.omegaM = float(cosmologyStruct.find("OmegaM").text)
-        self.omegaL = float(cosmologyStruct.find("OmegaL").text)
+        self.omega0 = float(cosmologyStruct.find("OmegaM").text)
+        self.lambda0 = float(cosmologyStruct.find("OmegaL").text)
         self.omegaB = float(cosmologyStruct.find("OmegaB").text)
         self.h0 = float(cosmologyStruct.find("H0").text)/100.0
         self.sigma8 = float(cosmologyStruct.find("sigma8").text)
         self.ns = float(cosmologyStruct.find("ns").text)
-        
+        self.cosmology = Cosmology(omega0=self.omega0,lambda0=self.lambda0,omegab=self.omegaB,h0=self.h0,\
+                                       sigma8=self.sigma8,ns=self.ns,radiation=radiation,\
+                                       zmax=self.snapshots.z.max(),nzmax=10000)               
         if self.verbose:
             print("------------------------------------------------------"                           )
             print(" SPECIFICATIONS: "+self.name                                                      )
@@ -49,7 +51,7 @@ class Simulation(object):
             print("            MIN. REDSHIFT   = "+str(self.snapshots.z.min())                       )
             print("       Cosmology:"                                                                )
             print("            OMEGA_MATTER    = "+str(self.omegaM)                                  )
-            print("            OMEGA_VACUUM    = "+str(self.omegaL)                                  )
+            print("            OMEGA_VACUUM    = "+str(self.omega0)                                  )
             print("            HUBBLE PARAM.   = "+str(self.h0)                                      )
             print("            OMEGA_BARYON    = "+str(self.omegaB)                                  )
             print("            SIGMA_8         = "+str(self.sigma8)                                  )
