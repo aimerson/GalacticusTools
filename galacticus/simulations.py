@@ -98,6 +98,37 @@ class Simulation(object):
         return snapshot
 
 
+    def set_parameters(self,cosmologicalParametersMethod="simple",\
+                           powerSpectrumPrimordialMethod="powerLaw",wavenumberReference=1,running=0,\
+                           mergerTreeFile=None,allTreesExistAtFinalTime=True,\
+                           mergerTreeReadOutputTimeSnapTolerance=0.0):
+        params = []
+        # Set cosmology parameters
+        params.append(("cosmologyParametersMethod",cosmologicalParametersMethod))
+        params.append(("HubbleConstant",self.h0*100,"cosmologyParametersMethod"))
+        params.append(("OmegaMatter",self.omega0,"cosmologyParametersMethod"))
+        params.append(("OmegaDarkEnergy",self.lambda0,"cosmologyParametersMethod"))
+        params.append(("OmegaBaryon",self.omegaB,"cosmologyParametersMethod"))
+        params.append(("sigma_8",self.sigma8,"cosmologicalMassVarianceMethod"))
+        params.append(("powerSpectrumPrimordialMethod",powerSpectrumPrimordialMethod))
+        params.append(("index",self.ns,"powerSpectrumPrimordialMethod"))
+        params.append(("wavenumberReference",wavenumberReference,"powerSpectrumPrimordialMethod"))
+        params.append(("running",running,"powerSpectrumPrimordialMethod"))
+
+        # Set merger trees parameters
+        if mergerTreeFile is not None:
+            params.append(("mergerTreeConstructMethod","read"))
+            params.append(("mergerTreeReadFileName",mergerTreeFile))
+        if allTreesExistAtFinalTime:
+            params.append(("allTreesExistAtFinalTime","true"))
+        else:
+            params.append(("allTreesExistAtFinalTime","false"))
+        params.append(("mergerTreeReadOutputTimeSnapTolerance",mergerTreeReadOutputTimeSnapTolerance))
+
+        return params
+
+        
+
 def locate_simulation_file(simulation):
     funcname = sys._getframe().f_code.co_name
     simfile = None        
