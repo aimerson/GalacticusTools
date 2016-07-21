@@ -15,7 +15,6 @@ class Simulation(object):
         
         # Load xml file of simulation specifications
         self.xmlFile = locate_simulation_file(simulation)
-        self.xmlFile = "./galacticus/data/Simulations/millennium.xml"
         xmlStruct = ET.parse(self.xmlFile)
         xmlRoot = xmlStruct.getroot()
         self.name = xmlRoot.attrib["name"]
@@ -104,14 +103,14 @@ def locate_simulation_file(simulation):
     # Millennium Simulation
     if fnmatch.fnmatch(simulation.lower(),"millennium") or \
             fnmatch.fnmatch(simulation.lower(),"ms-w1"):
-        simfile = pkg_resources.resource_filename(__name__,"../../data/Simulations/millennium.xml")
+        simfile = pkg_resources.resource_filename(__name__,"data/Simulations/millennium.xml")
     # Millennium 2 Simulation
     if fnmatch.fnmatch(simulation.lower(),"millennium2"):
-        simfile = pkg_resources.resource_filename(__name__,"../../data/Simulations/millennium2.xml")
+        simfile = pkg_resources.resource_filename(__name__,"data/Simulations/millennium2.xml")
     # MS-W7 simulation
     if fnmatch.fnmatch(simulation.lower(),"millgas") or \
             fnmatch.fnmatch(simulation.lower(),"ms-w7"):
-        simfile = pkg_resources.resource_filename(__name__,"../../data/Simulations/ms-w7.xml")
+        simfile = pkg_resources.resource_filename(__name__,"data/Simulations/ms-w7.xml")
     # ERROR if simulation not available
     if simfile is None:
         raise ValueError(funcname+"(): Simulation not recognised! Available simulations are: "+\
