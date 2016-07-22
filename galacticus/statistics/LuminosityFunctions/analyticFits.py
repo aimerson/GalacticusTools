@@ -1,5 +1,6 @@
 #! /usr/bin/env python
 
+import sys,os
 import fnmatch
 import numpy as np
 from scipy.integrate import romberg,quad
@@ -100,7 +101,7 @@ class SchechterLuminosities(object):
         USAGE: lf = SchechterFunction.phi(lum,[perLog10L])
 
         """
-        factor1 = (lum/self/Lstar)**self.alpha
+        factor1 = (lum/self.Lstar)**self.alpha
         factor2 = np.exp(-lum/self.Lstar)
         lf = self.phistar*factor1*factor2
         if perLog10L:

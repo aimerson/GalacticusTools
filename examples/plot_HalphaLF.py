@@ -10,10 +10,11 @@ from mpl_toolkits.axes_grid1 import AxesGrid
 
 
 G95 = Halpha('Gallego95')
-S09 = Halpha('Shim09')
+S09 = Halpha('Shim09',hubble=0.71)
 C13 = Halpha('Colbert13')
 S13 = Halpha('Sobral13')
-
+GAMA = Halpha('Gunawardhana13_GAMA')
+SDSS = Halpha('Gunawardhana13_SDSS')
     
 luminosities = np.linspace(38,44,100)
 
@@ -21,7 +22,7 @@ fig = figure(figsize=(15,10))
 axes = AxesGrid(fig,111,nrows_ncols=(2,3),axes_pad=0.0,\
                 share_all=True,label_mode="L",\
                 cbar_mode=None,aspect=False)
-redshifts  = [0.1,0.4,0.8,1.1,1.5,2.2]
+redshifts  = [0.09,0.4,0.84,1.1,1.48,2.23]
 
 addLegend = True
 hPozzetti = 0.7
@@ -48,9 +49,12 @@ for i,z in enumerate(redshifts):
     
     data = G95.selectRedshift(z)
     if data is not None:
-        l = data.log10L + np.log10((G95.hubble/0.7)**2)
-        phi = data.phi*((0.7/G95.hubble)**3)
-        err = data.phiErr*((0.7/G95.hubble)**3)
+        S = G95.Schechter(z)
+        phi = np.log10(S.phi(10.**luminosities))
+        ax.plot(luminosities,phi,c='g')
+        l = data.log10L 
+        phi = data.phi
+        err = data.phiErr
         posErr = np.log10(phi+err) - np.log10(phi)
         negErr = np.log10(phi) - np.log10(phi-err)
         np.place(negErr,np.isnan(negErr),99.0)
@@ -58,17 +62,23 @@ for i,z in enumerate(redshifts):
 
     data = S09.selectRedshift(z)
     if data is not None:
-        l = data.log10L + np.log10((S09.hubble/0.7)**2)
-        phi = data.phi*((0.7/S09.hubble)**3)
-        err = data.phiErr*((0.7/S09.hubble)**3)
+        S = S09.Schechter(z)
+        phi = np.log10(S.phi(10.**luminosities))
+        ax.plot(luminosities,phi,c='orange')
+        l = data.log10L 
+        phi = data.phi
+        err = data.phiErr
         posErr = np.log10(phi+err) - np.log10(phi)
         negErr = np.log10(phi) - np.log10(phi-err)
         np.place(negErr,np.isinf(negErr),99.0)
         np.place(negErr,np.isnan(negErr),99.0)
-        ax.errorbar(l,np.log10(phi),yerr=[negErr,posErr],marker='*',c='k',ls='none',mfc='none',mec='k',label=S09.dataset)
+        ax.errorbar(l,np.log10(phi),yerr=[negErr,posErr],marker='*',c='orange',ls='none',mfc='none',mec='orange',label=S09.dataset)
 
     data = C13.selectRedshift(z)
     if data is not None:
+        S = C13.Schechter(z)
+        phi = np.log10(S.phi(10.**luminosities))
+        ax.plot(luminosities,phi,c='r')
         l = data.log10L
         phi = data.phiCorr
         err = data.phiCorrErr
@@ -79,14 +89,35 @@ for i,z in enumerate(redshifts):
         
     data = S13.selectRedshift(z)    
     if data is not None:
-        l = data.log10L
-        phi = data.phiCorr
-        err = data.phiCorrErr
+        S = S13.Schechter(z)
+        phi = np.log10(S.phi(10.**luminosities))
+        ax.plot(luminosities,phi,c='b')
+        l = data.log10L+ np.log10((S13.hubble/0.7)**2)
+        phi = data.phiCorr*((0.7/S13.hubble)**3)
+        err = data.phiCorrErr*((0.7/S13.hubble)**3)
         posErr = np.log10(phi+err) - np.log10(phi)
         negErr = np.log10(phi) - np.log10(phi-err)
         np.place(negErr,np.isnan(negErr),99.0)
         xerr = data.errlog10L
         ax.errorbar(l,phi,yerr=err,xerr=xerr,marker='o',c='b',ls='none',mfc='none',mec='b',label=S13.dataset)
+
+    data = GAMA.selectRedshift(z)    
+    if data is not None:
+        l = data.log10L
+        phi = data.logphi
+        posErr = data.logphiPosErr
+        negErr = data.logphiNegErr
+        np.place(negErr,np.isnan(negErr),99.0)
+        ax.errorbar(l,phi,yerr=[negErr,posErr],marker='d',c='r',ls='none',mfc='none',mec='r',label=GAMA.dataset+" GAMA")
+
+    data = SDSS.selectRedshift(z)    
+    if data is not None:
+        l = data.log10L
+        phi = data.logphi
+        posErr = data.logphiPosErr
+        negErr = data.logphiNegErr
+        np.place(negErr,np.isnan(negErr),99.0)
+        ax.errorbar(l,phi,yerr=[negErr,posErr],marker='d',c='r',ls='none',mfc='r',mec='r',label=GAMA.dataset+" SDSS")
 
     ax.set_xlim(38.8,43.8)
     ax.set_ylim(-6,-1.01)

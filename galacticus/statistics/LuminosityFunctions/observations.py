@@ -3,15 +3,17 @@
 import sys,os,fnmatch
 import numpy as np
 import pkg_resources
-
+from .analyticFits import SchechterLuminosities
 
 class Halpha(object):
     
-    def __init__(self,dataset):        
+    def __init__(self,dataset,hubble=0.7):        
         classname = self.__class__.__name__
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        self.hubble = hubble
+
         # List available datasets
-        self.available = ["Gallego95","Shim09","Colbert13","Sobral13"]
+        self.available = ["Gallego95","Shim09","Colbert13","Sobral13","Gunawardhana13(GAMA)","Gunawardhana13(GAMA)"]
         # Load appropirate dataset
         if fnmatch.fnmatch(dataset.lower(),"*gallego*"):
             self.dataset = "Gallego et al. (1995)"
@@ -19,7 +21,10 @@ class Halpha(object):
             dtype = [("log10L",float),("phi",float),("phiErr",float)]
             self.data = np.loadtxt(ifile,dtype=dtype,usecols=range(len(dtype))).view(np.recarray)            
             self.data.log10L = np.log10(self.data.log10L*1.0e40)
-            self.hubble = 0.5
+            hubble = 0.5
+            self.data.log10L = self.data.log10L + np.log10((hubble/self.hubble)**2)
+            self.data.phi = self.data.phi*((self.hubble/hubble)**3)
+            self.data.phiErr = self.data.phiErr*((self.hubble/hubble)**3)
         elif fnmatch.fnmatch(dataset.lower(),"*shim*"):
             self.dataset = "Shim et al. (2009)"
             ifile = pkg_resources.resource_filename(__name__,"../../data/LuminosityFunctions/Shim09_Halpha.dat")
@@ -27,20 +32,51 @@ class Halpha(object):
             self.data = np.loadtxt(ifile,dtype=dtype,usecols=range(len(dtype))).view(np.recarray)            
             self.data.phi *= 1.0e-3
             self.data.phiErr *= 1.0e-3
-            self.hubble = 0.71
+            hubble = 0.71
+            self.data.log10L = self.data.log10L + np.log10((hubble/self.hubble)**2)
+            self.data.phi = self.data.phi*((self.hubble/hubble)**3)
+            self.data.phiErr = self.data.phiErr*((self.hubble/hubble)**3)
         elif fnmatch.fnmatch(dataset.lower(),"*colbert*"):
             self.dataset = "Colbert et al. (2013)"
             ifile = pkg_resources.resource_filename(__name__,"../../data/LuminosityFunctions/Colbert13_Halpha.dat")
             dtype = [("z",float),("log10L",float),("number",int),("phi",float),("phiCorr",float),("phiCorrErr",float)]
             self.data = np.loadtxt(ifile,dtype=dtype,usecols=range(len(dtype))).view(np.recarray)            
-            self.hubble = 0.7
+            hubble = 0.7
+            self.data.log10L = self.data.log10L + np.log10((hubble/self.hubble)**2)
+            self.data.phi = self.data.phi*((self.hubble/hubble)**3)
+            self.data.phiCorr = self.data.phiCorr*((self.hubble/hubble)**3)
+            self.data.phiCorrErr = self.data.phiCorrErr*((self.hubble/hubble)**3)
         elif fnmatch.fnmatch(dataset.lower(),"*sobral*"):
             self.dataset = "Sobral et al. (2013)"
             ifile = pkg_resources.resource_filename(__name__,"../../data/LuminosityFunctions/Sobral13_Halpha.dat")
             dtype = [("z",float),("log10L",float),("errlog10L",float),("number",int),("phiObs",float),("phiObsErr",float),\
                          ("phiCorr",float),("phiCorrErr",float),("volume",float)]
             self.data = np.loadtxt(ifile,dtype=dtype,usecols=range(len(dtype))).view(np.recarray)
-            self.hubble = 0.7
+            hubble = 0.7
+            self.data.log10L = self.data.log10L + np.log10((hubble/self.hubble)**2)
+            self.data.errlog10L = self.data.errlog10L + np.log10((hubble/self.hubble)**2)
+            self.data.phiObs = self.data.phiObs*((self.hubble/hubble)**3)
+            self.data.phiObsErr = self.data.phiObsErr*((self.hubble/hubble)**3)
+            self.data.phiCorr = self.data.phiCorr*((self.hubble/hubble)**3)
+            self.data.phiCorrErr = self.data.phiCorrErr*((self.hubble/hubble)**3)
+            self.data.volume *= 1.0e4            
+            self.data.volume *= ((hubble/self.hubble)**3)
+        elif fnmatch.fnmatch(dataset.lower(),"*gunawardhana*"):
+            self.dataset = "Gunawardhana et al. (2013)"
+            if "sdss" in dataset.lower():
+                ifile = pkg_resources.resource_filename(__name__,"../../data/LuminosityFunctions/Gunawardhana13_SDSS_Halpha.dat")
+            elif "gama" in dataset.lower():
+                ifile = pkg_resources.resource_filename(__name__,"../../data/LuminosityFunctions/Gunawardhana13_GAMA_Halpha.dat")
+            else:
+                raise ValueError(classname+"(): Gunawardhana et al. data available for two datasets! Specify either GAMA or SDSS in dataset name!")
+            dtype = [("z",float),("log10L",float),("logphi",float),("logphiNegErr",float),("logphiPosErr",float)]
+            self.data = np.loadtxt(ifile,dtype=dtype,usecols=range(len(dtype))).view(np.recarray)
+            self.data.log10L += 7.0  # Convert from Watts to ergs/s
+            hubble = 0.7
+            self.data.log10L += np.log10((hubble/self.hubble)**2)
+            self.data.logphi += np.log10((self.hubble/hubble)**3)
+            self.data.logphiNegErr += np.log10((self.hubble/hubble)**3)
+            self.data.logphiPosErr += np.log10((self.hubble/hubble)**3)            
         else:
             raise ValueError(classname+"(): Dataset name not recognised! Currently available datasets: "+\
                                  ",".join(self.avaialble))
@@ -78,9 +114,75 @@ class Halpha(object):
             if z > 1.7 and z < 2.8:
                 mask = self.data.z == 2.23
             data = self.data[mask]                            
+        if self.dataset == "Gunawardhana et al. (2013)":
+            mask = np.zeros(len(self.data.z),bool)
+            if z < 0.1:
+                mask = self.data.z == 0.05
+            if z > 0.1 and z < 0.15:
+                mask = self.data.z == 0.125
+            if z > 0.17 and z < 0.24:
+                mask = self.data.z == 0.205
+            if z > 0.24 and z < 0.34:
+                mask = self.data.z == 0.29
+            data = self.data[mask]                            
         if len(data.log10L) == 0:
             data = None
         return data
+
+
+    def Schechter(self,z):
+        object = None
+        if self.dataset == "Gallego et al. (1995)":
+            if z < 0.1:
+                hubble = 0.7 # Rescaled values from Geach et al (2010)
+                Lstar = 10**41.87                
+                Lstar *= ((hubble/self.hubble)**2)
+                phistar = 10**-2.78
+                phistar *= ((self.hubble/hubble)**3)
+                object = SchechterLuminosities(-1.3,Lstar,phistar)
+        if self.dataset == "Colbert et al. (2013)":
+            hubble = 0.7
+            if z > 0.3 and z < 0.9:
+                Lstar = 10**41.72                
+                Lstar *= ((hubble/self.hubble)**2)
+                phistar = 10**-2.51
+                phistar *= ((self.hubble/hubble)**3)
+                object = SchechterLuminosities(-1.27,Lstar,phistar)
+            if z > 0.9 and z < 1.5:
+                Lstar = 10**42.18                
+                Lstar *= ((hubble/self.hubble)**2)
+                phistar = 10**-2.70
+                phistar *= ((self.hubble/hubble)**3)
+                object = SchechterLuminosities(-1.43,Lstar,phistar)
+        if self.dataset == "Sobral et al. (2013)":
+            hubble = 0.7
+            if z >= 0.39 and z <= 0.41:
+                Lstar = 10**41.95                
+                Lstar *= ((hubble/self.hubble)**2)
+                phistar = 10**-3.12
+                phistar *= ((self.hubble/hubble)**3)
+                object = SchechterLuminosities(-1.75,Lstar,phistar)
+            if z >= 0.82 and z <= 0.86:
+                Lstar = 10**42.25                
+                Lstar *= ((hubble/self.hubble)**2)
+                phistar = 10**-2.47
+                phistar *= ((self.hubble/hubble)**3)
+                object = SchechterLuminosities(-1.56,Lstar,phistar)                
+            if z >= 1.45 and z <= 1.49:
+                Lstar = 10**42.56                
+                Lstar *= ((hubble/self.hubble)**2)
+                phistar = 10**-2.61
+                phistar *= ((self.hubble/hubble)**3)
+                object = SchechterLuminosities(-1.62,Lstar,phistar)                                
+            if z >= 2.21 and z <= 2.25:
+                Lstar = 10**42.87                
+                Lstar *= ((hubble/self.hubble)**2)
+                phistar = 10**-2.78
+                phistar *= ((self.hubble/hubble)**3)
+                object = SchechterLuminosities(-1.59,Lstar,phistar)                                
+        return object
+
+
 
 
 
