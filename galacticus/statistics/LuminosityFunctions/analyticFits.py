@@ -93,18 +93,18 @@ class SchechterLuminosities(object):
         self.phistar = phistar
         return
 
-    def phi(self,lum,perLog10L=True):
+    def phi(self,lum,perDex=True):
         """
         phi(): Return Schechter luminosity function for specified
                                luminosities
 
-        USAGE: lf = SchechterFunction.phi(lum,[perLog10L])
+        USAGE: lf = SchechterFunction.phi(lum,[perDex])
 
         """
         factor1 = (lum/self.Lstar)**self.alpha
         factor2 = np.exp(-lum/self.Lstar)
         lf = self.phistar*factor1*factor2
-        if perLog10L:
+        if perDex:
             lf *= np.log(10.0)*(lum/self.Lstar)
         return lf
         
@@ -137,13 +137,13 @@ class EuclidModel1(object):
     def Lstar(self,z):
         return self.lstar0*(1.0+z)**self.delta
 
-    def phi(self,l,z,perLog10L=True):
+    def phi(self,l,z,perDex=True):
         # Luminosity function at a redshift, z
         lstar = self.Lstar(z)        
         factor1 = (l/lstar)**self.alpha
         factor2 = np.exp(-l/lstar)
         lf = self.phistar(z)*factor1*factor2
-        if perLog10L:
+        if perDex:
             lf *= np.log(10.0)*(l/lstar)
         return lf
     
@@ -173,14 +173,14 @@ class EuclidModel2(object):
             phistar = self.phistar0*((1.0+self.zbreak)**(2.0*self.epsilon))*((1.0+z)**(-1.0*self.epsilon))        
         return phistar
 
-    def phi(self,l,z,perLog10L=True):
+    def phi(self,l,z,perDex=True):
         # Luminosity function at a redshift, z
         lstar = self.Lstar(z)        
         factor1 = (l/lstar)**self.alpha
         factor2 = np.exp(-l/lstar)
         phistar = self.phistar(z)
         lf = phistar*factor1*factor2
-        if perLog10L:
+        if perDex:
             lf *= np.log(10.0)*l/lstar
         return lf
 
@@ -216,14 +216,14 @@ class EuclidModel3(object):
     def phistar(self,z):
         return self.phistar0
 
-    def phi(self,l,z,perLog10L=True):
+    def phi(self,l,z,perDex=True):
         # Luminosity function at a redshift, z
         Lstar = self.Lstar(z)
         factor1 = (l/Lstar)**self.alpha
         factor2 = np.exp(-(1.0-self.gamma)*l/Lstar)
         factor3 = (1.0 + np.expm1(1.0)*((l/Lstar)**self.delta))**-self.gamma
         lf = factor1*factor2*factor3*self.phistar(z)
-        if perLog10L:
+        if perDex:
             lf *= np.log(10)*l/Lstar
         return lf
 
@@ -247,8 +247,8 @@ class EuclidLuminosityFunction(object):
     def phistar(self,z):
         return self.model.phistar(z)
 
-    def phi(self,luminosity,z):
-        return self.model.phi(luminosity,z)
+    def phi(self,luminosity,z,perDex=True):
+        return self.model.phi(luminosity,z,perDex=perDex)
 
     def integrate(self,llow,lupp,z,**kwargs):
         kwargs["args"] = (z)
