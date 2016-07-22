@@ -62,9 +62,6 @@ for i,z in enumerate(redshifts):
 
     data = S09.selectRedshift(z)
     if data is not None:
-        S = S09.Schechter(z)
-        phi = np.log10(S.phi(10.**luminosities))
-        ax.plot(luminosities,phi,c='orange')
         l = data.log10L 
         phi = data.phi
         err = data.phiErr
