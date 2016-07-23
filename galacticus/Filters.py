@@ -4,9 +4,11 @@ import sys,fnmatch
 import numpy as np
 from scipy.interpolate import interp1d
 from scipy.integrate import romb
+import pkg_resources
 import xml.etree.ElementTree as ET
 from .config import *
 from .EmissionLines import emissionLines
+from .parameters import formatParametersFile
 
 def getTopHatLimits(wavelengthCentral,resolution,verbose=False):        
     funcname = sys._getframe().f_code.co_name
@@ -25,14 +27,15 @@ def getTopHatLimits(wavelengthCentral,resolution,verbose=False):
 
 
 
-def getVegaSpectrum(specfile=None):
-    if specfile is None:
-        specfile = galacticusPath+"/data/stellarAstrophysics/vega/A0V_Castelli.xml"
+def getVegaSpectrum(specFile=None):
+    if specFile is None:
+        specFile = pkg_resources.resource_filename(__name__,"data/stellarAstrophysics/Vega/A0V_Castelli.xml")
+        #specFile = galacticusPath+"/data/stellarAstrophysics/vega/A0V_Castelli.xml"
     # Load Vega spectrum
     xmlStruct = ET.parse(specFile)
     xmlRoot = xmlStruct.getroot()
     xmlMap = {c.tag:p for p in xmlRoot.iter() for c in p} 
-    data = response.findall("datum")
+    data = xmlRoot.findall("datum")
     spectrum = np.zeros(len(data),dtype=[("wavelength",float),("flux",float)])
     for i,datum in enumerate(data):
         spectrum["wavelength"][i] = float(datum.text.split()[0])
@@ -41,8 +44,6 @@ def getVegaSpectrum(specfile=None):
     spectrum["wavelength"] = spectrum["wavelength"][isort]
     spectrum["flux"] = spectrum["flux"][isort]
     return spectrum.view(np.recarray)
-
-
 
 
 def computeEffectiveWavelength(wavelength,transmission):
@@ -64,10 +65,6 @@ def getFilterTransmission(filterFile):
     return transmission.view(np.recarray)
 
 
-
-
-
-
 class VegaOffset(object):
     
     def __init__(self,VbandFilterFile=None):
@@ -79,9 +76,9 @@ class VegaOffset(object):
         self.fluxABV = None
         return
 
-    def computeFluxes(self,wavelength,transmission,kRomberg=100,**kwargs):        
+    def computeFluxes(self,wavelength,transmission,kRomberg=8,**kwargs):        
         # Interpolate spectrum and transmission data
-        wavelengthJoint = np.linspace(wavelength.min(),wavelength.max(),2*kRomberg+1)
+        wavelengthJoint = np.linspace(wavelength.min(),wavelength.max(),2**kRomberg+1)
         deltaWavelength = wavelengthJoint[1] - wavelengthJoint[0]
         interpolateTransmission = interp1d(wavelength,transmission,**kwargs)
         interpolateFlux = interp1d(self.vegaSpectrum.wavelength,self.vegaSpectrum.flux,**kwargs)
@@ -97,7 +94,7 @@ class VegaOffset(object):
         fluxAB = romb(filteredSpectrumAB,dx=deltaWavelength)
         return (fluxAB,fluxVega)
 
-    def computeOffset(self,wavelength,transmission,kRomberg=100,**kwargs):                
+    def computeOffset(self,wavelength,transmission,kRomberg=8,**kwargs):                
         # Compute fluxes for V-band magnitude if not already computed
         if self.fluxABV is None or self.fluxVegaV is None:
             wavelengthV = self.transmissionV.wavelength
@@ -168,7 +165,48 @@ class Filter(object):
                             for w,t in zip(self.transmission.wavelength,self.transmission.transmission)]
             print("".join(infoLine))
         return
-            
+
+
+def createFilter(filePath,name,response,description=None,origin=None,url=None,\
+                     effectiveWavelength=None,vegaOffset=None,vBandFilter=None):    
+    # Create tree root
+    root = ET.Element("filter")
+    # Add name and other descriptions
+    ET.SubElement(root,"name").text = name
+    if description is None:
+        description = name
+    ET.SubElement(root,"description").text = description
+    if origin is None:
+        origin = "unknown"
+    ET.SubElement(root,"origin").text = origin
+    if url is None:
+        url = "unknown"
+    ET.SubElement(root,"url").text = url
+    # Add in response data
+    RES = ET.SubElement(root,"response")
+    dataSize = len(response["wavelength"])
+    for i in range(dataSize):
+        wavelength = response["wavelength"][i]
+        transmission = response["response"][i]
+        datum = "{0:7.3f} {1:9.7f}".format(wavelength,transmission)
+        ET.SubElement(RES,"datum").text = datum
+    # Compute effective wavlength and Vega offset if needed
+    if effectiveWavelength is None:
+        wavelength = response["wavelength"]
+        transmission = response["response"]
+        effectiveWavelength = computeEffectiveWavelength(wavelength,transmission)
+    ET.SubElement(root,"effectiveWavelength").text = str(effectiveWavelength)
+    if vegaOffset is None:
+        wavelength = response["wavelength"]
+        transmission = response["response"]
+        VO = VegaOffset(VbandFilterFile=vBandFilter)
+        vegaOffset = VO.computeOffset(wavelength,transmission)
+    ET.SubElement(root,"vegaOffset").text = str(vegaOffset)
+    # Finalise tree and save to file
+    tree = ET.ElementTree(root)
+    tree.write(filePath)
+    formatParametersFile(filePath)
+    return
 
         
 class GalacticusFilters(object):
@@ -232,4 +270,10 @@ class GalacticusFilters(object):
             print(funcname+"(): Effective wavelength (rest frame) for filter '"+filterName + \
                       "' = {0:f} Angstroms".format(effectiveWavelength))
         return effectiveWavelength
+
+
+
+
+
+
 
