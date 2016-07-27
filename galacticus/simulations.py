@@ -39,6 +39,10 @@ class Simulation(object):
         self.h0 = float(cosmologyStruct.find("H0").text)/100.0
         self.sigma8 = float(cosmologyStruct.find("sigma8").text)
         self.ns = float(cosmologyStruct.find("ns").text)
+        try:
+            self.temperatureCMB = float(cosmologyStruct.find("temperatureCMB").text)
+        except AttributeError:
+            self.temperatureCMB = 2.726
         self.cosmology = Cosmology(omega0=self.omega0,lambda0=self.lambda0,omegab=self.omegaB,h0=self.h0,\
                                        sigma8=self.sigma8,ns=self.ns,radiation=radiation,\
                                        zmax=self.snapshots.z.max(),nzmax=10000)               
@@ -109,6 +113,7 @@ class Simulation(object):
         params.append(("OmegaMatter",self.omega0,"cosmologyParametersMethod"))
         params.append(("OmegaDarkEnergy",self.lambda0,"cosmologyParametersMethod"))
         params.append(("OmegaBaryon",self.omegaB,"cosmologyParametersMethod"))
+        params.append(("temperatureCMB",self.temperatureCMB,"cosmologyParametersMethod"))
         params.append(("sigma_8",self.sigma8,"cosmologicalMassVarianceMethod"))
         params.append(("powerSpectrumPrimordialMethod",powerSpectrumPrimordialMethod))
         params.append(("index",self.ns,"powerSpectrumPrimordialMethod"))
