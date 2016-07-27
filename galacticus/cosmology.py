@@ -5,7 +5,7 @@ import numpy as np
 import scipy as sp
 from scipy.constants import c,constants
 from scipy.integrate import romberg
-
+from .constants import Pi,massSolar,Parsec
 
 class Cosmology(object):
     """
@@ -62,12 +62,15 @@ class Cosmology(object):
         self.omegak = 1.0 - (self.omega0 + self.lambda0 + self.omegar)
 
         # Define useful constants/conversions
-        self.Mpc = constants.mega*constants.parsec
+        self.Mpc = constants.mega*constants.parsec        
         self.H100 = 100.0*constants.kilo/self.Mpc
         self.Gyr = constants.giga*constants.year
         self.invH0 = (self.Mpc/(100.0*constants.kilo))/self.Gyr
         self.HubbleDistance = c/self.H100
-        self._kmpersec_to_mpchpergyr = constants.kilo*(self.Gyr/self.Mpc)*self.h0
+        self._kmpersec_to_mpchpergyr = constants.kilo*(self.Gyr/self.Mpc)*self.h0                
+        self.criticalDensity = (3.0*(100**2)/8.0/Pi/constants.G)
+        self.criticalDensity *=(constants.kilo/self.Mpc)**2
+        self.criticalDensity /= massSolar/(self.Mpc**3)
 
         # Set up array of redshift vs. comoving distance for
         # interpolation for other properties
@@ -379,7 +382,22 @@ class Cosmology(object):
 
 
 
+    def particleMass(self,boxSize,particlesPerSide):
+        numberDensity = (float(particlesPerSide)/float(boxSize))**3
+        return self.criticalDensity*self.omega0/numberDensity
 
+    def boxSize(self,particleMass,particlesPerSide):
+        boxSize = particleMass*(particlesPerSide**3)
+        boxSize /= self.criticalDensity*self.omega0
+        return boxSize**(1.0/3.0)
+    
+    def particlesPerSide(self,boxSize,particleMass):
+        return (self.criticalDensity*self.omega0*(boxSize**3)/particleMass)**(1.0/3.0)
+    
+        
+
+
+    
 class WMAP(Cosmology):
     
     def __init__(self,year,radiation=False,zmax=20.0,nzmax=10000):
