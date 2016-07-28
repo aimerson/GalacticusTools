@@ -169,7 +169,7 @@ class HDF5(object):
         return
 
     def lsDatasets(self,hdfdir):
-        objs = self.lsdir(hdfdir,recursive=False)             
+        objs = self.lsGroups(hdfdir,recursive=False)             
         dsets = []
         def _is_dataset(obj):
             return isinstance(self.fileObj[hdfdir+"/"+obj],h5py.Dataset)        

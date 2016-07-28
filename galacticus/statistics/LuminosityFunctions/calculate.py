@@ -1,8 +1,8 @@
 #! /usr/bin/env python
 
 
-import sys
-import fnmatch
+import sys,fnmatch
+import h5py
 import numpy as np
 from ...hdf5 import HDF5
 from ...io import GalacticusHDF5
@@ -10,7 +10,7 @@ from ...Luminosities import ergPerSecond
 from ...utils.progress import Progress
 
 
-class GalacticusLuminosityFunction(object):
+class ComputeLuminosityFunction(object):
     
     def __init__(self,galHDF5Obj,magnitudeBins=None,luminosityBins=None):        
         classname = self.__class__.__name__
@@ -149,8 +149,36 @@ class GalacticusLuminosityFunction(object):
 
 
 
-
-
-
-
+class GalacticusLuminosityFunction(object):
+    
+    def __init__(self,luminosityFunctionFile):
+        classname = self.__class__.__name__
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        self.file = luminosityFunctionFile
+        f = HDF5(self.file,'r')
+        # Read Hubble parameter
+        self.hubble = f.readAttributes("/")["hubbleParameter"]
+        # Read bins arrays
+        bins = f.readDatasets("/",required=["luminosityBins","magnitudeBins"])
+        self.luminosityBins = np.copy(bins["luminosityBins"])
+        self.magnitudeBins = np.copy(bins["magnitudeBins"])
+        del bins
+        # Read list of available outputs and datasets
+        self.outputs = list(map(str,f.lsGroups("Outputs")))
+        self.redshifts = np.ones(len(self.outputs))
+        self.datasets = {}
+        for i,out in enumerate(self.outputs):
+            self.redshifts[i] = f.readAttributes("Outputs/"+out)["redshift"]
+            self.datasets[out] = list(map(str,f.lsDatasets("Outputs/"+out)))
+        f.close()
+        return
+    
+    def getDatasets(self,z,required=None):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        iselect = np.argmin(np.fabs(self.redshifts-z))
+        path = "Outputs/"+self.outputs[iselect]
+        f = HDF5(self.file,'r')
+        lfData = f.readDatasets(path,required=required)
+        f.close()
+        return lfData
 
