@@ -72,9 +72,10 @@ class Cosmology(object):
         self.Mpc = constants.mega*Parsec        
         self.Gyr = constants.giga*constants.year
         self._kmpersec_to_mpchpergyr = constants.kilo*(self.Gyr/self.Mpc)*self.h0                
-        self.H100 = 100.0*constants.kilo/self.Mpc
-        self.invH0 = (self.Mpc/(100.0*constants.kilo))/self.Gyr
-        self.HubbleDistance = c/self.H100
+        self.H0SI = self.H0*constants.kilo/self.Mpc
+        self.HubbleTime = (self.Mpc/(self.H0*constants.kilo))/self.Gyr
+        self.HubbleDistance = c/self.H0SI
+        self.HubbleVolume = self.HubbleDistance**3
 
         # Compute critical density
         self.criticalDensity = (3.0*(100**2)/8.0/Pi/constants.G)
@@ -125,7 +126,7 @@ class Cosmology(object):
         H(z): Function to return the Hubble parameter as measured
               by an observer at redshift, z.
         """
-        result = 100.0*self.E(z)
+        result = self.H0*self.E(z)
         return result
 
     
@@ -140,7 +141,7 @@ class Cosmology(object):
         a = 1.0/(1.0+z)
         result = self.omegak*(a**-2) + self.lambda0 + \
                  self.omega0*(a**-3) + self.omegar*(a**-4)
-        result = (c/self.H100)/np.sqrt(result)/self.Mpc
+        result = (c/self.H0SI)/np.sqrt(result)/self.Mpc
         return result
 
 
@@ -186,22 +187,34 @@ class Cosmology(object):
                            a redshift, z, for the given cosmology.
         
         USAGE: age_of_universe(z)
+
+        Note: equations from Mo, van den Bosch & White (2010) Ch.3 Eq. 3.96-3.99
         
         """
         a = 1.0/(1.0+z)
-        if(self.omega0 >= 0.99999): # Einstein de Sitter Universe
-            result = self.invH0*2.0*np.sqrt(a)/(3.0*self.h0)
+        result = None
+        if np.fabs(self.lambda0) < 1.0e-9: # lambda0 = 0
+            if self.omega0 == 1.0 : 
+                # Einstein de Sitter Universe (Mo et al. 2010, Eq. 3.96)
+                result = self.HubbleTime*(2.0/3.0)*(a**(3.0/2.0))
+            elif self.omega0 < 1:
+                # Open Universe with lambda0 = 0 and omega0 < 1 (Mo et al. 2010, Eq. 3.97)
+                factor1 = self.HubbleTime*self.omega0/2.0/((1.0-self.omega0)**(3.0/2.0))
+                factor2 = 2.0*np.sqrt((1-self.omega0)*(self.omega0*z+1.0))/self.omega0/(1.0+z)
+                factor3 = -np.arccosh((self.omega0*z-self.omega0+2.0)/(self.omega0*(1.0+z)))
+                result = factor1*(factor2+factor3)
+            else:
+                # Closed Universe with lambda = 0 and omega > 1 (Mo et al. 2010, Eq. 3.98)
+                factor1 = self.HubbleTime*self.omega0/2.0/((self.omega0-1.0)**(3.0/2.0))                
+                factor2 = -2.0*np.sqrt((self.omega0-1.0)*(self.omega0*z+1.0))/self.omega0/(1.0+z)
+                factor3 = np.arccos((self.omega0*z-self.omega0+2.0)/(self.omega0*(1.0+z)))
+                result = factor1*(factor2+factor3)
         else:
-            if(self.lambda0 <= 0.0): # Open Universe
-                zplus1 = 1.0/a
-                result1 = self.omega0/(2.0*self.h0*(1-self.omega0)**1.5)
-                result2 = 2.0*np.sqrt(1.0-self.omega0)*np.sqrt(self.omega0*(zplus1-1.0)+1.0)
-                result3 = np.arccosh((self.omega0*(zplus1-1.0)-self.omega0+2.0)/(self.omega0*zplus1))
-                result = self.invH0*result1*(result2/result3)
-            else: # Flat Universe with non-zero Cosmological Constant
-                result1 = (2.0/(3.0*self.h0*np.sqrt(1.0-self.omega0)))
-                result2 = np.arcsinh(np.sqrt((1.0/self.omega0-1.0)*a)*a)
-                result = self.invH0*result1*result2
+            # Flat Universe with lambda0 + omega0 = 1 (Mo et al. 2010, Eq. 3.99)
+            if np.fabs(self.lambda0+self.omega0-1.0) < 1.0e-9:
+                factor1 = self.HubbleTime*(2.0/3.0)/np.sqrt(self.lambda0)
+                factor2 = np.sqrt(self.lambda0*(a**3)) + np.sqrt(self.lambda0*(a**3)+self.omega0)
+                result = factor1*np.log(factor2/np.sqrt(self.omega0))
         return result
             
             
@@ -217,6 +230,34 @@ class Cosmology(object):
         return t
 
 
+
+    
+    def comoving_transverse_distance(self,z=0.0):
+        """
+        comoving_transverse_distance(): Returns the transverse comoving distance (in Mpc/h or) 
+                                        Mpc) corresponding to redshift, z.
+
+        USAGE: comoving_transverse_distance(z)
+                                        
+
+        Note: from Hogg (1999) Eq.16.
+        """
+        if self.omegak > 0:
+            result = self.HubbleDistance
+            result *= np.sinh(np.sqrt(self.omegak)*self.comoving_distance(z)/self.HubbleDistance)
+            result /= np.sqrt(self.omegak)
+        elif self.omegak < 0:
+            result = self.HubbleDistance
+            result *= np.sin(np.sqrt(np.fabs(self.omegak))*self.comoving_distance(z)/self.HubbleDistance)
+            result /= np.sqrt(np.fabs(self.omegak))
+        else:
+            result = self.comoving_distance(z)
+        return result
+
+
+
+
+
     def angular_diameter_distance(self,z=0.0):
         """
         angular_diameter_distance(): Returns the angular diameter
@@ -226,36 +267,7 @@ class Cosmology(object):
         USAGE: angular_diameter_distance(z)    
 
         """
-        dr = self.comoving_distance(z)*self.Mpc/(c/self.H100)
-        x = np.sqrt(np.abs(self.omegak))*dr
-        if np.ndim(x) > 0:
-            ratio = np.ones_like(x)*-1.00
-            mask = (x > 0.1)
-            y = x[np.where(mask)]
-            if(self.omegak > 0.0):
-                np.place(ratio,mask,0.5*(np.exp(y)-np.exp(-y))/y)
-            else:
-                np.place(ratio,mask,np.sin(y)/y)
-            mask = (x <= 0.1)
-            y = x[np.where(mask)]**2
-            if(self.omegak < 0.0): 
-                y = -y
-            np.place(ratio,mask,1.0 + y/6.0 + (y**2)/120.0)
-        else:        
-            ratio = -1.0
-            if(x > 0.1):
-                if(self.omegak > 0.0):
-                    ratio = 0.5*(np.exp(x)-np.exp(-x))/x
-                else:
-                    ratio = np.sin(x)/x
-            else:
-                y = x**2
-                if(self.omegak < 0.0): 
-                    y = -y
-                ratio = 1.0 + y/6.0 + (y**2)/120.0
-        dt = ratio*dr/(1.0+z)
-        dA = (c/self.H100)*dt/self.Mpc
-        return dA
+        return self.comoving_transverse_distance(z)/(1.0+z)
 
 
     def angular_scale(self,z=0.0):
@@ -280,8 +292,8 @@ class Cosmology(object):
         USAGE: luminosity_distance(z)
         
         """
-        da = self.angular_diameter_distance(z)*self.Mpc/(c/self.H100)
-        dL = (c/self.H100)*da*((1.0+z)**2)/self.Mpc
+        da = self.angular_diameter_distance(z)*self.Mpc/(c/self.H0SI)
+        dL = (c/self.H0SI)*da*((1.0+z)**2)/self.Mpc
         return dL
     
 
@@ -293,48 +305,37 @@ class Cosmology(object):
         
         USAGE: comoving_volume(z)
         
-        """
-        dr = self.comoving_distance(z)*self.Mpc/(c/self.H100)
-        x = np.sqrt(np.abs(self.omegak))*dr
-        if np.ndim(z) > 0:
-            ratio = np.ones_like(z)*-1.0
-            mask = (x > 0.1)
-            y = x[np.where(mask)]
-            if(self.omegak > 0.0):
-                rat = (0.125*(np.exp(2.0*y)-np.exp(-2.0*y))-y/2.0)
-            else:
-                rat = (y/2.0 - np.sin(2.0*y)/4.0)
-            np.place(ratio,mask,rat/((y**3)/3.0))
-            mask = (x <= 0.1)
-            y = x[np.where(mask)]**2
-            if(self.omegak < 0.0): 
-                y = -y
-            np.place(ratio,mask,1.0 + y/5.0 + (y**2)*(2.0/105.0))
-        else:  
-            ratio = -1.0
-            if(x > 0.1):
-                if(self.omegak > 0.0):
-                    ratio = (0.125*(np.exp(2.0*x)-np.exp(-2.0*x))-x/2.0)
-                else:
-                    ratio = (x/2.0 - np.sin(2.0*x)/4.0)
-                ratio = ratio/((x**3)/3.0)
-            else:
-                y = x**2
-                if(self.omegak < 0.0): 
-                    y = -y
-                ratio = 1.0 + y/5.0 + (y**2)*(2.0/105.0)
-        vol = 4.0*np.pi*ratio*(((c/self.H100)*dr/self.Mpc)**3)/3.0
-        return vol
+        Note: From Hogg (1999) Eq.29
 
+        """
+
+        DM = self.comoving_transverse_distance(z)        
+        if self.omegak > 0.0:
+            DMDH = DM/self.HubbleDistance            
+            factor1 = 4.0*Pi*self.HubbleVolume/2.0/self.omegak
+            factor2 = DMDH*np.sqrt(1.0+self.omegak*(DMDH**2))
+            factor3 = -np.arcsinh(np.sqrt(np.fabs(self.omegak))*DMDH)/np.sqrt(np.fabs(self.omegak))
+            result = factor1*(factor2+factor3)
+        elif self.omegak < 0.0:
+            DMDH = DM/self.HubbleDistance            
+            factor1 = 4.0*Pi*self.HubbleVolume/2.0/self.omegak
+            factor2 = DMDH*np.sqrt(1.0+self.omegak*(DMDH**2))
+            factor3 = -np.arcsin(np.sqrt(np.fabs(self.omegak))*DMDH)/np.sqrt(np.fabs(self.omegak))
+            result = factor1*(factor2+factor3)
+        else:
+            result = 4.0*Pi*(DM**3)/3.0
+        return result
+
+    
 
     def dVdz(self,z=0.0):
         """
         dVdz() : Returns the comoving volume element dV/dz
                  at redshift, z, for all sky.
         
-        dV = (c/H100)*(1+z)**2*D_A**2/E(z) dz dOmega
+        dV = (c/H0SI)*(1+z)**2*D_A**2/E(z) dz dOmega
         
-        f(z) = (c/H100)/E(z)
+        f(z) = (c/H0SI)/E(z)
         
         ==> dV/dz(z,all sky) = 4*PI*f(z)*(1+z)**2*D_A**2
              
@@ -355,16 +356,10 @@ class Cosmology(object):
 
         NOTE from Galacticus manual:
         The luminosity computed in this way is that in the galaxy rest
-        frame using a filter blueshifted to the galaxy’s redshift. This means
+        frame using a filter blueshifted to the galaxy's redshift. This means
         that to compute an apparent magnitude you must add not only the
         distance modulus, but a factor of 2.5 log10(1 + z) to account for
         compression of photon frequencies.
-
-        There is no h dependence as we work always in length units of Mpc/h 
-        such that our absolute magnitudes are really Mabs-5logh and no 
-        additional h dependence is needed here to get apparent magnitudes 
-        that are h independent.
-        
         """
         dref = 10.0/constants.mega # 10pc in Mpc
         dL = self.luminosity_distance(z)
@@ -381,8 +376,9 @@ class Cosmology(object):
         ZZ = r*np.sin(dec)
         return XX,YY,ZZ
 
-
-
+    #
+    # Functions for N-body simulations
+    #
     def particleMass(self,boxSize,particlesPerSide):
         numberDensity = (float(particlesPerSide)/float(boxSize))**3
         return self.criticalDensity*self.omega0/numberDensity
@@ -394,6 +390,8 @@ class Cosmology(object):
     
     def particlesPerSide(self,boxSize,particleMass):
         return (self.criticalDensity*self.omega0*(boxSize**3)/particleMass)**(1.0/3.0)
+
+
 
 
 class WMAP(Cosmology):
