@@ -420,7 +420,7 @@ class Cosmology(object):
 
 class WMAP(Cosmology):
     
-    def __init__(self,year,radiation=False,zmax=20.0,nzmax=10000):
+    def __init__(self,year,h_independent=True,radiation=False,zmax=20.0,nzmax=10000):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         self.year = year        
@@ -449,7 +449,7 @@ class WMAP(Cosmology):
             print("           Select one of the following years: 1,3,5,7,9.")                        
         super(WMAP, self).__init__(omega0=omega0,lambda0=lambda0,omegab=omegab,h0=h0,\
                                        sigma8=sigma8,ns=ns,radiation=radiation,\
-                                       zmax=zmax,nzmax=nzmax)
+                                       zmax=zmax,nzmax=nzmax,h_independent=h_independent)
         return
 
 

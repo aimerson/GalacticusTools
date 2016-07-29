@@ -71,8 +71,8 @@ class ComputeLuminosityFunction(object):
         PROG = Progress(len(goodProps))
         for p in goodProps:
             values = np.array(out["nodeData/"+p])
-            if fnmatch.fnmatch(p,"*LineLuminosity*")
-:                values = adjustHubble(values,self.hubbleGalacticus,self.hubble,"luminosity")
+            if fnmatch.fnmatch(p,"*LineLuminosity*"):
+                values = adjustHubble(values,self.hubbleGalacticus,self.hubble,"luminosity")
                 values = np.log10(ergPerSecond(values))
                 values += np.log10((self.hubbleGalacticus/self.hubble)**2)
                 bins = self.luminosityBins
@@ -128,7 +128,13 @@ class ComputeLuminosityFunction(object):
             print(funcname+"(): Writing luminosity function data to "+hdf5File+" ...")            
         fileObj = HDF5(hdf5File,'w')
         # Write value of Hubble parameter
-        fileObj.addAttributes("/",{"hubbleParameter":self.hubble})
+        fileObj.mkGroup("Cosmology")
+        fileObj.addAttributes("Cosmology",{"HubbleParameter":self.hubble})
+        fileObj.addAttributes("Cosmology",{"OmegaMatter":self.galHDF5Obj.parameters["OmegaMatter"]})
+        fileObj.addAttributes("Cosmology",{"OmegaBaryon":self.galHDF5Obj.parameters["OmegaBaryon"]})
+        fileObj.addAttributes("Cosmology",{"OmegaDarkEnergy":self.galHDF5Obj.parameters["OmegaDarkEnergy"]})
+        fileObj.addAttributes("Cosmology",{"sigma8":self.galHDF5Obj.parameters["sigma_8"]})            
+        fileObj.addAttributes("Cosmology",{"ns":self.galHDF5Obj.parameters["index"]})
         # Write luminosity and magnitude bins
         luminosityBinWidth = self.luminosityBins[1] - self.luminosityBins[0]
         luminosityBins = self.luminosityBins[:-1] + luminosityBinWidth/2.0
@@ -166,8 +172,13 @@ class GalacticusLuminosityFunction(object):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         self.file = luminosityFunctionFile
         f = HDF5(self.file,'r')
-        # Read Hubble parameter
-        self.hubble = f.readAttributes("/")["hubbleParameter"]
+        # Read cosmological parameters
+        self.hubble = f.readAttributes("Cosmology")["HubbleParameter"]        
+        self.omega0 = f.readAttributes("Cosmology")["OmegaMatter"]        
+        self.lambda0 = f.readAttributes("Cosmology")["OmegaDarkEnergy"]        
+        self.omegab = f.readAttributes("Cosmology")["OmegaBaryon"]        
+        self.sigma8 = f.readAttributes("Cosmology")["sigma8"]        
+        self.ns = f.readAttributes("Cosmology")["ns"]                
         # Read bins arrays
         bins = f.readDatasets("/",required=["luminosityBins","magnitudeBins"])
         self.luminosityBins = np.copy(bins["luminosityBins"])
