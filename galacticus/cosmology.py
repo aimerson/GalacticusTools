@@ -266,6 +266,8 @@ class Cosmology(object):
         
         USAGE: angular_diameter_distance(z)    
 
+        Note: from Hogg (1999) Eq.18
+
         """
         return self.comoving_transverse_distance(z)/(1.0+z)
 
@@ -282,6 +284,28 @@ class Cosmology(object):
         a = da/206.26480
         return a
     
+
+    def angular_distance_separation(self,z1,z2):
+        """
+        angular_distance_separation(): Returns the angular separation between two 
+                                       objects at redshifts z1 and z2.
+        
+        USAGE: angular_distance_separation(z1,z2)
+        
+        NOTES: From Hogg (1999) Eq.19
+               Assumes omegaK >= 0 (returns None for omegaK < 0)
+               Assumes z1 and z2 have equal dimensions
+        """
+        result = None
+        if self.omegak >= 0.0:
+            DM1 = self.comoving_transverse_distance(z1)
+            DM2 = self.comoving_transverse_distance(z2)
+            result = DM2*np.sqrt(1.0*self.omegak*((DM1/self.HubbleDistance)**2))
+            result += -DM1*np.sqrt(1.0*self.omegak*((DM2/self.HubbleDistance)**2))
+            result *= 1.0/(1.0+z2)
+        return result
+
+
 
     def luminosity_distance(self,z=0.0):
         """
