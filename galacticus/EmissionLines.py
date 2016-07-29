@@ -9,6 +9,7 @@ from .Luminosities import Get_Luminosity
 from .constants import speedOfLight,luminositySolar,luminosityAB,angstrom
 from .utils.sorting import natural_sort_key
 from .config import *
+from .cosmology import Cosmology
 
 ##########################################################
 # EMISSION LINES CLASS

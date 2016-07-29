@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-import sys
+import sys,fnmatch
 import numpy as np
 import scipy as sp
 from scipy.constants import c,constants
@@ -43,8 +43,8 @@ class Cosmology(object):
     
     """
     
-    def __init__(self,omega0=0.25,lambda0=0.75,omegab=0.045,h0=0.73,\
-                 sigma8=0.9,ns=1.0,radiation=False,zmax=20.0,nzmax=10000):
+    def __init__(self,omega0=0.25,lambda0=0.75,omegab=0.045,h0=0.73,sigma8=0.9,ns=1.0,\
+                     radiation=False,zmax=20.0,nzmax=10000,h_independent=True):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
 
@@ -61,13 +61,22 @@ class Cosmology(object):
             self.omegar = 0.0            
         self.omegak = 1.0 - (self.omega0 + self.lambda0 + self.omegar)
 
+        # Store value for Hubble Constant
+        if h_independent:
+            self.H0 = 100
+        else:
+            self.H0 = 100.0*self.h0
+        self.h_independent = h_independent
+        
         # Define useful constants/conversions
-        self.Mpc = constants.mega*constants.parsec        
-        self.H100 = 100.0*constants.kilo/self.Mpc
+        self.Mpc = constants.mega*Parsec        
         self.Gyr = constants.giga*constants.year
+        self._kmpersec_to_mpchpergyr = constants.kilo*(self.Gyr/self.Mpc)*self.h0                
+        self.H100 = 100.0*constants.kilo/self.Mpc
         self.invH0 = (self.Mpc/(100.0*constants.kilo))/self.Gyr
         self.HubbleDistance = c/self.H100
-        self._kmpersec_to_mpchpergyr = constants.kilo*(self.Gyr/self.Mpc)*self.h0                
+
+        # Compute critical density
         self.criticalDensity = (3.0*(100**2)/8.0/Pi/constants.G)
         self.criticalDensity *=(constants.kilo/self.Mpc)**2
         self.criticalDensity /= massSolar/(self.Mpc**3)
@@ -343,27 +352,19 @@ class Cosmology(object):
                               Distance Modulus (BCDM) at redshift, z.
         
         USAGE: band_corrected_distance_modulus(z)
-            
-        FURTHER INFORMATION:
+
+        NOTE from Galacticus manual:
+        The luminosity computed in this way is that in the galaxy rest
+        frame using a filter blueshifted to the galaxy’s redshift. This means
+        that to compute an apparent magnitude you must add not only the
+        distance modulus, but a factor of 2.5 log10(1 + z) to account for
+        compression of photon frequencies.
+
         There is no h dependence as we work always in length units of Mpc/h 
         such that our absolute magnitudes are really Mabs-5logh and no 
         additional h dependence is needed here to get apparent magnitudes 
         that are h independent.
         
-        In Galform versions 2.5.1 onwards the additional -2.5 * log10(1.0+z)
-        is needed to convert from absolute to apparent magnitude as the 
-        definition of absolute magnitude in the Galform code has been changed
-        by a factor of (1+z). With the new definition a galaxy with a SED in 
-        which f_nu is a constant will, quite sensibly, have the same AB 
-        absolute magnitude independent wave band range (including whether it 
-        is rest or observer frame) and independent of redshift. 
-        
-        One way of thinking about this is that while the standard luminosity
-        distance and corresponding distance modulus applies to bolometric 
-        luminosities, for a filter of finite width the flux depends on the
-        band width of the filter in the galaxy's rest frame and it is this 
-        that we are taking into account when defining this "band corrected"
-        distance modulus. 
         """
         dref = 10.0/constants.mega # 10pc in Mpc
         dL = self.luminosity_distance(z)
@@ -393,11 +394,8 @@ class Cosmology(object):
     
     def particlesPerSide(self,boxSize,particleMass):
         return (self.criticalDensity*self.omega0*(boxSize**3)/particleMass)**(1.0/3.0)
-    
-        
 
 
-    
 class WMAP(Cosmology):
     
     def __init__(self,year,radiation=False,zmax=20.0,nzmax=10000):
@@ -433,3 +431,48 @@ class WMAP(Cosmology):
         return
 
 
+
+def adjustHubble(values,hIn,hOut,datatype,verbose=False):
+    funcname = sys._getframe().f_code.co_name    
+    # Get type of data to convert
+    if fnmatch.fnmatch(datatype.lower(),"mag*"):
+        dtype = "magnitude"
+        result = values - 5.0*np.log10(hOut,hIn)
+    elif fnmatch.fnmatch(datatype.lower(),"lum*"):
+        dtype = "luminosity"
+        result = values * ((hOut/hIn)**2)
+    elif fnmatch.fnmatch(datatype.lower(),"dis*"):
+        dtype = "distance"
+        result = values * (hIn/hOut)
+    elif fnmatch.fnmatch(datatype.lower(),"vol*"):
+        dtype = "volume"
+        result = values * ((hIn/hOut)**3)
+    elif fnmatch.fnmatch(datatype.lower(),"mass*"):
+        dtype = "mass"
+        result = values * (hIn/hOut)
+    elif fnmatch.fnmatch(datatype.lower(),"den*"):
+        dtype = "density"
+        result = values * ((hOut/hIn)**3)
+    else:
+        availableTypes = ["magnitude","luminosity","distance","volume","mass","density"]
+        report = funcname+"(): Specified type not recognised!\n"
+        report = report = "      Available datatypes are: "+", ".join(availableTypes)
+        raise ValueError(report)
+    if verbose:
+        print(funcname+"(): Converted "+dtype+" from h="+str(hIn)+" to h="+str(hOut))    
+    return result
+        
+
+
+
+
+
+
+
+
+
+    
+        
+
+
+    

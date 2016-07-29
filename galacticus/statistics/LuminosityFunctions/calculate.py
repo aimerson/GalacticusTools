@@ -8,16 +8,20 @@ from ...hdf5 import HDF5
 from ...io import GalacticusHDF5
 from ...Luminosities import ergPerSecond
 from ...utils.progress import Progress
+from ...cosmology import adjustHubble
+
 
 
 class ComputeLuminosityFunction(object):
     
-    def __init__(self,galHDF5Obj,magnitudeBins=None,luminosityBins=None):        
+    def __init__(self,galHDF5Obj,hubble=1.0,magnitudeBins=None,luminosityBins=None):        
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Store Galacticus file object
         self.galHDF5Obj = galHDF5Obj        
-        self.hubble = self.galHDF5Obj.parameters["HubbleConstant"]/100.0
+        self.hubbleGalacticus = self.galHDF5Obj.parameters["HubbleConstant"]/100.0
+        # Set Hubble parameter to correct to
+        self.hubble = hubble
         # Store bins for magnitudes/luminosities
         self.magnitudeBins = magnitudeBins
         if self.magnitudeBins is None:
@@ -67,11 +71,14 @@ class ComputeLuminosityFunction(object):
         PROG = Progress(len(goodProps))
         for p in goodProps:
             values = np.array(out["nodeData/"+p])
-            if fnmatch.fnmatch(p,"*LineLuminosity*"):
+            if fnmatch.fnmatch(p,"*LineLuminosity*")
+:                values = adjustHubble(values,self.hubbleGalacticus,self.hubble,"luminosity")
                 values = np.log10(ergPerSecond(values))
+                values += np.log10((self.hubbleGalacticus/self.hubble)**2)
                 bins = self.luminosityBins
             else:
                 bins = self.magnitudeBins
+                values = adjustHubble(values,self.hubbleGalacticus,self.hubble,"magnitude")
             zLF[p],bins = np.histogram(values,bins=bins,weights=weight)
             PROG.increment()
             if verbose:
@@ -90,8 +97,11 @@ class ComputeLuminosityFunction(object):
             self.luminosityFunction = lfClass.luminosityFunction.copy()
             self.magnitudeBins = np.copy(lfClass.magnitudeBins)
             self.luminosityBins = np.copy(lfClass.luminosityBins)
-            
+            self.hubble = lfClass.hubble
         else:
+            # Check values for Hubble parameter are consistent
+            if self.hubble != lfClass.hubble:
+                raise ValueError(funcname+"(): Values for Hubble parameter are not consistent!")
             # Check luminosity and magnitude bins for two LF objects are consistent
             binsDiff = np.fabs(self.luminosityBins-lfClass.luminosityBins)
             if any(binsDiff>binsTolerance):
@@ -104,7 +114,7 @@ class ComputeLuminosityFunction(object):
             for outKey in self.luminosityFunction.keys():
                 if outKey in addLF.keys():
                     for p in self.luminosityFunction[outKey].keys():
-                        if p in addLF[outKey].keys():
+                        if p in addLF[outKey].keys():                            
                             self.luminosityFunction[outKey][p] += addLF[outKey][p]
                 PROG.increment()
                 if verbose:
@@ -182,3 +192,4 @@ class GalacticusLuminosityFunction(object):
         f.close()
         return lfData
 
+    
