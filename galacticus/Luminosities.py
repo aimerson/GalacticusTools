@@ -8,7 +8,11 @@ from .GalacticusErrors import ParseError
 from .constants import luminositySolar,erg
 
 def ergPerSecond(luminosity):
-    return luminosity*luminositySolar/erg
+    luminosity = np.log10(luminosity)
+    luminosity += np.log10(luminositySolar)
+    luminosity -= np.log10(erg)
+    luminosity = 10.0**luminosity
+    return luminosity
 
 
 def Get_Luminosity(galHDF5Obj,z,datasetName,overwrite=False):

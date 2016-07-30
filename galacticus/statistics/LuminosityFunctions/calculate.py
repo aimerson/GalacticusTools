@@ -112,10 +112,10 @@ class ComputeLuminosityFunction(object):
             # Add luminosity functions 
             PROG = Progress(len(self.luminosityFunction.keys()))       
             for outKey in self.luminosityFunction.keys():
-                if outKey in addLF.keys():
+                if outKey in lfClass.luminosityFunction.keys():
                     for p in self.luminosityFunction[outKey].keys():
-                        if p in addLF[outKey].keys():                            
-                            self.luminosityFunction[outKey][p] += addLF[outKey][p]
+                        if p in lfClass.luminosityFunction[outKey].keys():                            
+                            self.luminosityFunction[outKey][p] += lfClass.luminosityFunction[outKey][p]
                 PROG.increment()
                 if verbose:
                     PROG.print_status_line()
@@ -155,8 +155,13 @@ class ComputeLuminosityFunction(object):
             fileObj.addAttributes("Outputs/"+outstr,{"redshift":z})
             for p in self.luminosityFunction[outstr].keys():
                 path = "Outputs/"+outstr+"/"
-                lfData = self.luminosityFunction[outstr][p]
-                fileObj.addDataset(path,p,lfData,chunks=True,compression="gzip",\
+                redshiftLabel = fnmatch.filter(p.split(":"),"z*")[0]
+                lfData = self.luminosityFunction[outstr][p]                
+                if fnmatch.fnmatch(p,"*LineLuminosity*"):
+                    lfData /= luminosityBinWidth
+                else:
+                    lfdata /= magnitudeBinWidth
+                fileObj.addDataset(path,p.replace(":"+redshiftLabel,""),lfData,chunks=True,compression="gzip",\
                                        compression_opts=6)                        
         fileObj.close()
         if verbose:
@@ -199,7 +204,11 @@ class GalacticusLuminosityFunction(object):
         iselect = np.argmin(np.fabs(self.redshifts-z))
         path = "Outputs/"+self.outputs[iselect]
         f = HDF5(self.file,'r')
-        lfData = f.readDatasets(path,required=required)
+        availableDatasets = list(map(str,f.lsDatasets(path)))
+        datasets = []
+        for req in required:
+            datasets = datasets + fnmatch.filter(availableDatasets,req)
+        lfData = f.readDatasets(path,required=datasets)
         f.close()
         return lfData
 
