@@ -48,10 +48,10 @@ class ComputeLuminosityFunction(object):
         # Get properties to process        
         allProps = self.galHDF5Obj.availableDatasets(z)
         if props is None:
-            goodProps = fnmatch.filter(allProps,"*LuminositiesStellar*")
+            goodProps = fnmatch.filter(allProps,"magnitude*")
             if not incTopHatFilters:
-                topHats = fnmatch.filter(allProps,"*LuminositiesStellar:emissionLineContinuum*") + \
-                    fnmatch.filter(allProps,"*LuminositiesStellar:topHat*")
+                topHats = fnmatch.filter(allProps,"magnitude*emissionLineContinuum*") + \
+                    fnmatch.filter(allProps,"magnitude*topHat*")
                 if len(topHats) > 0:
                     goodProps = list(set(props).difference(topHats))
             goodProps = goodProps + fnmatch.filter(allProps,"*LineLuminosity*")

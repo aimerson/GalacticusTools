@@ -459,7 +459,7 @@ def adjustHubble(values,hIn,hOut,datatype,verbose=False):
     # Get type of data to convert
     if fnmatch.fnmatch(datatype.lower(),"mag*"):
         dtype = "magnitude"
-        result = values - 5.0*np.log10(hOut,hIn)
+        result = values - 5.0*np.log10(hOut/hIn)
     elif fnmatch.fnmatch(datatype.lower(),"lum*"):
         dtype = "luminosity"
         result = values * ((hOut/hIn)**2)
