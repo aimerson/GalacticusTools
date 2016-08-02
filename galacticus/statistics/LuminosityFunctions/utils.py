@@ -6,7 +6,7 @@ import numpy as np
 from scipy import integrate
 from scipy import interpolate
 
-
+from ...plotting.utils import *
 
 
 
@@ -24,7 +24,7 @@ def integrateLuminosityFunction(bins,luminosityFunction,lowerLimit=None,upperLim
     isort = np.copy(np.argsort(bins))
     bins = bins[isort]
     luminosityFunction = luminosityFunction[isort]
-    # Set ingration limits to extreme bin values if not specified
+    # Set integration limits to extreme bin values if not specified
     if lowerLimit is None:
         lowerLimit = bins.min()
     if upperLimit is None:
