@@ -74,7 +74,7 @@ class Cosmology(object):
         self._kmpersec_to_mpchpergyr = constants.kilo*(self.Gyr/self.Mpc)*self.h0                
         self.H0SI = self.H0*constants.kilo/self.Mpc
         self.HubbleTime = (self.Mpc/(self.H0*constants.kilo))/self.Gyr
-        self.HubbleDistance = c/self.H0SI
+        self.HubbleDistance = c/constants.kilo/self.H0
         self.HubbleVolume = self.HubbleDistance**3
 
         # Compute critical density
@@ -357,18 +357,14 @@ class Cosmology(object):
         dVdz() : Returns the comoving volume element dV/dz
                  at redshift, z, for all sky.
         
-        dV = (c/H0SI)*(1+z)**2*D_A**2/E(z) dz dOmega
-        
-        f(z) = (c/H0SI)/E(z)
-        
-        ==> dV/dz(z,all sky) = 4*PI*f(z)*(1+z)**2*D_A**2
-             
+        dV = (c/H0)*(1+z)**2*D_A**2/E(z) dz dOmega
         
         USAGE: dVdz(z)
 
         """
         dA = self.angular_diameter_distance(z)
-        return self.f(z)*(dA**2)*((1.0+z)**2)*4.0*np.pi
+        dV = self.HubbleDistance*(dA**2)*((1.0+z)**2)/self.E(z)
+        return dV*4.0*Pi
     
 
     def band_corrected_distance_modulus(self,z=0.0):

@@ -5,6 +5,7 @@ import fnmatch
 import numpy as np
 from scipy.interpolate import interp1d
 from scipy.integrate import romberg
+from ...utils.progress import Progress
 from ...constants import Pi,centi,megaParsec
 from ...cosmology import Cosmology,adjustHubble
 from ..LuminosityFunctions.calculate import GalacticusLuminosityFunction
@@ -33,7 +34,7 @@ class ComputeNumberCounts(object):
         return
         
 
-    def integrateLuminosityFunctions(self,datasetName,lowerLimit,upperLimit,zmax=None,**kwargs):
+    def integrateLuminosityFunctions(self,datasetName,lowerLimit,upperLimit,zmax=None,verbose=False,**kwargs):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name 
         if datasetName not in self.availableDatasets:
             raise ValueError(funcname+"(): '"+datasetName+"' not in list of available datasets!")                
@@ -44,7 +45,14 @@ class ComputeNumberCounts(object):
         outIntegral = np.array(self.luminosityFunction.outputs)
         lfIntegral = np.zeros_like(zIntegral)            
         # Determine luminosity function integral as function of redshift
-        for iz,z in enumerate(zIntegral):
+        if verbose:
+            print(funcname+"(): Computing luminosity function for Galacticus snapshot outputs...")
+        PROG = Progress(len(zIntegral))
+        for iz,redshift in enumerate(zIntegral):
+            if redshift == 0.0:
+                z = 1.0e-6
+            else:
+                z = redshift
             if fnmatch.fnmatch(datasetName,"*LineLuminosity*"):                
                 radius = self.COSMOLOGY.comoving_distance(z)
                 radius *= (megaParsec/centi)
@@ -67,14 +75,15 @@ class ComputeNumberCounts(object):
                 lf = self.luminosityFunction.getDatasets(z,required=[datasetName])[datasetName]
                 lf = adjustHubble(lf,self.luminosityFunction.hubble,self.COSMOLOGY.h0,"density")            
             lfIntegral[iz] = integrateLuminosityFunction(bins,lf,lowerLimit=zLowLimit,upperLimit=zUppLimit,**kwargs)
-            dA = adjustHubble(self.COSMOLOGY.angular_diameter_distance(z),\
-                                  self.luminosityFunction.hubble,self.COSMOLOGY.h0,"distance")
             lfIntegral[iz] *= self.COSMOLOGY.dVdz(z)
+            PROG.increment()
+            if verbose:
+                PROG.print_status_line()
         return zIntegral,lfIntegral
 
 
     
-    def compute(self,datasetName,bins,zmin=None,zmax=None,**kwargs):        
+    def compute(self,datasetName,bins,zmin=None,zmax=None,verbose=False,**kwargs):        
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         if datasetName not in self.availableDatasets:
             raise ValueError(funcname+"(): '"+datasetName+"' not in list of available datasets!")                
@@ -99,10 +108,16 @@ class ComputeNumberCounts(object):
         for key in integrateKeys:
             if key in kwargs.keys():
                 kwargsIntegrate[key] = kwargs[key]
+        if verbose:
+            print(funcname+"(): Computing number counts in each flux/magnitude bin...")
+        PROG = Progress(len(bins))        
         for i,bin in enumerate(bins):                       
-            zIntegral,lfIntegral = self.integrateLuminosityFunctions(datasetName,bin,bin+binWidth,zmax=zmax,**kwargs)           
+            zIntegral,lfIntegral = self.integrateLuminosityFunctions(datasetName,bin,bin+binWidth,zmax=zmax,verbose=False,**kwargs)           
             fz = interp1d(np.array(zIntegral),np.array(lfIntegral),**kwargsInterpolate)
             counts[i] = romberg(fz,zmin,zmax,**kwargsIntegrate)
+            PROG.increment()
+            if verbose:
+                PROG.print_status_line()
         counts /= (allsky*binWidth)
         return bins,counts
 

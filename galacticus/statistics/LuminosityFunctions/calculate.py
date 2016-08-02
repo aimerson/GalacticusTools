@@ -160,7 +160,7 @@ class ComputeLuminosityFunction(object):
                 if fnmatch.fnmatch(p,"*LineLuminosity*"):
                     lfData /= luminosityBinWidth
                 else:
-                    lfdata /= magnitudeBinWidth
+                    lfData /= magnitudeBinWidth
                 fileObj.addDataset(path,p.replace(":"+redshiftLabel,""),lfData,chunks=True,compression="gzip",\
                                        compression_opts=6)                        
         fileObj.close()
