@@ -47,10 +47,12 @@ class NumberCounts(object):
         radius = self.COSMOLOGY.comoving_distance(redshift)
         radius *= (megaParsec/centi)
         area = 4.0*Pi*(radius**2)                        
+        faintFluxLimit = 10.0**faintFluxLimit
         faintLuminosityLimit = np.log10(faintFluxLimit*area)
         if brightFluxLimit is None:
             brightLuminosityLimit = None
         else:            
+            brightFluxLimit = 10.0**brightFluxLimit
             brightLuminosityLimit = np.log10(brightFluxLimit*area)
         return faintLuminosityLimit,brightLuminosityLimit
 
@@ -151,10 +153,11 @@ class fluxNumberCounts(NumberCounts):
             zmax = np.minimum(self.luminosityFunction.redshifts.max(),zmax)            
         # Compute counts
         if verbose:
-            print(funcname+"(): Computing number counts in each flux/magnitude bin...")
+            print(funcname+"(): Computing number counts in each flux/magnitude bin for dataset '"+datasetName+"'...")
         kwargsInterpolate = self._get_interpolate_keywords(**kwargs)
         kwargsIntegrate = self._get_integrate_keywords(**kwargs)
         binWidth = bins[1] - bins[0]
+        print binWidth
         PROG = Progress(len(bins))        
         for i,bin in enumerate(bins):                       
             if fnmatch.fnmatch(datasetName,"*LineLuminosity*"):
@@ -173,7 +176,9 @@ class fluxNumberCounts(NumberCounts):
             if verbose:
                 PROG.print_status_line()
         allsky = 4.0*Pi*(180.0/Pi)**2    
-        counts /= (allsky*binWidth)
+        counts /= allsky
+        if not cumulative:
+            counts /= binWidth
         return bins,counts
 
 

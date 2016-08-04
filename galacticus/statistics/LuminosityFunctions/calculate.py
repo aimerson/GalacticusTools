@@ -33,7 +33,7 @@ class ComputeLuminosityFunction(object):
         self.luminosityFunction = {}
         return
 
-    def processOutput(self,z,props=None,incTopHatFilters=False,overwrite=False,verbose=False):        
+    def processOutput(self,z,props=None,incTopHatFilters=False,addWeight=1.0,overwrite=False,verbose=False):        
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         # Locate output
         iselect = np.argmin(np.fabs(self.galHDF5Obj.outputs.z-z))
@@ -66,6 +66,7 @@ class ComputeLuminosityFunction(object):
         cts = np.array(out["mergerTreeCount"])
         wgt = np.array(out["mergerTreeWeight"])
         weight = np.copy(np.repeat(wgt,cts))
+        weight *= addWeight
         if verbose:
             print(funcname+"(): Computing luminosity functions...")
         PROG = Progress(len(goodProps))
