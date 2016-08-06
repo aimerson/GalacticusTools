@@ -107,7 +107,33 @@ class SchechterLuminosities(object):
         if perDex:
             lf *= np.log(10.0)*(lum/self.Lstar)
         return lf
-        
+
+
+######################################################################################
+# Saunders functional form for luminosity function
+######################################################################################
+
+class SaundersLuminosities(object):
+
+    def __init__(self,Lstar,C,alpha,sigma):
+        classname = self.__class__.__name__
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        self.Lstar = Lstar
+        self.C = C
+        self.alpha = alpha
+        self.sigma = sigma
+        return
+
+    def phi(self,lum,perDex=True):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        factor1 = (lum/self.Lstar)**self.alpha
+        factor2 = -1.0/(2.0*self.sigma**2)
+        factor3 = np.log10(1.0+(lum/self.Lstar))
+        lf = self.C*factor1*np.exp(factor2*factor3**2)
+        if perDex:
+            lf *= np.log(10.0)*(lum/self.Lstar)
+        return lf
+
 
 
 ######################################################################################

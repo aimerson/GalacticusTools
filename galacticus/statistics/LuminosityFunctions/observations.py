@@ -3,7 +3,7 @@
 import sys,os,fnmatch
 import numpy as np
 import pkg_resources
-from .analyticFits import SchechterLuminosities
+from .analyticFits import SchechterLuminosities,SaundersLuminosities
 
 class Halpha(object):
     
@@ -67,8 +67,10 @@ class Halpha(object):
             self.dataset = "Gunawardhana et al. (2013)"
             if "sdss" in dataset.lower():
                 ifile = pkg_resources.resource_filename(__name__,"../../data/LuminosityFunctions/Gunawardhana13_SDSS_Halpha.dat")
+                self.dataset = self.dataset + " [SDSS]"
             elif "gama" in dataset.lower():
                 ifile = pkg_resources.resource_filename(__name__,"../../data/LuminosityFunctions/Gunawardhana13_GAMA_Halpha.dat")
+                self.dataset = self.dataset + " [GAMA]"
             else:
                 raise ValueError(classname+"(): Gunawardhana et al. data available for two datasets! Specify either GAMA or SDSS in dataset name!")
             dtype = [("z",float),("log10L",float),("logphi",float),("logphiNegErr",float),("logphiPosErr",float)]
