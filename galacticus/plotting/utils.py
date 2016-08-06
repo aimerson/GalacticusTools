@@ -200,7 +200,7 @@ def Legend(ax,ec='none',fc='none',fontcolor="k",**kwargs):
 
 def ImageStats2D(ax,X,Y,Xbins,Ybins,Z=None,statistic="count",\
                            weights=None,func=None,**kwargs):
-    from ..statistics import binstats2D
+    from ..statistics.utils import binstats2D
     """                                                                                                                                                                                                                     
     statistic can be: mean,median,sum,product,std,var,percentile,avg,max,min,mode                                                                                                                                           
     NB 'avg' is weighted average                                                                                                                                                                                            

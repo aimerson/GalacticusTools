@@ -53,7 +53,9 @@ class Halpha(object):
                          ("phiCorr",float),("phiCorrErr",float),("volume",float)]
             self.data = np.loadtxt(ifile,dtype=dtype,usecols=range(len(dtype))).view(np.recarray)
             hubble = 0.7
+            self.data.log10L -= 2.0/5.0
             self.data.log10L = self.data.log10L + np.log10((hubble/self.hubble)**2)
+            
             self.data.errlog10L = self.data.errlog10L + np.log10((hubble/self.hubble)**2)
             self.data.phiObs = self.data.phiObs*((self.hubble/hubble)**3)
             self.data.phiObsErr = self.data.phiObsErr*((self.hubble/hubble)**3)
@@ -149,7 +151,7 @@ class Halpha(object):
                 phistar *= ((self.hubble/hubble)**3)
                 object = SchechterLuminosities(-1.27,Lstar,phistar)
             if z > 0.9 and z < 1.5:
-                Lstar = 10**42.18                
+                Lstar = 10**42.18
                 Lstar *= ((hubble/self.hubble)**2)
                 phistar = 10**-2.70
                 phistar *= ((self.hubble/hubble)**3)
@@ -158,24 +160,28 @@ class Halpha(object):
             hubble = 0.7
             if z >= 0.39 and z <= 0.41:
                 Lstar = 10**41.95                
+                Lstar *= 10**-0.4
                 Lstar *= ((hubble/self.hubble)**2)
                 phistar = 10**-3.12
                 phistar *= ((self.hubble/hubble)**3)
                 object = SchechterLuminosities(-1.75,Lstar,phistar)
             if z >= 0.82 and z <= 0.86:
-                Lstar = 10**42.25                
+                Lstar = 10**42.25
+                Lstar *= 10**-0.4                                
                 Lstar *= ((hubble/self.hubble)**2)
                 phistar = 10**-2.47
                 phistar *= ((self.hubble/hubble)**3)
                 object = SchechterLuminosities(-1.56,Lstar,phistar)                
             if z >= 1.45 and z <= 1.49:
                 Lstar = 10**42.56                
+                Lstar *= 10**-0.4                
                 Lstar *= ((hubble/self.hubble)**2)
                 phistar = 10**-2.61
                 phistar *= ((self.hubble/hubble)**3)
                 object = SchechterLuminosities(-1.62,Lstar,phistar)                                
             if z >= 2.21 and z <= 2.25:
                 Lstar = 10**42.87                
+                Lstar *= 10**-0.4                
                 Lstar *= ((hubble/self.hubble)**2)
                 phistar = 10**-2.78
                 phistar *= ((self.hubble/hubble)**3)
