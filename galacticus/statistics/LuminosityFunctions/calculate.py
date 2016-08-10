@@ -75,7 +75,6 @@ class ComputeLuminosityFunction(object):
             if fnmatch.fnmatch(p,"*LineLuminosity*"):
                 values = adjustHubble(values,self.hubbleGalacticus,self.hubble,"luminosity")
                 values = np.log10(ergPerSecond(values))
-                values += np.log10((self.hubbleGalacticus/self.hubble)**2)
                 bins = self.luminosityBins
             else:
                 bins = self.magnitudeBins
