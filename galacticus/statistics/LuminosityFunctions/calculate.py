@@ -14,14 +14,17 @@ from ...cosmology import adjustHubble
 
 class ComputeLuminosityFunction(object):
     
-    def __init__(self,galHDF5Obj,hubble=1.0,magnitudeBins=None,luminosityBins=None):        
+    def __init__(self,galHDF5Obj,hubble=None,magnitudeBins=None,luminosityBins=None):        
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Store Galacticus file object
         self.galHDF5Obj = galHDF5Obj        
         self.hubbleGalacticus = self.galHDF5Obj.parameters["HubbleConstant"]/100.0
         # Set Hubble parameter to correct to
-        self.hubble = hubble
+        if hubble is None:
+            self.hubble = self.hubbleGalacticus
+        else:
+            self.hubble = hubble
         # Store bins for magnitudes/luminosities
         self.magnitudeBins = magnitudeBins
         if self.magnitudeBins is None:
@@ -67,6 +70,7 @@ class ComputeLuminosityFunction(object):
         wgt = np.array(out["mergerTreeWeight"])
         weight = np.copy(np.repeat(wgt,cts))
         weight *= addWeight
+        weight = adjustHubble(weight,self.hubbleGalacticus,self.hubble,'density')
         if verbose:
             print(funcname+"(): Computing luminosity functions...")
         PROG = Progress(len(goodProps))
