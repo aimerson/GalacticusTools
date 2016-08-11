@@ -109,6 +109,39 @@ class SchechterLuminosities(object):
         return lf
 
 
+    def numberBrighter(self,L_low=None):
+        """
+        numberBrighter(): Integrate Schechter function to return
+                            number of galaxies brighter than L=L_low.
+
+        USAGE: SchechterFunction.numberBrighter([L_low])
+  
+               L_low = limiting luminosity (default L_low = 0)
+
+        """
+
+        if L_low is None:
+            return self.phistar*spspec.gamma(self.alpha+1.0)
+        else:
+            return self.phistar*spspec.gammainc(self.alpha+1.0,L_low/self.Lstar)
+
+    def luminosityBrighter(self,L_low=None):
+        """                                                                                                                                                                                                                 
+        luminosityBrighter(): Integrate Schechter function to return
+                                total luminosity of galaxies brighter
+                                than L=L_low.
+                                                                                                                                                                                                                            
+        USAGE: SchechterFunction.luminosityBrighter([L_low])
+
+               L_low = limiting luminosity (default L_low = 0)                                                                                                                                                              
+        """
+        import scipy.special as spspec
+        if L_low is None:
+            return self.phistar*self.Lstar*spspec.gamma(self.alpha+2.0)
+        else:
+            return self.phistar*self.Lstar*spspec.gammainc(self.alpha+2.0,L_low/self.Lstar)
+
+
 ######################################################################################
 # Saunders functional form for luminosity function
 ######################################################################################
