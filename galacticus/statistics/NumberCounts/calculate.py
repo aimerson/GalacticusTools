@@ -84,15 +84,22 @@ class NumberCounts(object):
         return kwargsIntegrate
 
 
-    def integrateLuminosityFunctions(self,datasetName,faintLimit,brightLimit=None,zmax=None,verbose=False,**kwargs):
+    def integrateLuminosityFunctions(self,datasetName,faintLimit,brightLimit=None,zmin=None,zmax=None,verbose=False,**kwargs):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name 
         if datasetName not in self.availableDatasets:
             raise ValueError(funcname+"(): '"+datasetName+"' not in list of available datasets!")                
         zIntegral = self.luminosityFunction.redshifts
-        if zmax < zIntegral.max():
-            zcut = zIntegral[zIntegral>zmax].min()
-            mask = zIntegral<=zcut
-            zIntegral = zIntegral[mask]
+        # Select only redshift snapshots spanning redshift range of interest
+        if zmax is not None:            
+            if zmax < zIntegral.max():
+                zcut = zIntegral[zIntegral>zmax].min()
+                mask = zIntegral<=zcut
+                zIntegral = zIntegral[mask]
+        if zmin is not None:
+            if zmin > zIntegral.min():
+                zcut = zIntegral[zIntegral<zmin].max()
+                mask = zIntegral>=zcut
+                zIntegral = zIntegral[mask]
         lfIntegral = np.zeros_like(zIntegral)                    
         # Determine luminosity function integral as function of redshift
         if verbose:
@@ -105,9 +112,10 @@ class NumberCounts(object):
                 z = redshift
             if fnmatch.fnmatch(datasetName,"*LineLuminosity*"):   
                 zfaintLimit,zbrightLimit = self.getLuminosityLimits(z,faintLimit,brightFluxLimit=brightLimit)                
+                bw = self.luminosityFunction.luminosityBins[1] - self.luminosityFunction.luminosityBins[0]
                 bins = 10.0**self.luminosityFunction.luminosityBins
                 bins = adjustHubble(bins,self.luminosityFunction.hubble,self.COSMOLOGY.h0,"luminosity")
-                lf = self.luminosityFunction.getDatasets(z,required=[datasetName])[datasetName]
+                lf = self.luminosityFunction.getDatasets(z,required=[datasetName])[datasetName]            
                 lf = adjustHubble(lf,self.luminosityFunction.hubble,self.COSMOLOGY.h0,"density")
                 bins = np.log10(bins)
                 lfIntegral[iz] = integrateLuminosityFunction(bins,lf,lowerLimit=zfaintLimit,upperLimit=zbrightLimit,**kwargs)
@@ -157,7 +165,6 @@ class fluxNumberCounts(NumberCounts):
         kwargsInterpolate = self._get_interpolate_keywords(**kwargs)
         kwargsIntegrate = self._get_integrate_keywords(**kwargs)
         binWidth = bins[1] - bins[0]
-        print binWidth
         PROG = Progress(len(bins))        
         for i,bin in enumerate(bins):                       
             if fnmatch.fnmatch(datasetName,"*LineLuminosity*"):
@@ -168,7 +175,7 @@ class fluxNumberCounts(NumberCounts):
                 uppLimit = bin
             if cumulative:
                 uppLimit = None            
-            zIntegral,lfIntegral = self.integrateLuminosityFunctions(datasetName,lowLimit,brightLimit=uppLimit,zmax=zmax,\
+            zIntegral,lfIntegral = self.integrateLuminosityFunctions(datasetName,lowLimit,brightLimit=uppLimit,zmin=zmin,zmax=zmax,\
                                                                          cumulative=cumulative,verbose=False,**kwargs)                           
             fz = interp1d(np.array(zIntegral),np.array(lfIntegral),**kwargsInterpolate)
             counts[i] = romberg(fz,zmin,zmax,**kwargsIntegrate)
