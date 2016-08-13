@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 
 import sys,fnmatch
+import math,re
 import numpy as np
 import matplotlib
 from scipy.stats import *
@@ -153,31 +154,73 @@ def make_colourmap(seq):
 def print_rounded_value(x,dx):
     return str(Decimal(str(x)).quantize(Decimal(str(dx))))
 
-def sigfig(x,n,latex=True):
-    if n ==0:
+def frexp10(x):
+    exp = int(math.log10(x)) 
+    return x / 10**exp, exp
+
+def sigfig(number,sigfig,latex=True):
+    if sigfig == 0:
         return 0
-    fmt = "%."+str(n-1)+"E"
-    s = fmt % x
-    s = str(float(s))
-    if "e" in s:
-        s = s.split("e")
-        m = n - len(s[0].replace(".","").replace("-","").lstrip("0"))
-        s[0] = s[0].ljust(len(s[0])+m,"0")
-        if "." in s[0]:
-            if len(s[0].split(".")[1].strip("0")) == 0 and len(s[0].split(".")[0]) >= n:
-                s[0] = s[0].split(".")[0]
-        if latex:
-                s[1] = "$\\times 10^{"+str(int(s[1]))+"}$"
-        else:
-            s[1] = "e" + s[1]
-        s = "".join(s)
+    number = str(number)
+    # Split mantissa and exponent
+    if "e" in number.lower():
+        m = number.split("e")[0]
+        e = number.split("e")[1]
     else:
-        m = n - len(s.replace(".","").replace("-","").lstrip("0"))
-        s = s.ljust(len(s)+m,"0")
-        if "." in s:
-            if len(s.split(".")[1].strip("0")) == 0 and len(s.split(".")[0]) >= n:
-                s = s.split(".")[0]
-    return s
+        m = number
+        e = None
+    # Check if negative
+    neg = re.search('-',str(m))
+    if neg is None:
+        neg = False
+    else:
+        neg = True
+        m = m.replace("-","")
+    # Trim mantissa
+    l = list(m)
+    sigfigs = [i for i, x in enumerate(l) if fnmatch.fnmatch(x,'[1-9]')]
+    if sigfig > len(sigfigs):
+        lsf= sigfigs[-1]
+    else:
+        lsf= sigfigs[sigfig-1]
+    if lsf < len(l)-1:
+        nd = lsf+1
+        if nd < len(l):
+            if l[nd] == ".":
+                nd += 1
+            if int(l[nd]) >= 5:
+                if int(l[lsf]) == 9:
+                    pd = lsf
+                    while int(l[pd])== 9:
+                        l[pd] = "0"
+                        pd -= 1
+                        if l[pd] == '.':
+                            pd -= 1
+                    l[pd] = str(int(l[pd])+1)
+                else:
+                    l[lsf] = str(int(l[lsf])+1)
+    if "." in l:
+        dp = l.index(".")
+        if dp > lsf:
+            l = l[:dp]
+        else:
+            l = l[:lsf+1]
+    m = "".join(l[:lsf+1])[::-1].zfill(len(l))[::-1]
+    # Add minus if negative
+    if neg:
+        m ="-"+m
+    # Add on exponent if present
+    if e is None:
+        number = m
+    else:
+        number = m+"e"+e
+        if latex:
+            number = number.replace("e","$\\times 10^{")+"}$"
+    return number
+
+
+
+
 
 ####################################################################################
 # LEGEND FUNCTIONS

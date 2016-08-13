@@ -111,7 +111,7 @@ class NumberCounts(object):
             else:
                 z = redshift
             if fnmatch.fnmatch(datasetName,"*LineLuminosity*"):   
-                zfaintLimit,zbrightLimit = self.getLuminosityLimits(z,faintLimit,brightFluxLimit=brightLimit)                
+                zfaintLimit,zbrightLimit = self.getLuminosityLimits(z,faintLimit,brightFluxLimit=brightLimit)                            
                 bw = self.luminosityFunction.luminosityBins[1] - self.luminosityFunction.luminosityBins[0]
                 bins = 10.0**self.luminosityFunction.luminosityBins
                 bins = adjustHubble(bins,self.luminosityFunction.hubble,self.COSMOLOGY.h0,"luminosity")

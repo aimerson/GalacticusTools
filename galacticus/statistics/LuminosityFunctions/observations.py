@@ -118,7 +118,7 @@ class Halpha(object):
             if z > 1.7 and z < 2.8:
                 mask = self.data.z == 2.23
             data = self.data[mask]                            
-        if self.dataset == "Gunawardhana et al. (2013)":
+        if fnmatch.fnmatch(self.dataset,"Gunawardhana et al. (2013)*"):
             mask = np.zeros(len(self.data.z),bool)
             if z < 0.1:
                 mask = self.data.z == 0.05

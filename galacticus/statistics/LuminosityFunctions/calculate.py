@@ -203,10 +203,14 @@ class GalacticusLuminosityFunction(object):
         f.close()
         return
     
-    def getDatasets(self,z,required=None):
+    def getDatasets(self,z,required=None,verbose=False):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         iselect = np.argmin(np.fabs(self.redshifts-z))
         path = "Outputs/"+self.outputs[iselect]
+        if verbose:
+            print_str = funcname+"(): Reading luminosity function(s) for z = "+\
+                str(self.redshifts[iselect])+"\n         -- located in path "+path
+            print(print_str)
         f = HDF5(self.file,'r')
         availableDatasets = list(map(str,f.lsDatasets(path)))
         datasets = []
