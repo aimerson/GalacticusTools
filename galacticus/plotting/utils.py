@@ -215,7 +215,7 @@ def sigfig(number,sigfig,latex=True):
     else:
         number = m+"e"+e
         if latex:
-            number = number.replace("e","$\\times 10^{")+"}$"
+            number = number.replace("e","\\times 10^{")+"}"
     return number
 
 
