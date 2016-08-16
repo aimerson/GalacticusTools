@@ -21,13 +21,15 @@ from ..LuminosityFunctions.utils import integrateLuminosityFunction
 
 class NumberCounts(object):
     
-    def __init__(self,luminosityFunctionObj):               
+    def __init__(self,luminosityFunctionObj,hubble=None):               
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Store objects
         self.luminosityFunction = luminosityFunctionObj
+        if hubble is None:
+            hubble = self.luminosityFunction.hubble
         self.COSMOLOGY = Cosmology(omega0=self.luminosityFunction.omega0,lambda0=self.luminosityFunction.lambda0,\
-                                      omegab=self.luminosityFunction.omegab,h0=self.luminosityFunction.hubble,\
+                                      omegab=self.luminosityFunction.omegab,h0=hubble,\
                                        sigma8=self.luminosityFunction.sigma8,ns=self.luminosityFunction.ns,\
                                        h_independent=False)
         # Extract list of datasets that have luminosity function data available at all redshifts
@@ -116,6 +118,7 @@ class NumberCounts(object):
                 bins = 10.0**self.luminosityFunction.luminosityBins
                 bins = adjustHubble(bins,self.luminosityFunction.hubble,self.COSMOLOGY.h0,"luminosity")
                 lf = self.luminosityFunction.getDatasets(z,required=[datasetName])[datasetName]            
+                lf *= bw
                 lf = adjustHubble(lf,self.luminosityFunction.hubble,self.COSMOLOGY.h0,"density")
                 bins = np.log10(bins)
                 lfIntegral[iz] = integrateLuminosityFunction(bins,lf,lowerLimit=zfaintLimit,upperLimit=zbrightLimit,**kwargs)
@@ -124,6 +127,7 @@ class NumberCounts(object):
                 bins = adjustHubble(self.luminosityFunction.magnitudeBins,\
                                      self.luminosityFunction.hubble,self.COSMOLOGY.h0,"magnitude")               
                 lf = self.luminosityFunction.getDatasets(z,required=[datasetName])[datasetName]
+                lf *= bw
                 lf = adjustHubble(lf,self.luminosityFunction.hubble,self.COSMOLOGY.h0,"density")       
                 lfIntegral[iz] = integrateLuminosityFunction(bins,lf,lowerLimit=zbrightLimit,upperLimit=zfaintLimit,**kwargs)
             lfIntegral[iz] *= self.COSMOLOGY.dVdz(z)
@@ -137,8 +141,8 @@ class NumberCounts(object):
 
 class fluxNumberCounts(NumberCounts):
     
-    def __init__(self,luminosityFunctionObj):
-        super(fluxNumberCounts,self).__init__(luminosityFunctionObj)
+    def __init__(self,luminosityFunctionObj,hubble=None):
+        super(fluxNumberCounts,self).__init__(luminosityFunctionObj,hubble=hubble)
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         return
