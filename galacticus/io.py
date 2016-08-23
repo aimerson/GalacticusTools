@@ -77,6 +77,7 @@ class GalacticusHDF5(HDF5):
         return history.view(np.recarray)
 
     def selectOutput(self,z):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Select epoch closest to specified redshift
         iselect = np.argmin(np.fabs(self.outputs.z-z))
         outstr = "Output"+str(self.outputs["iout"][iselect])
