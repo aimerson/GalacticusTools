@@ -7,7 +7,7 @@ from scipy.integrate import romb
 import pkg_resources
 import xml.etree.ElementTree as ET
 from .config import *
-from .EmissionLines import emissionLines
+from .EmissionLines import cloudyTable
 from .parameters import formatParametersFile
 
 def getTopHatLimits(wavelengthCentral,resolution,verbose=False):        
@@ -220,7 +220,7 @@ class GalacticusFilters(object):
             self.filtersDirectory = filtersDirectory
         self.effectiveWavelengths = {}
         self.filters = {}
-        self.emissionLinesClass = emissionLines()
+        self.cloudyTableClass = cloudyTable()
         return
 
     def load(self,filterName,path=None,store=False,verbose=False):                
@@ -251,7 +251,7 @@ class GalacticusFilters(object):
                     resolution = filterInfo[2]
                 else:
                     if fnmatch.fnmatch(filterName,"*emissionLineContinuumCentral*"):
-                        wavelenght = self.emissionLinesClass.getWavelength(filterInfo[1])
+                        wavelength = self.cloudyTableClass.getWavelength(filterInfo[1])
                         resolution = filterInfo[2]
                         pass
                     elif fnmatch.fnmatch(filterName,"*emissionLineContinuumOffset*"):
