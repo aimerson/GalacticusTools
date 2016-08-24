@@ -2,6 +2,12 @@
 
 from setuptools import setup, find_packages
 
+
+
+datafiles = ['data/LuminosityFunctions/*.dat','data/Simulations/*.xml','data/stellarAstrophysics/Vega/*.xml',\
+                 'data/stellarAstrophysics/hiiRegions/*.hdf5']
+
+
 setup(name='galacticus',
       version='0.1',
       description='User tools for the Galacticus semi-annalytical model',
@@ -11,6 +17,6 @@ setup(name='galacticus',
       license='MIT',
       packages=find_packages(),
       package_dir={'galacticus':'galacticus'},
-      package_data={'galacticus':['data/LuminosityFunctions/*.dat','data/Simulations/*.xml']},
+      package_data={'galacticus':datafiles},
       zip_safe=False)
 

@@ -3,36 +3,203 @@
 import sys,re
 import fnmatch
 import numpy as np
+import pkg_resources
+from scipy.interpolate import interpn
 from .hdf5 import HDF5
 from .io import GalacticusHDF5
+from .GalacticusErrors import ParseError
 from .Luminosities import Get_Luminosity
-from .constants import speedOfLight,luminositySolar,luminosityAB,angstrom
+from .constants import massSolar,megaParsec,centi,Pi,massAtomic,atmicMassHydrogen,massFractionHydrogen,erg,luminositySolar
 from .utils.sorting import natural_sort_key
 from .config import *
 from .cosmology import Cosmology
+
+
+
+##########################################################
+# EMISSION LINES TABLE FROM CLOUDY
+##########################################################
+
+class cloudyTable(HDF5):
+    
+    def __init__(self):
+        classname = self.__class__.__name__
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        hdf5File = pkg_resources.resource_filename(__name__,"data/stellarAstrophysics/hiiRegions/emissionLines.hdf5")
+        # Initalise HDF5 class and open emissionLines.hdf5 file
+        super(cloudyTable, self).__init__(hdf5File,'r')
+        # Extract names and properties of lines
+        self.lines = list(map(str,self.fileObj["lines"].keys()))
+        self.wavelengths = {}
+        self.luminosities = {}
+        for l in self.lines:
+            self.wavelengths[l] = self.readAttributes("lines/"+l,required=["wavelength"])["wavelength"]            
+            self.luminosities[l] = self.readDatasets('lines',required=[l])[l]
+        # Store interpolants                
+        self.interpolantNames = ["metallicity","densityHydrogen","ionizingFluxHydrogen",\
+                    "ionizingFluxHeliumToHydrogen","ionizingFluxOxygenToHydrogen"]        
+        self.interpolants = ()
+        for name in self.interpolantNames:
+            values = np.log10(self.readDatasets('/',required=[name])[name])
+            print name,values
+            self.interpolants = self.interpolants + (values,)
+        return
+
+    def getWavelength(self,lineName):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        if lineName not in self.lines:
+            raise IndexError(funcname+"(): Line '"+lineName+"' not found!")
+        index = self.lines.index(lineName)
+        return self.wavelengths[index]
+
+    def interpolate(self,lineName,metallicity,densityHydrogen,ionizingFluxHydrogen,\
+                        ionizingFluxHeliumToHydrogen,ionizingFluxOxygenToHydrogen,**kwargs):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        if lineName not in self.lines:
+            raise IndexError(funcname+"(): Line '"+lineName+"' not found!")
+        tableLuminosities = self.luminosities[lineName]
+        ngals = len(metallicity)
+        galaxyData = np.zeros((ngals,ngals,ngals,ngals,ngals),dtype=float)
+        galaxyData[0] = metallicity
+        galaxyData[1] = densityHydrogen
+        galaxyData[2] = ionizingFluxHydrogen
+        galaxyData[3] = ionizingFluxHeliumToHydrogen
+        galaxyData[4] = ionizingFluxOxygenToHydrogen
+        luminosities = interpn(points,tableLuminosities,galaxyData,**kwargs)        
+        return luminosities
+        
+
 
 ##########################################################
 # EMISSION LINES CLASS
 ##########################################################
 
-
-class emissionLines(HDF5):
+class galacticusEmissionLines(object):
     
-    def __init__(self):        
+    def __init__(self):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
-        # Initalise HDF5 class and open emissionLines.hdf5 file
-        super(emissionLines, self).__init__(galacticusPath+"/data/hiiRegions/emissionLines.hdf5",'r')        
-        # Extract names and properties of lines
-        self.lines = list(map(str,self.fileObj["lines"].keys()))
-        self.wavelengths = {}
-        for l in self.lines:
-            self.wavelengths[l] = self.readAttributes("lines/"+l,required=["wavelength"])["wavelength"]        
+        self.CLOUDY = cloudyTable()
         return
 
-    def getWavelength(self,line):
-        index = self.lines.index(line)
-        return self.wavelengths[index]
+    def getWavelength(self,lineName):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        if lineName not in self.CLOUDY.lines:
+            raise IndexError(funcname+"(): Line '"+lineName+"' not found!")
+        index = self.CLOUDY.lines.index(lineName)
+        return self.CLOUDY.wavelengths[index]
+        
+    def getLineLuminosity(self,galHDF5Obj,z,datasetName,overwrite=False,**kwargs):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        # Check dataset name corresponds to a luminosity
+        if not fnmatch.fnmatch(datasetName,"*LineLuminosity:*:z*"):
+            raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
+        # Get nearest redshift output
+        out = galHDF5Obj.selectOutput(z)
+        # Check if luminosity already calculated
+        if datasetName in galHDF5Obj.availableDatasets(z) and not overwrite:
+            return np.array(out["nodeData/"+datasetName])
+        # Set mass (in solar masses) and lifetime (in Gyr) of HII regions
+        massHIIRegion = 7.5e3 
+        lifetimeHIIRegion = 1.0e-3 
+        # Extract information from dataset name
+        datasetInfo = datasetName.split(":")
+        component = datasetInfo[0].replace("LineLuminosity","")
+        lineName = datasetInfo[1]
+        if datasetInfo[2]!="rest" and datasetInfo[2]!="observed":
+            filterName = datasetInfo[2]
+        else:
+            filterName = None
+        frame = fnmatch.filter(datasetInfo,"rest") + fnmatch.filter(datasetInfo,"observed") 
+        frame = frame[0]
+        redshift = fnmatch.filter(datasetInfo,"z*")[0].replace("z","")
+        # Compute various properties for interpolation over Cloudy tables
+        gasMass = np.copy(out["nodeData/"+component+"MassGas"])
+        radius = np.copy(out["nodeData/"+component+"Radius"])
+        starFormationRate = np.copy(out["nodeData/"+component+"StarFormationRate"])
+        abundanceGasMetals = np.copy(out["nodeData/"+component+"AbundancesGasMetals"])
+        LyContinuum = np.copy(out["nodeData/"+component+"LymanContinuumLuminosity:z"+redshift])
+        HeContinuum = np.copy(out["nodeData/"+component+"HeliumContinuumLuminosity:z"+redshift])
+        OxContinuum = np.copy(out["nodeData/"+component+"OxygenContinuumLuminosity:z"+redshift])
+        # Useful masks to avoid dividing by zero etc.
+        hasGas = gasMass > 0.0
+        hasSize = radius > 0.0        
+        hasFlux = LyContinuum > 0.0
+        # i) compute metallicity
+        metallicity = np.zeros_like(gasMass)
+        np.place(metallicity,hasGas,np.log10(abundanceGasMetals[hasGas]/gasMass[hasGas]))
+        # ii) compute hydrogen density
+        densityHydrogen = np.zeros_like(gasMass)
+        mask = np.logical_and(hasGas,hasSize)
+        tmp = gasMass[mask]*massSolar/(radius[mask]*centi/megaParsec)**3
+        tmp = np.log10(tmp/(4.0*Pi*massAtomic*atmicMassHydrogen*massFractionHydrogen))
+        np.place(densityHydrogen,mask,np.copy(tmp))
+        del tmp
+        # iii) compute Lyman continuum luminosity
+        ionizingFluxHydrogen = np.zeros_like(gasMass)
+        tmp = np.log10(LyContinuum[hasFlux]) + 50.0
+        np.place(ionizingFluxHydrogen,hasFlux,np.copy(tmp))
+        del tmp
+        # iv) compute luminosity ratios He/H and Ox/H
+        ionizingFluxHeliumToHydrogen = np.zeros_lime(gasMass)
+        tmp = np.log10(HeContinuum[hasFlux]/LyContinuum[hasFlux])
+        np.place(ionizingFluxHeliumToHydrogen,hasFlux,np.copy(tmp))
+        del tmp
+        ionizingFluxOxygenToHydrogen = np.zeros_lime(gasMass)
+        tmp = np.log10(OxContinuum[hasFlux]/LyContinuum[hasFlux])
+        np.place(ionizingFluxOxygenToHydrogen,hasFlux,np.copy(tmp))
+        del tmp
+        # Check if returning raw line luminosity or luminosity under filter
+        luminosityMultiplier = 1.0
+        if filterName is not None:
+            pass # Still need to translate this! (Probably call a separate function)
+        # Find number of HII regions
+        numberHIIRegion = starFormationRate*lifetimeHIIRegion/massHIIRegion
+        # Convert the hydrogen ionizing luminosity to be per HII region
+        ionizingFluxHydrogen -= np.log10(numberHIIRegion)
+        # Interpolate over Cloudy tables to get luminosity per HII region
+        lineLuminosity = self.CLOUDY.interpolate(lineName,metallicity,\
+                                                     densityHydrogen,ionizingFluxHydrogen,\
+                                                     ionizingFluxHeliumToHydrogen,\
+                                                     ionizingFluxOxygenToHydrogen,**kwargs)
+        # Convert to line luminosity in Solar luminosities (or AB maggies if a filter was specified)
+        lineLuminosity *= luminosityMultiplier*numberHIIRegion*erg/luminositySolar
+        # Add luminosity to file and return values
+        galHDF5Obj.addDataset(out.name+"/nodeData/",datasetName,lineLuminosity)
+        # Add appropriate attributes to new dataset
+        attr = {"unitsInSI":luminositySolar}
+        galHDF5Obj.addAttributes(out.name+"/nodeData/"+datasetName,attr)
+        return lineLuminosity
+
+    def getTotalLineLuminosity(self,galHDF5Obj,z,datasetName,overwrite=False):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        if not datasetName.startswith("total"):
+            print("WARNING! "+funcname+"(): '"+datasetName+"' is not a 'total' property!")
+            return None
+        # Check dataset name corresponds to a luminosity
+        if not fnmatch.fnmatch(datasetName,"*LineLuminosity:*:z*"):
+            raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
+        # Get nearest redshift output
+        out = galHDF5Obj.selectOutput(z)
+        # Check if luminosity already calculated -- return if not
+        # wanting to recalculate
+        if datasetName in galHDF5Obj.availableDatasets(z) and not overwrite:
+            return np.array(out["nodeData/"+datasetName])
+        # Extract disk and spheroid luminosities
+        allprops = galHDF5Obj.availableDatasets(z)
+        diskName = datasetName.replace("total","disk")
+        diskLuminosity = self.getLineLuminosity(galHDF5Obj,z,diskName)
+        spheroidName = datasetName.replace("total","spheroid")
+        spheroidLuminosity = self.getLineLuminosity(galHDF5Obj,z,spheroidName)
+        # Compute total luminosity and add to file
+        totalLuminosity = diskLuminosity + spheroidLuminosity
+        galHDF5Obj.addDataset(out.name+"/nodeData/",datasetName,totalLuminosity)
+        # Add appropriate attributes to new dataset
+        attr = {"unitsInSI":luminositySolar}
+        galHDF5Obj.addAttributes(out.name+"/nodeData/"+datasetName,attr)
+        return totalLuminosity
+
+
 
 
 
@@ -79,54 +246,6 @@ def getLatexName(line):
         name = "\mathrm{"+elem+ones+"_{"+wave+"\\AA}}"
     return name
 
-
-
-##########################################################
-# EMISSION LINE LUMINOSITY
-##########################################################
-
-def Get_Total_Line_Luminosity(galHDF5Obj,z,datasetName,overwrite=False):
-    funcname = sys._getframe().f_code.co_name
-    if not datasetName.startswith("total"):
-        print("WARNING! "+funcname+"(): '"+datasetName+"' is not a 'total' property!")
-        return None
-    else:
-        # Get nearest redshift output
-        out = galHDF5Obj.selectOutput(z)
-        # Check if luminosity already calculated -- return if not wanting
-        # to recalculate
-        if datasetName in galHDF5Obj.availableDatasets(z) and not overwrite:
-            return np.array(out["nodeData/"+datasetName])
-        else:
-            # Extract disk and spheroid luminosities
-            allprops = galHDF5Obj.availableDatasets(z)
-            diskName = datasetName.replace("total","disk")
-            diskLuminosity = Get_Line_Luminosity(galHDF5Obj,z,diskName)
-            spheroidName = datasetName.replace("total","spheroid")
-            spheroidLuminosity = Get_Line_Luminosity(galHDF5Obj,z,spheroidName)
-            # Compute total luminosity and add to file
-            totalLuminosity = diskLuminosity + spheroidLuminosity            
-            galHDF5Obj.addDataset(out.name+"/nodeData/",datasetName,totalLuminosity)
-            # Add appropriate attributes to new dataset
-            attr = {"unitsInSI":luminositySolar}
-            galHDF5Obj.addAttributes(out.name+"/nodeData/"+datasetName,attr)
-            return totalLuminosity
-        
-
-def Get_Line_Luminosity(galHDF5Obj,z,datasetName,overwrite=False):
-    funcname = sys._getframe().f_code.co_name
-    # Get nearest redshift output
-    out = galHDF5Obj.selectOutput(z)
-    # Check if wanting a total luminosity -- if so pass to Get_Total_Luminosity
-    if datasetName.startswith("total"):
-        return Get_Total_Line_Luminosity(galHDF5Obj,z,datasetName,overwrite=overwrite)
-    # Check if luminosity already calculated -- return if not wanting to recalculate
-    if datasetName in galHDF5Obj.availableDatasets(z) and not overwrite:
-        return np.array(out["nodeData/"+datasetName])
-    else:
-        # Calculate line luminosity -- need to finish this part!!!
-        return None
-    
 
 ##########################################################
 # COMPUTE EQUIVALENT WIDTH
