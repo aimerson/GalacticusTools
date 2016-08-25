@@ -11,4 +11,6 @@ class ParseError(GalacticusError):
         # Call the base class constructor with the parameters it needs
         super(ParseError, self).__init__(message)
 
+
+
         

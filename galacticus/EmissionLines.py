@@ -4,12 +4,16 @@ import sys,re
 import fnmatch
 import numpy as np
 import pkg_resources
-from scipy.interpolate import interpn
+from scipy.interpolate import interpn,interp1d
+from scip.integrate import romb
 from .hdf5 import HDF5
 from .io import GalacticusHDF5
 from .GalacticusErrors import ParseError
+from .Filters import GalacticusFilters
 from .Luminosities import Get_Luminosity
-from .constants import massSolar,megaParsec,centi,Pi,massAtomic,atmicMassHydrogen,massFractionHydrogen,erg,luminositySolar
+from .constants import massSolar,luminositySolar,luminosityAB
+from .constants import megaParsec,centi,Pi,erg,angstrom,speedOfLight
+from .cosntants import massAtomic,atmicMassHydrogen,massFractionHydrogen
 from .utils.sorting import natural_sort_key
 from .config import *
 from .cosmology import Cosmology
@@ -41,7 +45,6 @@ class cloudyTable(HDF5):
         self.interpolants = ()
         for name in self.interpolantNames:
             values = np.log10(self.readDatasets('/',required=[name])[name])
-            print name,values
             self.interpolants = self.interpolants + (values,)
         return
 
@@ -80,6 +83,7 @@ class galacticusEmissionLines(object):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         self.CLOUDY = cloudyTable()
+        self.FILTERS = GalacticusFilters()
         return
 
     def getWavelength(self,lineName):
@@ -88,6 +92,74 @@ class galacticusEmissionLines(object):
             raise IndexError(funcname+"(): Line '"+lineName+"' not found!")
         index = self.CLOUDY.lines.index(lineName)
         return self.CLOUDY.wavelengths[index]
+
+
+
+    def getLuminosityMultiplier(self,datasetName,**kwargs):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Extract information from dataset name
+        datasetInfo = datasetName.split(":")
+        component = datasetInfo[0].replace("LineLuminosity","")
+        lineName = datasetInfo[1]
+        if datasetInfo[2]!="rest" and datasetInfo[2]!="observed":
+            filterName = datasetInfo[2]
+        else:
+            filterName = None
+        frame = fnmatch.filter(datasetInfo,"rest") + fnmatch.filter(datasetInfo,"observed")
+        frame = frame[0]
+        redshift = fnmatch.filter(datasetInfo,"z*")[0].replace("z","")
+        # Return unity if no filter specified
+        luminosityMultiplier = 1.0
+        # Compute multiplier for filter
+        if filterName is not None:
+            FILTER = self.FILTERS.load(filterName,**kwargs).transmission
+            lineWavelength = self.getWavelength(lineName)
+            if frame == "observed":
+                lineWavelength *= (1.0+float(redshift))
+            luminosityMultiplier = 0.0
+            lowLimit = FILTER.wavelength[FILTER.transmission>0].min()
+            uppLimit = FILTER.wavelength[FILTER.transmission>0].max()                        
+            if lineWavelength >= lowLimit and lineWavelength <= uppLimit:
+                # Interpolate the transmission to the line wavelength  
+                transmissionCurve = interp1d(FILTER.wavelength,FILTER.transmission)
+                luminosityMultiplier = transmissionCurve(lineWavelength)                
+                # Integrate a zero-magnitude AB source under the filter
+                k = 10
+                wavelengths = np.linspace(FILTER.wavelength[0],FILTER.wavelength[-1],2**k+1)
+                deltaWavelength = wavelengths[1] - wavelengths[0]
+                transmission = transmissionCurve(wavelengths)/wavelengths**2
+                del transmissionCurve                
+                transmission *= speedOfLight*luminosityAB/(angstrom*luminositySolar)
+                filterLuminosityAB = romb(transmission,dx=deltaWavelength)
+                # Compute the multiplicative factor to convert line
+                # luminosity to luminosity in AB units in the filter
+                luminosityMultiplier /= filterLuminosityAB
+                # Galacticus defines observed-frame luminosities by
+                # simply redshifting the galaxy spectrum without
+                # changing the amplitude of F_nu (i.e. the compression
+                # of the spectrum into a smaller range of frequencies
+                # is not accounted for). For a line, we can understand
+                # how this should affect the luminosity by considering
+                # the line as a Gaussian with very narrow width (such
+                # that the full extent of the line always lies in the
+                # filter). In this case, when the line is redshifted
+                # the width of the Gaussian (in frequency space) is
+                # reduced, while the amplitude is unchanged (as, once
+                # again, we are not taking into account the
+                # compression of the spectrum into the smaller range
+                # of frequencies). The integral over the line will
+                # therefore be reduced by a factor of (1+z) - this
+                # factor is included in the following line. Note that,
+                # when converting this observed luminosity into an
+                # observed flux a factor of (1+z) must be included to
+                # account for compression of photon frequencies (just
+                # as with continuum luminosities in Galacticus) which
+                # will counteract the effects of the 1/(1+z) included
+                # below.
+                if frame == "observed":
+                    luminosityMultiplier /= (1.0+float(redshift))
+        return luminosityMultiplier
+                
         
     def getLineLuminosity(self,galHDF5Obj,z,datasetName,overwrite=False,**kwargs):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
@@ -106,10 +178,6 @@ class galacticusEmissionLines(object):
         datasetInfo = datasetName.split(":")
         component = datasetInfo[0].replace("LineLuminosity","")
         lineName = datasetInfo[1]
-        if datasetInfo[2]!="rest" and datasetInfo[2]!="observed":
-            filterName = datasetInfo[2]
-        else:
-            filterName = None
         frame = fnmatch.filter(datasetInfo,"rest") + fnmatch.filter(datasetInfo,"observed") 
         frame = frame[0]
         redshift = fnmatch.filter(datasetInfo,"z*")[0].replace("z","")
@@ -150,9 +218,8 @@ class galacticusEmissionLines(object):
         np.place(ionizingFluxOxygenToHydrogen,hasFlux,np.copy(tmp))
         del tmp
         # Check if returning raw line luminosity or luminosity under filter
-        luminosityMultiplier = 1.0
         if filterName is not None:
-            pass # Still need to translate this! (Probably call a separate function)
+            luminosityMultiplier = self.getLuminosityMultiplier(datasetName)
         # Find number of HII regions
         numberHIIRegion = starFormationRate*lifetimeHIIRegion/massHIIRegion
         # Convert the hydrogen ionizing luminosity to be per HII region

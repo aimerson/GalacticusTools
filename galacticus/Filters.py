@@ -8,29 +8,25 @@ import pkg_resources
 import xml.etree.ElementTree as ET
 from .config import *
 from .EmissionLines import cloudyTable
+from .GalacticusErrors import ParseError
 from .parameters import formatParametersFile
 
-def getTopHatLimits(wavelengthCentral,resolution,verbose=False):        
-    funcname = sys._getframe().f_code.co_name
-    if verbose:
-        infoLine = "wavelengthCentral = {0:f}A  resolution = {1:f}A".format(wavelengthCentral,resolution)
-        print(funcname+"(): "+infoLine)
-    wavelengthRatio = (np.sqrt(4.0*resolution**2+1.0)+1.0)/(np.sqrt(4.0*resolution**2+1.0)-1.0)
-    wavelengthMinimum = wavelengthCentral*(np.sqrt(4.0*resolution**2+1.0)-1.0)/2.0/resolution
-    wavelengthMinimum /= wavelengthRatio
-    wavelengthMaximum = wavelengthCentral*(np.sqrt(4.0*resolution**2+1.0)+1.0)/2.0/resolution
-    wavelengthMaximum /= wavelengthRatio
-    if verbose:
-        infoLine = "wavelengthMinimum = {0:f}A  wavelengthMaximum = {1:f}A".format(wavelengthMinimum,wavelengthMaximum)
-        print(funcname+"(): "+infoLine)
-    return (wavelengthMinimum,wavelengthMaximum)
+
+###############################################################################
+# COMPUTE FILTER PROPERTIES
+###############################################################################
+
+def computeEffectiveWavelength(wavelength,transmission):
+    return np.sum(wavelength*transmission)/np.sum(transmission)
 
 
+###############################################################################
+# AB/VEGA CONVERSIONS
+###############################################################################
 
 def getVegaSpectrum(specFile=None):
     if specFile is None:
         specFile = pkg_resources.resource_filename(__name__,"data/stellarAstrophysics/Vega/A0V_Castelli.xml")
-        #specFile = galacticusPath+"/data/stellarAstrophysics/vega/A0V_Castelli.xml"
     # Load Vega spectrum
     xmlStruct = ET.parse(specFile)
     xmlRoot = xmlStruct.getroot()
@@ -44,25 +40,6 @@ def getVegaSpectrum(specFile=None):
     spectrum["wavelength"] = spectrum["wavelength"][isort]
     spectrum["flux"] = spectrum["flux"][isort]
     return spectrum.view(np.recarray)
-
-
-def computeEffectiveWavelength(wavelength,transmission):
-    return np.sum(wavelength*transmission)/np.sum(transmission)
-
-
-def getFilterTransmission(filterFile):
-    # Open xml file and load structure
-    xmlStruct = ET.parse(filterFile)
-    xmlRoot = xmlStruct.getroot()
-    xmlMap = {c.tag:p for p in xmlRoot.iter() for c in p}
-    # Read filter transmission
-    response = xmlRoot.find("response")
-    data = response.findall("datum")
-    transmission = np.zeros(len(data),dtype=[("wavelength",float),("transmission",float)])
-    for i,datum in enumerate(data):
-        transmission["wavelength"][i] = float(datum.text.split()[0])
-        transmission["transmission"][i] = float(datum.text.split()[1])
-    return transmission.view(np.recarray)
 
 
 class VegaOffset(object):
@@ -110,6 +87,24 @@ class VegaOffset(object):
         # Return Vega offset
         return 2.5*np.log10(fluxVega*self.fluxABV/self.fluxVegaV/fluxAB)
     
+
+###############################################################################
+# FILTER FILES
+###############################################################################
+
+def getFilterTransmission(filterFile):
+    # Open xml file and load structure
+    xmlStruct = ET.parse(filterFile)
+    xmlRoot = xmlStruct.getroot()
+    xmlMap = {c.tag:p for p in xmlRoot.iter() for c in p}
+    # Read filter transmission
+    response = xmlRoot.find("response")
+    data = response.findall("datum")
+    transmission = np.zeros(len(data),dtype=[("wavelength",float),("transmission",float)])
+    for i,datum in enumerate(data):
+        transmission["wavelength"][i] = float(datum.text.split()[0])
+        transmission["transmission"][i] = float(datum.text.split()[1])
+    return transmission.view(np.recarray)
         
 class Filter(object):    
     def __init__(self,filterFile,verbose=False,VegaObj=None,VbandFilterFile=None,kRomberg=100,**kwargs):
@@ -166,7 +161,6 @@ class Filter(object):
             print("".join(infoLine))
         return
 
-
 def createFilter(filePath,name,response,description=None,origin=None,url=None,\
                      effectiveWavelength=None,vegaOffset=None,vBandFilter=None):    
     # Create tree root
@@ -208,6 +202,82 @@ def createFilter(filePath,name,response,description=None,origin=None,url=None,\
     formatParametersFile(filePath)
     return
 
+
+###############################################################################
+# TOP HAT FILTERS 
+###############################################################################
+
+def getTopHatLimits(wavelengthCentral,resolution,verbose=False):        
+    funcname = sys._getframe().f_code.co_name
+    if verbose:
+        infoLine = "wavelengthCentral = {0:f}A  resolution = {1:f}A".format(wavelengthCentral,resolution)
+        print(funcname+"(): "+infoLine)
+    wavelengthRatio = (np.sqrt(4.0*resolution**2+1.0)+1.0)/(np.sqrt(4.0*resolution**2+1.0)-1.0)
+    wavelengthMinimum = wavelengthCentral*(np.sqrt(4.0*resolution**2+1.0)-1.0)/2.0/resolution
+    wavelengthMinimum /= wavelengthRatio
+    wavelengthMaximum = wavelengthCentral*(np.sqrt(4.0*resolution**2+1.0)+1.0)/2.0/resolution
+    wavelengthMaximum /= wavelengthRatio
+    if verbose:
+        infoLine = "wavelengthMinimum = {0:f}A  wavelengthMaximum = {1:f}A".format(wavelengthMinimum,wavelengthMaximum)
+        print(funcname+"(): "+infoLine)
+    return (wavelengthMinimum,wavelengthMaximum)
+
+
+class TopHat(object):
+    
+    def __init__(self,filterName,VegaObj=None,VbandFilterFile=None,kRomberg=100,\                 
+                 transmissionArraySize=1000,verbose=False,**kwargs):
+        classname = self.__class__.__name__
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        self.name = filterName
+        filterInfo = self.filterName.split("_")
+        if fnmatch.fnmatch(self.filterName,"topHat*"):
+            self.centralWavelength = float(filterInfo[1])
+            self.resolution = float(filterInfo[2])
+        elif fnmatch.fnmatch(self.filterName,"emissionLineContinuum*"):
+            if len(filterInfo) == 4:
+                self.centralWavelength = float(filterInfo[2])
+                self.resolution = float(filterInfo[3])
+            elif len(filterInfo) == 3:
+                CLOUDY = cloudyTable()
+                self.centralWavelength = CLOUDY.getWavelength(filterInfo[1])
+                del CLOUDY
+                self.resolution = float(filterInfo[2])
+        else:
+            raise ParseError(funcname+"(): filter '"+self.filterName+"' not a top hat filter!")
+        # Compute transmission curve
+        limits = getTopHatLimits(self.centralWavelength,self.resolution)
+        offset = np.fabs(limits[1] - limits[0])*0.01
+        self.transmission = np.zeros(len(transmissionArraySize),dtype=[("wavelength",float),("transmission",float)])
+        self.transmission = self.transmission.view(np.recarray)
+        self.transmission.wavelength = np.linspace(limits[0]-offset,limits[1]+offset,transmissionArraySize)
+        inside = np.logical_and(self.transmission.wavelength>=limits[0],self.transmission.wavelength<=limits[1])
+        np.place(self.transmission.transmission,inside,1.0)
+        del inside
+        # Compute effective wavelength
+        self.effectiveWavelength = computeEffectiveWavelength(self.transmission.wavelength,self.transmission.transmission)
+        # Compute AB-Vega offset
+        if VegaObj is None:
+                VegaObj = VegaOffset(VbandFilterFile=VbandFilterFile)
+            self.vegaOffset = VegaObj.computeOffset(self.transmission.wavelength,self.transmission.transmission,\
+                                                        kRomberg=kRomberg,**kwargs)
+        # Report filter information
+        if verbose:
+            print(classname+"(): Filter '"+self.name+"' attribrutes:")
+            for k in self.__dict__.keys():
+                if k is not "transmission":
+                    print("        "+k+" = "+str(self.__dict__[k]))
+            print(classname+"(): Filter '"+self.name+"' transmission curve:")
+            print("                  Wavelength (A)                  Transmission")
+            infoLine = ["                   {0:f}                      {1:f}\n".format(w,t) \
+                            for w,t in zip(self.transmission.wavelength,self.transmission.transmission)]
+            print("".join(infoLine))
+        return 
+
+
+###############################################################################
+# FILTERS CLASS
+###############################################################################
         
 class GalacticusFilters(object):
     
@@ -223,15 +293,18 @@ class GalacticusFilters(object):
         self.cloudyTableClass = cloudyTable()
         return
 
-    def load(self,filterName,path=None,store=False,verbose=False):                
+    def load(self,filterName,path=None,store=False,**kwargs):                
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         if filterName not in self.filters.keys():        
-            if path is None:
-                path = self.filtersDirectory+"/"+filterName+".xml"
-            if not os.path.exists(path):
-                error = funcname+"(): Path to filter '"+filterName+"' does not exist!\n  Specified path = "+path
-                raise IOError(error)
-            FILTER = Filter(path,verbose=verbose)
+            if fnmatch.fnmatch(filterName,"*topHat*") or fnmatch.fnmatch(filterName,"*emissionLine*"):
+                FILTER = TopHat(filterName,**kwargs)
+            else:
+                if path is None:
+                    path = self.filtersDirectory+"/"+filterName+".xml"
+                if not os.path.exists(path):
+                    error = funcname+"(): Path to filter '"+filterName+"' does not exist!\n  Specified path = "+path
+                    raise IOError(error)
+                FILTER = Filter(path,verbose=verbose)
             self.effectiveWavelengths[filterName] = FILTER.effectiveWavelength
             if store:
                 self.filters[filterName] = FILTER            
@@ -244,28 +317,9 @@ class GalacticusFilters(object):
         if filterName in self.effectiveWavelengths.keys():
             effectiveWavelength = self.effectiveWavelengths[filterName]
         else:
-            if fnmatch.fnmatch(filterName,"*topHat*") or fnmatch.fnmatch(filterName,"*emissionLine*"):                            
-                filterInfo = filterName.split("_")
-                if fnmatch.fnmatch(filterName,"*topHat*"):
-                    wavelength = filterInfo[1]
-                    resolution = filterInfo[2]
-                else:
-                    if fnmatch.fnmatch(filterName,"*emissionLineContinuumCentral*"):
-                        wavelength = self.cloudyTableClass.getWavelength(filterInfo[1])
-                        resolution = filterInfo[2]
-                        pass
-                    elif fnmatch.fnmatch(filterName,"*emissionLineContinuumOffset*"):
-                        wavelength = filterInfo[3]
-                        resolution = filterInfo[4]
-                if verbose:
-                    infoLine = "filter={0:s}  wavelength={1:s}  resolution={2:s}".format(filter,wavelength,resolution)
-                    print(funcname+"(): Top hat filter information:\n        "+infoLine)
-                topHatLimits = getTopHatLimits(float(wavelength),float(resolution))
-                effectiveWavelength = (topHatLimits[0]+topHatLimits[1])/2.0
-            else:
-                FILTER = self.load(filterName,path=path,store=store,verbose=verbose)
-                del FILTER
-                effectiveWavelength = self.effectiveWavelengths[filterName]
+            FILTER = self.load(filterName,path=path,store=store,verbose=verbose)
+            del FILTER
+            effectiveWavelength = self.effectiveWavelengths[filterName]
         if verbose:
             print(funcname+"(): Effective wavelength (rest frame) for filter '"+filterName + \
                       "' = {0:f} Angstroms".format(effectiveWavelength))
