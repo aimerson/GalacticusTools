@@ -225,8 +225,8 @@ def getTopHatLimits(wavelengthCentral,resolution,verbose=False):
 
 class TopHat(object):
     
-    def __init__(self,filterName,VegaObj=None,VbandFilterFile=None,kRomberg=100,\                 
-                 transmissionArraySize=1000,verbose=False,**kwargs):
+    def __init__(self,filterName,VegaObj=None,VbandFilterFile=None,kRomberg=100,\
+                     transmissionArraySize=1000,verbose=False,**kwargs):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         self.name = filterName
