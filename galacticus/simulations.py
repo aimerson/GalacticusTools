@@ -149,6 +149,9 @@ def locate_simulation_file(simulation):
     if fnmatch.fnmatch(simulation.lower(),"millgas") or \
             fnmatch.fnmatch(simulation.lower(),"ms-w7"):
         simfile = pkg_resources.resource_filename(__name__,"data/Simulations/ms-w7.xml")
+    # Planck 256 Mpc/h simulation 
+    if fnmatch.fnmatch(simulation.lower(),"p*256*"):
+        simfile = pkg_resources.resource_filename(__name__,"data/Simulations/planck256.xml")
     # ERROR if simulation not available
     if simfile is None:
         raise ValueError(funcname+"(): Simulation not recognised! Available simulations are: "+\
