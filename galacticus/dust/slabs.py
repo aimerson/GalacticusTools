@@ -2,6 +2,7 @@
 
 # Values/fits from: http://webast.ast.obs-mip.fr/hyperz/hyperz_manual1/node10.html
 
+import sys
 import numpy as np
 import copy
 import fnmatch
@@ -30,6 +31,8 @@ class Allen(SLAB):
     def __init__(self,Rv=3.1):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        if Rv is None:
+            Rv = 3.1
         # Construct array for dust curve
         wavelengths = np.array([1000., 1110., 1250., 1430., 1670., 2000., 2220., 2500., \
                                     2850., 3330., 3650., 4000., 4400., 5000., 5530., 6700., \
@@ -51,6 +54,8 @@ class Calzetti(SLAB):
     def __init__(self,Rv=4.05):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        if Rv is None:
+            Rv = 4.05
         # Construct array for dust curve
         def lowRange(wavelength):
             # Fit for lower regime
@@ -100,7 +105,7 @@ class Fitzpatrick(SLAB):
             if invLambda < 5.9:
                 C4 = 0.0
             factor2 = C2*invLambda
-            factor3 = C3/(invLambda+(invLambda0**2/invLambda)+gamma**2)
+            factor3 = C3/((invLambda-(invLambda0**2/invLambda))**2+gamma**2)
             factor4 = C4*(0.539*(invLambda-5.9)**2+0.0564*(invLambda-5.9)**3)
             return C1+factor2+factor3+factor4
         diff = 1.0*angstrom/micron
@@ -113,11 +118,23 @@ class Fitzpatrick(SLAB):
             upp = 3330
             if Rv is None:
                 Rv = 2.72
-        wavelengths = np.arange(lowangstrom/micron,(upp*angstrom/micron)+diff,diff)        
-        dustTable = np.zeros(len(wavelengths),dtype=[("wavelength",float),("klambda",float)]).view(np.recarray)
-        dustTable.wavelength = np.copy(wavelengths)
-        del wavelengths
-        dustTable.klambda = np.array([colorRatio(l,galaxy) for l in dustTable.wavelength]) + Rv
+        wavelengths = np.arange(low*angstrom/micron,(upp*angstrom/micron)+diff,diff)        
+        klambda = np.array([colorRatio(l,galaxy) for l in wavelengths]) + Rv
+        wavelengthsAllen = np.array([1000., 1110., 1250., 1430., 1670., 2000., 2220., 2500., \
+                                         2850., 3330., 3650., 4000., 4400., 5000., 5530., 6700., \
+                                         9000., 10000., 20000., 100000.])*angstrom/micron
+        klambdaAllen = np.array([4.20, 3.70, 3.30, 3.00, 2.70, 2.80, 2.90, 2.30, 1.97, 1.69,\
+                                     1.58, 1.45, 1.32, 1.13, 1.00, 0.74, 0.46, 0.38, 0.11,0.00])*Rv
+        mask = wavelengthsAllen > wavelengths.max()
+        wavelengthsAllen = wavelengthsAllen[mask]
+        klambdaAllen = klambdaAllen[mask]
+        dustTable = np.zeros(len(wavelengths)+len(wavelengthsAllen),dtype=[("wavelength",float),("klambda",float)]).view(np.recarray)           
+        dustTable.wavelength = np.append(np.copy(wavelengths),np.copy(wavelengthsAllen))
+        dustTable.klambda = np.append(np.copy(klambda),np.copy(klambdaAllen))
+        del wavelengths,klambda
+
+        print dustTable.wavelength
+
         # Initalise SLAB class
         super(Fitzpatrick,self).__init__(Rv=Rv,dustTable=dustTable)        
         return
@@ -125,10 +142,14 @@ class Fitzpatrick(SLAB):
     
 
 class Prevot(SLAB):
-            classname = self.__class__.__name__
+    
+    def __init__(self,Rv=None):
+        classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        if Rv is None:
+            Rv = 3.1
         # Construct array for dust curve
-        wavelength = np.array([1275., 1330., 1385., 1435., 1490., 1545., 1595., 1647., 1700.,\
+        wavelengths = np.array([1275., 1330., 1385., 1435., 1490., 1545., 1595., 1647., 1700.,\
                                    1755., 1810., 1860., 1910., 2000., 2115., 2220., 2335., 2445.,\
                                    2550., 2665., 2778., 2890., 2995., 3105., 3704., 4255., 5291.,\
                                    12500., 16500., 22000.])
@@ -144,3 +165,20 @@ class Prevot(SLAB):
         super(Prevot,self).__init__(Rv=Rv,dustTable=dustTable)        
         return
 
+
+
+def slabModel(model,Rv=None):
+    
+    if fnmatch.fnmatch(model.lower(),"cal*"):
+        DUST = Calzetti(Rv=Rv)
+    elif fnmatch.fnmatch(model.lower(),"al*"):
+        print model
+        DUST = Allen(Rv=Rv)
+    elif fnmatch.fnmatch(model.lower(),"fit*"):
+        DUST = Fitzpatrick(Rv=Rv,galaxy="LMC")
+    elif fnmatch.fnmatch(model.lower(),"seat*"):
+        DUST = Fitzpatrick(Rv=Rv,galaxy="MW")
+    elif fnmatch.fnmatch(model.lower(),"prev*"):
+        DUST = Prevot(Rv=Rv)
+    return DUST
+    
