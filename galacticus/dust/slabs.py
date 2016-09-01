@@ -132,9 +132,6 @@ class Fitzpatrick(SLAB):
         dustTable.wavelength = np.append(np.copy(wavelengths),np.copy(wavelengthsAllen))
         dustTable.klambda = np.append(np.copy(klambda),np.copy(klambdaAllen))
         del wavelengths,klambda
-
-        print dustTable.wavelength
-
         # Initalise SLAB class
         super(Fitzpatrick,self).__init__(Rv=Rv,dustTable=dustTable)        
         return
@@ -172,7 +169,6 @@ def slabModel(model,Rv=None):
     if fnmatch.fnmatch(model.lower(),"cal*"):
         DUST = Calzetti(Rv=Rv)
     elif fnmatch.fnmatch(model.lower(),"al*"):
-        print model
         DUST = Allen(Rv=Rv)
     elif fnmatch.fnmatch(model.lower(),"fit*"):
         DUST = Fitzpatrick(Rv=Rv,galaxy="LMC")
