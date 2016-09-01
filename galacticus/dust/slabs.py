@@ -46,6 +46,7 @@ class Allen(SLAB):
         del klambda
         # Initalise SLAB class
         super(Allen,self).__init__(Rv=Rv,dustTable=dustTable)        
+        self.reference = "Allen (1976) [MW]"
         return
 
     
@@ -76,6 +77,7 @@ class Calzetti(SLAB):
         dustTable.klambda /= Rv
         # Initalise SLAB class
         super(Calzetti,self).__init__(Rv=Rv,dustTable=dustTable)        
+        self.reference = "Calzetti et al. (2000) [SB]"
         return
 
 
@@ -111,11 +113,13 @@ class Fitzpatrick(SLAB):
             return C1+factor2+factor3+factor4
         diff = 1.0*angstrom/micron
         low = 1200.0
-        if fnmatch.fnmatch(galaxy.lower(),"mw"):            
+        if fnmatch.fnmatch(galaxy.lower(),"mw"):      
+            self.reference = "Fitzpatrick & Massa (1986) [MW]"      
             upp = 3650
             if Rv is None:
                 Rv = 3.1
-        elif fnmatch.fnmatch(galaxy.lower(),"lmc"):            
+        elif fnmatch.fnmatch(galaxy.lower(),"lmc"):     
+            self.reference = "Fitzpatrick & Massa (1986) [LMC]"             
             upp = 3330
             if Rv is None:
                 Rv = 2.72
@@ -163,6 +167,7 @@ class Prevot(SLAB):
         del klambda
         # Initalise SLAB class
         super(Prevot,self).__init__(Rv=Rv,dustTable=dustTable)        
+        self.reference = "Prevot et al. (1984) [SMC]"             
         return
 
 
