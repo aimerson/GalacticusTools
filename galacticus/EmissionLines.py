@@ -5,7 +5,7 @@ import fnmatch
 import numpy as np
 import pkg_resources
 from scipy.interpolate import interpn,interp1d
-from scip.integrate import romb
+from scipy.integrate import romb
 from .hdf5 import HDF5
 from .io import GalacticusHDF5
 from .GalacticusErrors import ParseError
