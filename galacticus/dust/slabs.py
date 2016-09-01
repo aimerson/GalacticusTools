@@ -21,8 +21,8 @@ class SLAB(object):
         self.dustCurve = interp1d(self._dustTable.wavelength,self._dustTable.klambda,kind='linear',fill_value="extrapolate")                
         return
 
-    def attenuation(self,wavelength,eBV):        
-        return self.dustCurve(wavelength*angstrom/micron)*eBV
+    def attenuation(self,wavelength,Av):        
+        return self.dustCurve(wavelength*angstrom/micron)*Av
 
 
 
@@ -42,7 +42,7 @@ class Allen(SLAB):
         dustTable = np.zeros(len(wavelengths),dtype=[("wavelength",float),("klambda",float)]).view(np.recarray)
         dustTable.wavelength = np.copy(wavelengths)*angstrom/micron
         del wavelengths        
-        dustTable.klambda = np.copy(klambda)*Rv
+        dustTable.klambda = np.copy(klambda)
         del klambda
         # Initalise SLAB class
         super(Allen,self).__init__(Rv=Rv,dustTable=dustTable)        
@@ -73,6 +73,7 @@ class Calzetti(SLAB):
         mask = dustTable.wavelength >= 0.63
         dustTable.klambda = lowRange(dustTable.wavelength) + Rv
         np.place(dustTable.klambda,mask,uppRange(dustTable.wavelength)[mask]+Rv)                
+        dustTable.klambda /= Rv
         # Initalise SLAB class
         super(Calzetti,self).__init__(Rv=Rv,dustTable=dustTable)        
         return
@@ -131,6 +132,7 @@ class Fitzpatrick(SLAB):
         dustTable = np.zeros(len(wavelengths)+len(wavelengthsAllen),dtype=[("wavelength",float),("klambda",float)]).view(np.recarray)           
         dustTable.wavelength = np.append(np.copy(wavelengths),np.copy(wavelengthsAllen))
         dustTable.klambda = np.append(np.copy(klambda),np.copy(klambdaAllen))
+        dustTable.klambda /= Rv
         del wavelengths,klambda
         # Initalise SLAB class
         super(Fitzpatrick,self).__init__(Rv=Rv,dustTable=dustTable)        
@@ -157,6 +159,7 @@ class Prevot(SLAB):
         dustTable.wavelength = np.copy(wavelengths)*angstrom/micron
         del wavelengths        
         dustTable.klambda = np.copy(klambda) + Rv
+        dustTable.klambda /= Rv
         del klambda
         # Initalise SLAB class
         super(Prevot,self).__init__(Rv=Rv,dustTable=dustTable)        
