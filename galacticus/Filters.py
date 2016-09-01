@@ -7,7 +7,7 @@ from scipy.integrate import romb
 import pkg_resources
 import xml.etree.ElementTree as ET
 from .config import *
-from .EmissionLines import cloudyTable
+from .cloudy import cloudyTable
 from .GalacticusErrors import ParseError
 from .parameters import formatParametersFile
 
@@ -258,9 +258,9 @@ class TopHat(object):
         self.effectiveWavelength = computeEffectiveWavelength(self.transmission.wavelength,self.transmission.transmission)
         # Compute AB-Vega offset
         if VegaObj is None:
-                VegaObj = VegaOffset(VbandFilterFile=VbandFilterFile)
-            self.vegaOffset = VegaObj.computeOffset(self.transmission.wavelength,self.transmission.transmission,\
-                                                        kRomberg=kRomberg,**kwargs)
+            VegaObj = VegaOffset(VbandFilterFile=VbandFilterFile)
+        self.vegaOffset = VegaObj.computeOffset(self.transmission.wavelength,self.transmission.transmission,\
+                                                    kRomberg=kRomberg,**kwargs)
         # Report filter information
         if verbose:
             print(classname+"(): Filter '"+self.name+"' attribrutes:")
