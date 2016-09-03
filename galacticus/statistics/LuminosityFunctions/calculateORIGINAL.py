@@ -12,227 +12,28 @@ from ...cosmology import adjustHubble
 
 
 
-class LuminosityFunction(object):
+class ComputeLuminosityFunction(object):
     
-    def __init__(self,cosmologyDict,magnitudeBins=None,luminosityBins=None):
+    def __init__(self,galHDF5Obj,hubble=None,magnitudeBins=None,luminosityBins=None):        
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Store Galacticus file object
+        self.galHDF5Obj = galHDF5Obj        
+        self.hubbleGalacticus = self.galHDF5Obj.parameters["HubbleConstant"]/100.0
+        # Set Hubble parameter to correct to
+        if hubble is None:
+            self.hubble = self.hubbleGalacticus
+        else:
+            self.hubble = hubble
         # Store bins for magnitudes/luminosities
         self.magnitudeBins = magnitudeBins
         if self.magnitudeBins is None:
             self.magnitudeBins = np.arange(-40.0,-5.0,0.2)
         self.luminosityBins = luminosityBins
         if self.luminosityBins is None:
-            self.luminosityBins = np.linspace(35.0,44.0,100)            
-        # Dictionary for cosmology 
-        self.cosmology = cosmologyDict
-        # Dictionary for redshifts
-        self.outputs = {}
-        # Dictionary for luminosity
+            self.luminosityBins = np.linspace(35.0,44.0,100)
+        # Dictionary to store results
         self.luminosityFunction = {}
-        return
-
-
-    def _redshiftConsistent(self,z,outName,tolerance=0.01,force=False):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        consistent = True
-        if force:
-            return consistent
-        if len(self.outputs.keys()) == 0:
-            return consistent
-        if (np.fabs(z-self.outputs[outName])/z)>tolerance:
-            print("WARNING! "+funcname+"(): Redshifts NOT consistent! (Tolerance = "+\
-                      str(tolerance)+")")
-            consistent = False
-        return consistent
-    
-    def _cosmologyConsistent(self,cosmology,tolerance=0.01,force=False):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        consistent = True
-        if force:
-            return consistent
-        if any([(np.fabs(self.cosmolgy[p]-cosmology[p])/self.cosmology[p])>tolerance \
-                    for p in self.cosmology.keys()]):
-            print("WARNING! "+funcname+"(): Cosmology NOT consistent! (Tolerance = "+\
-                      str(tolerance)+")")
-            consistent = False
-        return consistent
-
-
-    def _datasetConsistent(self,datasetName):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        consistent = fnmatch.fnmatch(datasetName,"*Luminosity*") or fnmatch.fnmatch(datasetName,"*magitude*")
-        if not consistent:
-            print("WARNING! "+funcname+"(): Datasset '"+datasetName+"' is NOT a luminosity or a magnitude!")
-        return consistent
-
-    def _binsConsistent(self,datasetBins,datasetName,tolerance=0.01,force=False):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        consistent = True
-        if fnmatch.fnmatch(datasetName,"*Luminosity*"):
-            bins = self.luminosityBins
-        elif fnmatch.fnmatch(datasetName,"*magitude*"):
-            bins = self.magnitudeBins
-        else:
-            print("WARNING! "+funcname+"(): Dataset NOT consistent with luminosity or magnitude!")
-            return False
-        if bins is None:
-            return True
-        if len(bins) != len(datasetBins):
-            print("WARNING! "+funcname+"(): Number of bins NOT consistent!")
-            return False
-        if any((np.fabs(bins-datasetBins)/bins)>tolerance):
-            print("WARNING! "+funcname+"(): At least one bin NOT consistent! (Tolerance = "+\
-                      str(tolerance)+")")
-            return False
-        return consistent
-
-
-    def addDataset(self,outName,redshift,datasetName,datasetBins,datasetLF,cosmology,\
-                       force=False,overwrite=False,append=True,\
-                       zTolerance=0.01,cosmologyTolerance=0.01,binsTolerance=0.01):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        compute = True
-        # Check bins consistent
-        if not self._binsConsistent(datasetBins,datasetName,force=force):
-            return
-        # Check cosmology consistent
-        if not self._cosmologyConsistent(cosmology,tolerance=cosmologyTolerance,force=force):
-            return
-        # Check if dataset exists, whether cosmology/redshifts consistent and whether overwrite
-        if outName in self.outputs.keys():
-            if not self._redshiftConsistent(redshift,outName,tolerance=zTolerance,force=force):
-                return
-            compute = overwrite or append
-        else:
-            self.outputs[outName] = redshift
-            self.luminosityFunction[outName] = {}
-            compute = True
-        if not compute:
-            return
-        # Store luminosity function        
-        if datasetName in self.luminosityFunction[outName].keys():
-            if overwrite:
-                self.luminosityFunction[outName][datasetName] = np.copy(datasetLF)
-            if append:
-                self.luminosityFunction[outName][datasetName] += np.copy(datasetLF)
-        else:
-            self.luminosityFunction[outName][datasetName] = np.copy(datasetLF)
-        return
-
-    
-    def addLuminosityFunctions(self,lfObj,force=False,overwrite=False,append=True,\
-                                   zTolerance=0.01,cosmologyTolerance=0.01,binsTolerance=0.01,\
-                                   verbose=False):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name            
-        if verbose:
-            print(funcname+"(): adding luminosity functions...")                
-        # Check whether bins consistent
-        name = "totalLineLuminosity:balmerAlpha65653"
-        luminosityConsistent = self._binsConsistent(lfObj.luminosityBins,name,\
-                                                        tolerance=binsTolerance,force=force)
-        name = "totalMagnitude:SDSS_r"
-        magnitudeConsistent = self._binsConsistent(lfObj.luminosityBins,name,\
-                                                       tolerance=binsTolerance,force=force)
-        consistent = luminosityConsistent and magnitudeConsistent
-        if not consistent:
-            return
-        # Check whether cosmology consistent
-        if not self._cosmologyConsistent(lfObj.cosmology,tolerance=cosmologyTolerance,force=force):
-            return
-        # Import luminosity functions
-        PROG = Progress(len(self.luminosityFunction.keys()))       
-        for outKey in lfObj.luminosityFunction.keys():
-            z = lfObj.outputs[outKey]
-            if self._redshiftConsistent(z,outKey,zTolerance=0.01,force=force):
-                # Luminosities
-                luminosities = fnmatch.filter(lfObj.luminosityFunction[outkey].keys(),"*LineLuminosity*")                
-                dummy = [self.addDataset(outKey,z,name,self.luminosityBins,\
-                                             lfObj.luminosityFunction[outkey][name],lfObj.cosmology,\
-                                             force=True,overwrite=overwrite,append=append) for name in luminosities]
-                del dummy
-                # Magnitudes
-                magnitudes = fnmatch.filter(lfObj.luminosityFunction[outkey].keys(),"*Magnitude*")                
-                dummy = [self.addDataset(outKey,z,name,self.magnitudeBins,\
-                                             lfObj.luminosityFunction[outkey][name],lfObj.cosmology,\
-                                             force=True,overwrite=overwrite,append=append) for name in magnitudes]
-                del dummy
-            PROG.increment()
-            if verbose:
-                PROG.print_status_line(task=" adding z = "+str(z))
-        return
-        
-
-
-    def computeDataset(self,outName,redshift,datasetName,datasetValues,cosmology,\
-                           weight=None,force=False,overwrite=False,append=True,\
-                           zTolerance=0.01,cosmologyTolerance=0.01):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        compute = True
-        # Check cosmology consistent
-        if not self._cosmologyConsistent(cosmology,tolerance=cosmologyTolerance,force=force):
-            return
-        # Check if dataset exists, whether cosmology/redshifts consistent and whether overwrite
-        if outName in self.outputs.keys():
-            if not self._redshiftConsistent(redshift,outName,tolerance=zTolerance,force=force):
-                return
-            compute = overwrite or append
-        else:
-            if not self._datasetConsistent(datasetName):
-                return
-            self.outputs[outName] = redshift
-            self.luminosityFunction[outName] = {}
-            compute = True
-        if not compute:
-            return
-        # Compute and store luminosity function        
-        if fnmatch.fnmatch(p,"*LineLuminosity*"):
-            values = np.log10(ergPerSecond(datasetValues))
-            bins = self.luminosityBins
-        else:
-            values = datasetValues
-            bins = self.magnitudeBins                
-        lf,bins = np.histogram(values,bins=bins,weights=weight)            
-        if datasetName in self.luminosityFunction[outName].keys():
-            if overwrite:
-                self.luminosityFunction[outName][datasetName] = np.copy(lf)
-            if append:
-                self.luminosityFunction[outName][datasetName] += np.copy(lf)
-        else:
-            self.luminosityFunction[outName][datasetName] = np.copy(lf)
-        return
-    
-            
-
-
-
-
-
-
-
-
-
-
-
-class ComputeLuminosityFunction(LuminosityFunction):
-    
-    def __init__(self,galacticusFile,magnitudeBins=None,luminosityBins=None):        
-        classname = self.__class__.__name__
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        # Open Galacticus file
-        self.galacticusFile = galacticusFile
-        self.galHDF5Obj = GalacticusHDF5(self.galacticusFile,'r')        
-        # Store cosmology
-        COS = {}
-        COS["HubbleParameter"] = self.galHDF5Obj.parameters["HubbleConstant"]/100.0
-        COS["OmegaMatter"] = self.galHDF5Obj.parameters["OmegaMatter"]
-        COS["OmegaBaryon"] = self.galHDF5Obj.parameters["OmegaBaryon"]
-        COS["OmegaDarkEnergy"] = self.galHDF5Obj.parameters["OmegaDarkEnergy"]
-        COS["sigma8"] = self.galHDF5Obj.parameters["sigma_8"]
-        COS["ns"] = self.galHDF5Obj.parameters["index"]        
-        # Initalise LuminosityFunction class
-        super(ComputeLuminosityFunction, self).__init__(COS,magnitudeBins=magnitudeBins,\
-                                                            luminosityBins=luminosityBins)        
         return
 
     def processOutput(self,z,props=None,incTopHatFilters=False,addWeight=1.0,overwrite=False,verbose=False):        
