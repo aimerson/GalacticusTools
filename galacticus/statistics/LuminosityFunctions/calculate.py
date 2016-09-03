@@ -210,19 +210,76 @@ class LuminosityFunction(object):
         else:
             self.luminosityFunction[outName][datasetName] = np.copy(lf)
         return
+
+
+    def _writeDatasetToHDF5(self,fileObj,path,datasetName,datasetValue,binWidth=None):        
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name         
+        if len(fnmatch.filter(datasetName.split(":"),"z*"))>0:
+            redshiftLabel = fnmatch.filter(p.split(":"),"z*")[0]
+            property = datasetName.replace(":"+redshiftLabel,"")
+        else:
+            property = datasetName
+        values = datasetValue
+        if binWidth is not None:
+            if binWidth > 0:
+                values /= binWidth
+        fileObj.addDataset(path,property,np.copy(values),chunks=True,compression="gzip",\
+                               compression_opts=6)
+        return
+
+
+    def writeToHDF5(self,hdf5File,verbose=False,divideBinWidth=True):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name            
+        if verbose:
+            print(funcname+"(): Writing luminosity function data to "+hdf5File+" ...")            
+        fileObj = HDF5(hdf5File,'w')
+        # Write value of cosmological parameters
+        fileObj.mkGroup("Cosmology")
+        dummy = [fileObj.addAttributes("Cosmology",{key:self.cosmology[key]}) \
+                     for key in self.cosmology.keys()]
+        # Write luminosity and magnitude bins
+        luminosityBinWidth = self.luminosityBins[1] - self.luminosityBins[0]
+        luminosityBins = self.luminosityBins[:-1] + luminosityBinWidth/2.0
+        fileObj.addDataset("/","luminosityBins",luminosityBins,chunks=True,compression="gzip",\
+                               compression_opts=6)
+        fileObj.addAttributes("/luminosityBins",{"units":"log10(erg/s)"})
+        magnitudeBinWidth = self.magnitudeBins[1] - self.magnitudeBins[0]
+        magnitudeBins = self.magnitudeBins[:-1] + magnitudeBinWidth/2.0
+        fileObj.addDataset("/","magnitudeBins",magnitudeBins,chunks=True,compression="gzip",\
+                               compression_opts=6)        
+        # Create outputs group and write data for each output in luminosity functions dictionary        
+        fileObj.mkGroup("Outputs")
+        PROG = Progress(len(self.luminosityFunction.keys()))
+        for outstr in self.luminosityFunction.keys():            
+            fileObj.mkGroup("Outputs/"+outstr)
+            z = self.outputs[outstr]
+            fileObj.addAttributes("Outputs/"+outstr,{"redshift":z})
+            path = "Outputs/"+outstr+"/"
+            # i) Write luminosities
+            binWidth = None
+            if divideBinWidth:
+                binWidth = luminosityBinWidth
+            luminosities = fnmatch.filter(self.luminosityFunction[outstr].keys(),"*LineLuminosity*")
+            dummy = [ self._writeDatasetToHDF5(fileObj,path,name,self.luminosityFunction[outstr][name],binWidth=binWidth)\
+                          for name in luminosities]
+            del dummy
+            # ii) Write magnitudes
+            binWidth = None
+            if divideBinWidth:
+                binWidth = magnitudeBinWidth
+            magnitudes = fnmatch.filter(self.luminosityFunction[outstr].keys(),"*Magnitude*")
+            dummy = [ self._writeDatasetToHDF5(fileObj,path,name,self.luminosityFunction[outstr][name],binWidth=binWidth)\
+                          for name in magnitudes]
+            del dummy
+            PROG.increment()
+            PROG.print_status_line(task="z = "+str(z))
+        fileObj.close()
+        if verbose:
+            print(funcname+"(): luminosity function data successfully written to "+hdf5File)
+        return
+
+
     
-            
-
-
-
-
-
-
-
-
-
-
-
 class ComputeLuminosityFunction(LuminosityFunction):
     
     def __init__(self,galacticusFile,magnitudeBins=None,luminosityBins=None):        
@@ -244,154 +301,71 @@ class ComputeLuminosityFunction(LuminosityFunction):
                                                             luminosityBins=luminosityBins)        
         return
 
-    def processOutput(self,z,props=None,incTopHatFilters=False,addWeight=1.0,overwrite=False,verbose=False):        
+    def processOutputs(self,redshifts,props=None,incTopHatFilters=False,overwrite=False,verbose=0):        
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
-        # Locate output
-        iselect = np.argmin(np.fabs(self.galHDF5Obj.outputs.z-z))
-        outstr = "Output"+str(self.galHDF5Obj.outputs["iout"][iselect])
-        if outstr in self.luminosityFunction.keys() and not overwrite:
-            if verbose:
-                print(funcname+"(): Luminosity functions for "+outstr+" already computed.")
-            return
-        if verbose:
-            print(funcname+"(): Processing luminosity functions for "+outstr+"...")
-        out = self.galHDF5Obj.selectOutput(z)        
-        # Get properties to process        
-        allProps = self.galHDF5Obj.availableDatasets(z)
-        if props is None:
-            goodProps = fnmatch.filter(allProps,"magnitude*")
-            if not incTopHatFilters:
-                topHats = fnmatch.filter(allProps,"magnitude*emissionLineContinuum*") + \
-                    fnmatch.filter(allProps,"magnitude*topHat*")
-                if len(topHats) > 0:
-                    goodProps = list(set(props).difference(topHats))
-            goodProps = goodProps + fnmatch.filter(allProps,"*LineLuminosity*")
-        else:
-            goodProps = []
-            for p in props:
-                goodProps = goodProps + fnmatch.filter(allProps,p)  
-        if verbose:
-            print(funcname+"(): Identified "+str(len(goodProps))+" properties for processing...")
-        # Compute and store luminosity functions
-        zLF = {}
-        cts = np.array(out["mergerTreeCount"])
-        wgt = np.array(out["mergerTreeWeight"])
-        weight = np.copy(np.repeat(wgt,cts))
-        weight *= addWeight
-        weight = adjustHubble(weight,self.hubbleGalacticus,self.hubble,'density')
-        if verbose:
-            print(funcname+"(): Computing luminosity functions...")
-        PROG = Progress(len(goodProps))
-        for p in goodProps:
-            values = np.array(out["nodeData/"+p])
-            if fnmatch.fnmatch(p,"*LineLuminosity*"):
-                values = adjustHubble(values,self.hubbleGalacticus,self.hubble,"luminosity")
-                values = np.log10(ergPerSecond(values))
-                bins = self.luminosityBins
+        # Loop over redshifts
+        if verbose > 0:
+            print(funcname+"(): Processing redshift outputs...")
+        PROG = Progress(len(redshifts))
+        for z in redshifts:
+            # Locate and select output
+            iselect = np.argmin(np.fabs(self.galHDF5Obj.outputs.z-z))
+            outstr = "Output"+str(self.galHDF5Obj.outputs["iout"][iselect])
+            redshift = self.galHDF5Obj.outputs["z"][iselect]
+            if outstr in self.luminosityFunction.keys() and not overwrite:
+                if verbose == 2:
+                    print(funcname+"(): Luminosity functions for "+outstr+" already computed.")
+                continue
+            if verbose == 2:
+                print(funcname+"(): Processing luminosity functions for "+outstr+" (z = "+str(redshift)+" ...")
+            out = self.galHDF5Obj.selectOutput(z)        
+            # Calculate weights
+            cts = np.array(out["mergerTreeCount"])
+            wgt = np.array(out["mergerTreeWeight"])
+            weight = np.copy(np.repeat(wgt,cts))            
+            # Get properties to process        
+            allProps = self.galHDF5Obj.availableDatasets(z)
+            if props is None:
+                goodProps = fnmatch.filter(allProps,"Magnitude*")
+                if not incTopHatFilters:
+                    topHats = fnmatch.filter(allProps,"magnitude*emissionLineContinuum*") + \
+                        fnmatch.filter(allProps,"Magnitude*topHat*")
+                    if len(topHats) > 0:
+                        goodProps = list(set(props).difference(topHats))
+                goodProps = goodProps + fnmatch.filter(allProps,"*LineLuminosity*")
             else:
-                bins = self.magnitudeBins
-                values = adjustHubble(values,self.hubbleGalacticus,self.hubble,"magnitude")
-            zLF[p],bins = np.histogram(values,bins=bins,weights=weight)
+                goodProps = []
+                for p in props:
+                    goodProps = goodProps + fnmatch.filter(allProps,p)  
+            if verbose == 2:
+                print(funcname+"(): Identified "+str(len(goodProps))+" properties for processing...")
+            # Compute and store luminosity functions
+            if verbose == 2:
+                print(funcname+"(): Computing luminosity functions...")
+            # i) Luminosities
+            luminosities = fnmatch.filter(goodProps,"*LineLuminosity*")
+            dummy = [ self.computeDataset(outstr,z,name,np.log10(ergPerSecond(np.array(out["nodeData/"+name]))),\
+                                              self.cosmology,weight=weight,force=False,overwrite=overwrite,append=True,\
+                                              zTolerance=0.01,cosmologyTolerance=0.01) \
+                          for name in luminosities ]
+            del dummy
+            # ii) Magnitudes
+            magnitudes = fnmatch.filter(goodProps,"*Magnitude*")
+            dummy = [ self.computeDataset(outstr,z,name,np.array(out["nodeData/"+name]),\
+                                              self.cosmology,weight=weight,force=False,\
+                                              overwrite=overwrite,append=True,\
+                                              zTolerance=0.01,cosmologyTolerance=0.01) \
+                          for name in magnitudes ]
+            del dummy
             PROG.increment()
-            if verbose:
+            if verbose > 0:
                 PROG.print_status_line()
-        self.luminosityFunction[outstr] = zLF            
-        return
-
-        
-    def addLuminosityFunctions(self,lfClass,binsTolerance=1.0e-3,verbose=False):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name            
-        if verbose:
-            print(funcname+"(): adding luminosity functions...")                
-        # Check whether luminosity functions for this class have already been calculated.
-        # If not simply store second object as luminosity functions for this class.
-        if len(self.luminosityFunction.keys()) == 0:
-            self.luminosityFunction = lfClass.luminosityFunction.copy()
-            self.magnitudeBins = np.copy(lfClass.magnitudeBins)
-            self.luminosityBins = np.copy(lfClass.luminosityBins)
-            self.hubble = lfClass.hubble
-        else:
-            # Check values for Hubble parameter are consistent
-            if self.hubble != lfClass.hubble:
-                raise ValueError(funcname+"(): Values for Hubble parameter are not consistent!")
-            # Check luminosity and magnitude bins for two LF objects are consistent
-            binsDiff = np.fabs(self.luminosityBins-lfClass.luminosityBins)
-            if any(binsDiff>binsTolerance):
-                raise ValueError(funcname+"(): cannot add luminosity functions -- luminosity bins are not consistent!")
-            binsDiff = np.fabs(self.magnitudeBins-lfClass.magnitudeBins)
-            if any(binsDiff>binsTolerance):
-                raise ValueError(funcname+"(): cannot add luminosity functions -- magnitude bins are not consistent!")
-            # Add luminosity functions 
-            PROG = Progress(len(self.luminosityFunction.keys()))       
-            for outKey in self.luminosityFunction.keys():
-                if outKey in lfClass.luminosityFunction.keys():
-                    for p in self.luminosityFunction[outKey].keys():
-                        if p in lfClass.luminosityFunction[outKey].keys():                            
-                            self.luminosityFunction[outKey][p] += lfClass.luminosityFunction[outKey][p]
-                PROG.increment()
-                if verbose:
-                    PROG.print_status_line()
-        return
-
-    
-
-
-                    
-    def writeToHDF5(self,hdf5File,verbose=False):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name            
-        if verbose:
-            print(funcname+"(): Writing luminosity function data to "+hdf5File+" ...")            
-        fileObj = HDF5(hdf5File,'w')
-        # Write value of Hubble parameter
-        fileObj.mkGroup("Cosmology")
-        fileObj.addAttributes("Cosmology",{"HubbleParameter":self.hubble})
-        fileObj.addAttributes("Cosmology",{"OmegaMatter":self.galHDF5Obj.parameters["OmegaMatter"]})
-        fileObj.addAttributes("Cosmology",{"OmegaBaryon":self.galHDF5Obj.parameters["OmegaBaryon"]})
-        fileObj.addAttributes("Cosmology",{"OmegaDarkEnergy":self.galHDF5Obj.parameters["OmegaDarkEnergy"]})
-        fileObj.addAttributes("Cosmology",{"sigma8":self.galHDF5Obj.parameters["sigma_8"]})            
-        fileObj.addAttributes("Cosmology",{"ns":self.galHDF5Obj.parameters["index"]})
-        # Write luminosity and magnitude bins
-        luminosityBinWidth = self.luminosityBins[1] - self.luminosityBins[0]
-        luminosityBins = self.luminosityBins[:-1] + luminosityBinWidth/2.0
-        fileObj.addDataset("/","luminosityBins",luminosityBins,chunks=True,compression="gzip",\
-                               compression_opts=6)
-        fileObj.addAttributes("/luminosityBins",{"units":"log10(erg/s)"})
-        magnitudeBinWidth = self.magnitudeBins[1] - self.magnitudeBins[0]
-        magnitudeBins = self.magnitudeBins[:-1] + magnitudeBinWidth/2.0
-        fileObj.addDataset("/","magnitudeBins",magnitudeBins,chunks=True,compression="gzip",\
-                               compression_opts=6)        
-        # Create outputs group and write data for each output in luminosity functions dictionary
-        fileObj.mkGroup("Outputs")
-        for outstr in self.luminosityFunction.keys():            
-            fileObj.mkGroup("Outputs/"+outstr)
-            iout = int(outstr.replace("Output",""))
-            iselect = np.argwhere(self.galHDF5Obj.outputs.iout==iout)
-            z = str(self.galHDF5Obj.outputs["z"][iselect][0][0])            
-            fileObj.addAttributes("Outputs/"+outstr,{"redshift":z})
-            for p in self.luminosityFunction[outstr].keys():
-                path = "Outputs/"+outstr+"/"
-                if len(fnmatch.filter(p.split(":"),"z*"))>0:
-                    redshiftLabel = fnmatch.filter(p.split(":"),"z*")[0]
-                else:
-                    redshiftLabel = None
-                lfData = self.luminosityFunction[outstr][p]                
-                if fnmatch.fnmatch(p,"*LineLuminosity*"):
-                    lfData /= luminosityBinWidth
-                else:
-                    lfData /= magnitudeBinWidth
-                property = p
-                if redshiftLabel is not None:
-                    property = property.replace(":"+redshiftLabel,"")
-                fileObj.addDataset(path,property,lfData,chunks=True,compression="gzip",\
-                                       compression_opts=6)                        
-        fileObj.close()
-        if verbose:
-            print(funcname+"(): luminosity function data successfully written to "+hdf5File)
         return
 
 
 
-class GalacticusLuminosityFunction(object):
+
+class GalacticusLuminosityFunction(LuminosityFunction):
     
     def __init__(self,luminosityFunctionFile):
         classname = self.__class__.__name__
@@ -399,52 +373,49 @@ class GalacticusLuminosityFunction(object):
         self.file = luminosityFunctionFile
         f = HDF5(self.file,'r')
         # Read cosmological parameters
-        self.hubble = f.readAttributes("Cosmology")["HubbleParameter"]        
-        self.omega0 = f.readAttributes("Cosmology")["OmegaMatter"]        
-        self.lambda0 = f.readAttributes("Cosmology")["OmegaDarkEnergy"]        
-        self.omegab = f.readAttributes("Cosmology")["OmegaBaryon"]        
-        self.sigma8 = f.readAttributes("Cosmology")["sigma8"]        
-        self.ns = f.readAttributes("Cosmology")["ns"]                
+        COS = {key:f.readAttributes("Cosmology")[key] for key in f.readAttributes("Cosmology").keys()}
         # Read bins arrays
         bins = f.readDatasets("/",required=["luminosityBins","magnitudeBins"])
-        self.luminosityBins = np.copy(bins["luminosityBins"])
-        self.magnitudeBins = np.copy(bins["magnitudeBins"])
+        luminosityBins = np.copy(bins["luminosityBins"])
+        magnitudeBins = np.copy(bins["magnitudeBins"])
         del bins
+        # Initalise LuminosityFunction class
+        super(GalacticusLuminosityFunction, self).__init__(COS,magnitudeBins=magnitudeBins,\
+                                                               luminosityBins=luminosityBins)
         # Read list of available outputs and datasets
-        self.outputs = list(map(str,f.lsGroups("Outputs")))
-        self.redshifts = np.ones(len(self.outputs))
-        self.datasets = {}
-        for i,out in enumerate(self.outputs):
-            self.redshifts[i] = f.readAttributes("Outputs/"+out)["redshift"]
-            self.datasets[out] = list(map(str,f.lsDatasets("Outputs/"+out)))
-        f.close()
-        return
-
-    def constructDictionary(self):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        self.luminosityFunction = {}
-        f = HDF5(self.file,'r')
-        for output in self.outputs:
-            outputDict = f.readDatasets("Outputs/"+output,required=self.datasets[output])
-            self.luminosityFunction[output] = copy.copy(outputDict)
+        outputs = list(map(str,f.lsGroups("Outputs")))
+        for out in outputs:
+            self.outputs[out] = f.readAttributes("Outputs/"+out)["redshift"]        
         f.close()
         return
     
     def getDatasets(self,z,required=None,verbose=False):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        iselect = np.argmin(np.fabs(self.redshifts-z))
-        path = "Outputs/"+self.outputs[iselect]
+        # Locate appropriate output by nearest redshift
+        redshifts = np.array([self.outputs[key] for key in self.outputs.keys()])        
+        iselect = np.argmin(np.fabs(redshifts-z))
+        outstr = outputs[iselect]        
+        path = "Outputs/"+
         if verbose:
-            print_str = funcname+"(): Reading luminosity function(s) for z = "+\
-                str(self.redshifts[iselect])+"\n         -- located in path "+path
+            print_str = funcname+"(): Reading luminosity function(s) for "+outstr+\
+                " ( z = "+str(redshifts[iselect])+")"
             print(print_str)
-        f = HDF5(self.file,'r')
-        availableDatasets = list(map(str,f.lsDatasets(path)))
-        datasets = []
-        for req in required:
-            datasets = datasets + fnmatch.filter(availableDatasets,req)
-        lfData = f.readDatasets(path,required=datasets)
-        f.close()
-        return lfData
+        # Extract properties either from self.luminosityFunction if stored in memory
+        # or by reading the luminosity function file
+        if outstr in self.luminosityFunction.keys():
+            availableDatasets = list(map(str,self.luminosityFunction[outstr].keys()))
+            datasets = []
+            for req in required:
+                datasets = datasets + fnmatch.filter(availableDatasets,req)
+            values = {name:self.self.luminosityFunction[outstr][name] for name in datasets}
+        else:
+            f = HDF5(self.file,'r')
+            availableDatasets = list(map(str,f.lsDatasets(path)))
+            datasets = []
+            for req in required:
+                datasets = datasets + fnmatch.filter(availableDatasets,req)
+            values = f.readDatasets(path,required=datasets)
+            f.close()
+        return values
 
     
