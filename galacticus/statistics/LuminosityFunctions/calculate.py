@@ -169,13 +169,19 @@ class ComputeLuminosityFunction(object):
             fileObj.addAttributes("Outputs/"+outstr,{"redshift":z})
             for p in self.luminosityFunction[outstr].keys():
                 path = "Outputs/"+outstr+"/"
-                redshiftLabel = fnmatch.filter(p.split(":"),"z*")[0]
+                if len(fnmatch.filter(p.split(":"),"z*"))>0:
+                    redshiftLabel = fnmatch.filter(p.split(":"),"z*")[0]
+                else:
+                    redshiftLabel = None
                 lfData = self.luminosityFunction[outstr][p]                
                 if fnmatch.fnmatch(p,"*LineLuminosity*"):
                     lfData /= luminosityBinWidth
                 else:
                     lfData /= magnitudeBinWidth
-                fileObj.addDataset(path,p.replace(":"+redshiftLabel,""),lfData,chunks=True,compression="gzip",\
+                property = p
+                if redshiftLabel is not None:
+                    property = property.replace(":"+redshiftLabel,"")
+                fileObj.addDataset(path,property,lfData,chunks=True,compression="gzip",\
                                        compression_opts=6)                        
         fileObj.close()
         if verbose:
@@ -218,10 +224,7 @@ class GalacticusLuminosityFunction(object):
         self.luminosityFunction = {}
         f = HDF5(self.file,'r')
         for output in self.outputs:
-            outputDict = {}
-            for dataset in self.datasets[output]:
-                values = f.readDatasets("Outputs/"+output,required=[dataset])
-                outputDict[dataset] = np.copy(values[dataset])
+            outputDict = f.readDatasets("Outputs/"+output,required=self.datasets[output])
             self.luminosityFunction[output] = copy.copy(outputDict)
         f.close()
         return
