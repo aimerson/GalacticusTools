@@ -125,6 +125,16 @@ class ComputeLuminosityFunction(object):
                     PROG.print_status_line()
         return
 
+    
+    def applyWeight(self,weight,verbose=False):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name            
+        if verbose:
+            print(funcname+"(): Re-weighting luminosity function data using weight = "+str(weight)+" ...")            
+        for outKey in self.luminosityFunction.keys():
+            for p in self.luminosityFunction[outKey].keys():
+                self.luminosityFunction[outKey][p] *= weight
+        return
+
                     
     def writeToHDF5(self,hdf5File,verbose=False):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name            

@@ -33,6 +33,12 @@ class galacticusEmissionLines(object):
         self.FILTERS = GalacticusFilters()
         return
 
+
+    def getLineNames(self):
+        return self.CLOUDY.lines
+
+
+
     def getWavelength(self,lineName):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         if lineName not in self.CLOUDY.lines:
@@ -227,7 +233,7 @@ def getLineNames():
     #             "oxygenIII4959","oxygenIII5007",\
     #             "nitrogenII6584",\
     #             "sulfurII6731","sulfurII6716"]
-    lines = emissionLines().lines
+    lines = galacticusEmissionLines().getLineNames()
     return lines
 
 def availableLines(galHDF5Obj,z,frame=None,component=None,dust=None):    
