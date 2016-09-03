@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
-
 import sys,fnmatch
+import copy
 import h5py
 import numpy as np
 from ...hdf5 import HDF5
@@ -210,6 +210,19 @@ class GalacticusLuminosityFunction(object):
         for i,out in enumerate(self.outputs):
             self.redshifts[i] = f.readAttributes("Outputs/"+out)["redshift"]
             self.datasets[out] = list(map(str,f.lsDatasets("Outputs/"+out)))
+        f.close()
+        return
+
+    def constructDictionary(self):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        self.luminosityFunction = {}
+        f = HDF5(self.file,'r')
+        for output in self.outputs:
+            outputDict = {}
+            for dataset in self.datasets[output]:
+                values = f.readDatasets("Outputs/"+output,required=[dataset])
+                outputDict[dataset] = np.copy(values[dataset])
+            self.luminosityFunction[output] = copy.copy(outputDict)
         f.close()
         return
     
