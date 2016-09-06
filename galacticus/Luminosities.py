@@ -7,7 +7,7 @@ from .constants import luminosityAB
 from .GalacticusErrors import ParseError
 from .constants import luminositySolar,erg
 
-def ergPerSecond(luminosity):
+def ergPerSecond(luminosity):    
     luminosity = np.log10(luminosity)
     luminosity += np.log10(luminositySolar)
     luminosity -= np.log10(erg)

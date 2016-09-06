@@ -161,6 +161,12 @@ def frexp10(x):
 def sigfig(number,sigfig,latex=True):
     if sigfig == 0:
         return 0
+    # Check if number is zero
+    if number == 0:
+        if sigfig == 1:
+            return "0"
+        else:
+            return "0."+"0"*(sigfig-1)
     number = str(number)
     # Split mantissa and exponent
     if "e" in number.lower():

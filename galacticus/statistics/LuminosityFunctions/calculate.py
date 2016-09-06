@@ -40,6 +40,8 @@ class LuminosityFunction(object):
             return consistent
         if len(self.outputs.keys()) == 0:
             return consistent
+        if outName not in self.outputs.keys():
+            return consistent
         if (np.fabs(z-self.outputs[outName])/z)>tolerance:
             print("WARNING! "+funcname+"(): Redshifts NOT consistent! (Tolerance = "+\
                       str(tolerance)+")")
@@ -51,7 +53,7 @@ class LuminosityFunction(object):
         consistent = True
         if force:
             return consistent
-        if any([(np.fabs(self.cosmolgy[p]-cosmology[p])/self.cosmology[p])>tolerance \
+        if any([(np.fabs(self.cosmology[p]-cosmology[p])/self.cosmology[p])>tolerance \
                     for p in self.cosmology.keys()]):
             print("WARNING! "+funcname+"(): Cosmology NOT consistent! (Tolerance = "+\
                       str(tolerance)+")")
@@ -69,11 +71,12 @@ class LuminosityFunction(object):
     def _binsConsistent(self,datasetBins,datasetName,tolerance=0.01,force=False):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         consistent = True
-        if fnmatch.fnmatch(datasetName,"*Luminosity*"):
+        if fnmatch.fnmatch(datasetName.lower(),"*luminosity*"):
             bins = self.luminosityBins
-        elif fnmatch.fnmatch(datasetName,"*magitude*"):
+        elif fnmatch.fnmatch(datasetName.lower(),"*magnitude*"):
             bins = self.magnitudeBins
         else:
+            print "dataset = "+datasetName
             print("WARNING! "+funcname+"(): Dataset NOT consistent with luminosity or magnitude!")
             return False
         if bins is None:
@@ -132,7 +135,7 @@ class LuminosityFunction(object):
         luminosityConsistent = self._binsConsistent(lfObj.luminosityBins,name,\
                                                         tolerance=binsTolerance,force=force)
         name = "totalMagnitude:SDSS_r"
-        magnitudeConsistent = self._binsConsistent(lfObj.luminosityBins,name,\
+        magnitudeConsistent = self._binsConsistent(lfObj.magnitudeBins,name,\
                                                        tolerance=binsTolerance,force=force)
         consistent = luminosityConsistent and magnitudeConsistent
         if not consistent:
@@ -144,17 +147,17 @@ class LuminosityFunction(object):
         PROG = Progress(len(self.luminosityFunction.keys()))       
         for outKey in lfObj.luminosityFunction.keys():
             z = lfObj.outputs[outKey]
-            if self._redshiftConsistent(z,outKey,zTolerance=0.01,force=force):
+            if self._redshiftConsistent(z,outKey,tolerance=0.01,force=force):
                 # Luminosities
-                luminosities = fnmatch.filter(lfObj.luminosityFunction[outkey].keys(),"*LineLuminosity*")                
+                luminosities = fnmatch.filter(lfObj.luminosityFunction[outKey].keys(),"*LineLuminosity*")                
                 dummy = [self.addDataset(outKey,z,name,self.luminosityBins,\
-                                             lfObj.luminosityFunction[outkey][name],lfObj.cosmology,\
+                                             lfObj.luminosityFunction[outKey][name],lfObj.cosmology,\
                                              force=True,overwrite=overwrite,append=append) for name in luminosities]
                 del dummy
                 # Magnitudes
-                magnitudes = fnmatch.filter(lfObj.luminosityFunction[outkey].keys(),"*Magnitude*")                
+                magnitudes = fnmatch.filter(lfObj.luminosityFunction[outKey].keys(),"*Magnitude*")                
                 dummy = [self.addDataset(outKey,z,name,self.magnitudeBins,\
-                                             lfObj.luminosityFunction[outkey][name],lfObj.cosmology,\
+                                             lfObj.luminosityFunction[outKey][name],lfObj.cosmology,\
                                              force=True,overwrite=overwrite,append=append) for name in magnitudes]
                 del dummy
             PROG.increment()
@@ -195,8 +198,8 @@ class LuminosityFunction(object):
         if not compute:
             return
         # Compute and store luminosity function        
-        if fnmatch.fnmatch(p,"*LineLuminosity*"):
-            values = np.log10(ergPerSecond(datasetValues))
+        if fnmatch.fnmatch(datasetName,"*LineLuminosity*"):            
+            values = datasetValues
             bins = self.luminosityBins
         else:
             values = datasetValues
@@ -215,7 +218,7 @@ class LuminosityFunction(object):
     def _writeDatasetToHDF5(self,fileObj,path,datasetName,datasetValue,binWidth=None):        
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name         
         if len(fnmatch.filter(datasetName.split(":"),"z*"))>0:
-            redshiftLabel = fnmatch.filter(p.split(":"),"z*")[0]
+            redshiftLabel = fnmatch.filter(datasetName.split(":"),"z*")[0]
             property = datasetName.replace(":"+redshiftLabel,"")
         else:
             property = datasetName
@@ -259,7 +262,7 @@ class LuminosityFunction(object):
             binWidth = None
             if divideBinWidth:
                 binWidth = luminosityBinWidth
-            luminosities = fnmatch.filter(self.luminosityFunction[outstr].keys(),"*LineLuminosity*")
+            luminosities = fnmatch.filter(self.luminosityFunction[outstr].keys(),"*LineLuminosity*")        
             dummy = [ self._writeDatasetToHDF5(fileObj,path,name,self.luminosityFunction[outstr][name],binWidth=binWidth)\
                           for name in luminosities]
             del dummy
@@ -317,7 +320,7 @@ class ComputeLuminosityFunction(LuminosityFunction):
                     print(funcname+"(): Luminosity functions for "+outstr+" already computed.")
                 continue
             if verbose == 2:
-                print(funcname+"(): Processing luminosity functions for "+outstr+" (z = "+str(redshift)+" ...")
+                print(funcname+"(): Processing luminosity functions for "+outstr+" (z = "+str(redshift)+") ...")
             out = self.galHDF5Obj.selectOutput(z)        
             # Calculate weights
             cts = np.array(out["mergerTreeCount"])
@@ -344,7 +347,7 @@ class ComputeLuminosityFunction(LuminosityFunction):
                 print(funcname+"(): Computing luminosity functions...")
             # i) Luminosities
             luminosities = fnmatch.filter(goodProps,"*LineLuminosity*")
-            dummy = [ self.computeDataset(outstr,z,name,np.log10(ergPerSecond(np.array(out["nodeData/"+name]))),\
+            dummy = [ self.computeDataset(outstr,z,name,np.log10(ergPerSecond(np.array(out["nodeData/"+name])+1.0e-20)),\
                                               self.cosmology,weight=weight,force=False,overwrite=overwrite,append=True,\
                                               zTolerance=0.01,cosmologyTolerance=0.01) \
                           for name in luminosities ]
@@ -393,9 +396,9 @@ class GalacticusLuminosityFunction(LuminosityFunction):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Locate appropriate output by nearest redshift
         redshifts = np.array([self.outputs[key] for key in self.outputs.keys()])        
-        iselect = np.argmin(np.fabs(redshifts-z))
-        outstr = outputs[iselect]        
-        path = "Outputs/"+
+        iselect = np.argmin(np.fabs(redshifts-float(z)))
+        outstr = self.outputs.keys()[iselect]        
+        path = "Outputs/"+outstr
         if verbose:
             print_str = funcname+"(): Reading luminosity function(s) for "+outstr+\
                 " ( z = "+str(redshifts[iselect])+")"
