@@ -204,6 +204,8 @@ class LuminosityFunction(object):
         else:
             values = datasetValues
             bins = self.magnitudeBins                
+        if weight is None:
+            weight = np.ones_like(values)
         lf,bins = np.histogram(values,bins=bins,weights=weight)            
         if datasetName in self.luminosityFunction[outName].keys():
             if overwrite:
@@ -222,7 +224,7 @@ class LuminosityFunction(object):
             property = datasetName.replace(":"+redshiftLabel,"")
         else:
             property = datasetName
-        values = datasetValue
+        values = datasetValue    
         if binWidth is not None:
             if binWidth > 0:
                 values /= binWidth
