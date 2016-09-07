@@ -42,6 +42,8 @@ class LuminosityFunction(object):
             return consistent
         if outName not in self.outputs.keys():
             return consistent
+        if z == self.outputs[outName]:
+            return consistent
         if (np.fabs(z-self.outputs[outName])/z)>tolerance:
             print("WARNING! "+funcname+"(): Redshifts NOT consistent! (Tolerance = "+\
                       str(tolerance)+")")
@@ -103,7 +105,7 @@ class LuminosityFunction(object):
         if not self._cosmologyConsistent(cosmology,tolerance=cosmologyTolerance,force=force):
             return
         # Check if dataset exists, whether cosmology/redshifts consistent and whether overwrite
-        if outName in self.outputs.keys():
+        if outName in self.luminosityFunction.keys():
             if not self._redshiftConsistent(redshift,outName,tolerance=zTolerance,force=force):
                 return
             compute = overwrite or append
@@ -130,8 +132,9 @@ class LuminosityFunction(object):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name            
         if verbose:
             print(funcname+"(): adding luminosity functions...")                
+        # IF provided with file name, create GalacticusLuminosityFunction object
         if type(lfObj) is str:
-            lfObj = GalacticusLuminosityFunction(lfObj)
+            lfObj = GalacticusLuminosityFunction(lfObj)    
         # Check whether bins consistent
         name = "totalLineLuminosity:balmerAlpha65653"
         luminosityConsistent = self._binsConsistent(lfObj.luminosityBins,name,\
@@ -145,26 +148,50 @@ class LuminosityFunction(object):
         # Check whether cosmology consistent
         if not self._cosmologyConsistent(lfObj.cosmology,tolerance=cosmologyTolerance,force=force):
             return
-        # Import luminosity functions
-        PROG = Progress(len(self.luminosityFunction.keys()))       
-        for outKey in lfObj.luminosityFunction.keys():
-            z = lfObj.outputs[outKey]
-            if self._redshiftConsistent(z,outKey,tolerance=0.01,force=force):
-                # Luminosities
-                luminosities = fnmatch.filter(lfObj.luminosityFunction[outKey].keys(),"*LineLuminosity*")                
-                dummy = [self.addDataset(outKey,z,name,self.luminosityBins,\
-                                             lfObj.luminosityFunction[outKey][name],lfObj.cosmology,\
-                                             force=True,overwrite=overwrite,append=append) for name in luminosities]
-                del dummy
-                # Magnitudes
-                magnitudes = fnmatch.filter(lfObj.luminosityFunction[outKey].keys(),"*Magnitude*")                
-                dummy = [self.addDataset(outKey,z,name,self.magnitudeBins,\
-                                             lfObj.luminosityFunction[outKey][name],lfObj.cosmology,\
+        # Import luminosity functions        
+        if len(lfObj.luminosityFunction.keys()) > 0:
+            PROG = Progress(len(lfObj.luminosityFunction.keys()))       
+            for outKey in lfObj.luminosityFunction.keys():
+                z = lfObj.outputs[outKey]
+                if self._redshiftConsistent(z,outKey,tolerance=0.01,force=force):
+                    # Luminosities
+                    luminosities = fnmatch.filter(lfObj.luminosityFunction[outKey].keys(),"*LineLuminosity*")                
+                    dummy = [self.addDataset(outKey,z,name,self.luminosityBins,\
+                                                 lfObj.luminosityFunction[outKey][name],lfObj.cosmology,\
+                                                 force=True,overwrite=overwrite,append=append) for name in luminosities]
+                    del dummy
+                    # Magnitudes
+                    magnitudes = fnmatch.filter(lfObj.luminosityFunction[outKey].keys(),"*Magnitude*")                
+                    dummy = [self.addDataset(outKey,z,name,self.magnitudeBins,\
+                                                 lfObj.luminosityFunction[outKey][name],lfObj.cosmology,\
                                              force=True,overwrite=overwrite,append=append) for name in magnitudes]
-                del dummy
-            PROG.increment()
-            if verbose:
-                PROG.print_status_line(task=" adding z = "+str(z))
+                    del dummy
+                PROG.increment()
+                if verbose:
+                    PROG.print_status_line(task=" adding z = "+str(z))
+        else:
+            f = HDF5(lfObj.file,'r')
+            PROG = Progress(len(f.fileObj["Outputs"].keys()))       
+            for outKey in f.fileObj["Outputs"].keys():
+                z = float(f.readAttributes("Outputs/"+outKey,required=['redshift'])["redshift"])                
+                if self._redshiftConsistent(z,outKey,tolerance=0.01,force=force):
+                    keys = f.lsDatasets("Outputs/"+outKey)
+                    # Luminosities
+                    luminosities = fnmatch.filter(keys,"*LineLuminosity*")
+                    dummy = [self.addDataset(outKey,z,name,self.luminosityBins,\
+                                                 np.array(f.fileObj["Outputs/"+outKey][name]),lfObj.cosmology,\
+                                                 force=True,overwrite=overwrite,append=append) for name in luminosities]
+                    del dummy
+                    # Magnitudes
+                    magnitudes = fnmatch.filter(keys,"*Magnitude*")
+                    dummy = [self.addDataset(outKey,z,name,self.magnitudeBins,\
+                                                 np.array(f.fileObj["Outputs/"+outKey][name]),lfObj.cosmology,\
+                                                 force=True,overwrite=overwrite,append=append) for name in magnitudes]
+                    del dummy
+                PROG.increment()
+                if verbose:
+                    PROG.print_status_line(task=" adding z = "+str(z))
+            f.close()
         return
 
 
@@ -393,7 +420,7 @@ class GalacticusLuminosityFunction(LuminosityFunction):
         outputs = list(map(str,f.lsGroups("Outputs")))
         for out in outputs:
             self.outputs[out] = f.readAttributes("Outputs/"+out)["redshift"]        
-        f.close()
+        f.close()        
         return
     
     def getDatasets(self,z,required=None,verbose=False):
