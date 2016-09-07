@@ -262,7 +262,7 @@ class LuminosityFunction(object):
         return
 
 
-    def writeToHDF5(self,hdf5File,verbose=False,divideBinWidth=True):
+    def writeToHDF5(self,hdf5File,verbose=False,divideBinWidth=True,modifyBins=True):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name            
         if verbose:
             print(funcname+"(): Writing luminosity function data to "+hdf5File+" ...")            
@@ -273,12 +273,18 @@ class LuminosityFunction(object):
                      for key in self.cosmology.keys()]
         # Write luminosity and magnitude bins
         luminosityBinWidth = self.luminosityBins[1] - self.luminosityBins[0]
-        luminosityBins = self.luminosityBins[:-1] + luminosityBinWidth/2.0
+        if modifyBins:
+            luminosityBins = self.luminosityBins[:-1] + luminosityBinWidth/2.0
+        else:
+            luminosityBins = self.luminosityBins
         fileObj.addDataset("/","luminosityBins",luminosityBins,chunks=True,compression="gzip",\
                                compression_opts=6)
         fileObj.addAttributes("/luminosityBins",{"units":"log10(erg/s)"})
         magnitudeBinWidth = self.magnitudeBins[1] - self.magnitudeBins[0]
-        magnitudeBins = self.magnitudeBins[:-1] + magnitudeBinWidth/2.0
+        if modifyBins:
+            magnitudeBins = self.magnitudeBins[:-1] + magnitudeBinWidth/2.0
+        else:
+            magnitudeBins = self.magnitudeBins
         fileObj.addDataset("/","magnitudeBins",magnitudeBins,chunks=True,compression="gzip",\
                                compression_opts=6)        
         # Create outputs group and write data for each output in luminosity functions dictionary        
