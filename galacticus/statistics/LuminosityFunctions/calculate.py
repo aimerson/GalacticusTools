@@ -130,6 +130,8 @@ class LuminosityFunction(object):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name            
         if verbose:
             print(funcname+"(): adding luminosity functions...")                
+        if type(lfObj) is str:
+            lfObj = GalacticusLuminosityFunction(lfObj)
         # Check whether bins consistent
         name = "totalLineLuminosity:balmerAlpha65653"
         luminosityConsistent = self._binsConsistent(lfObj.luminosityBins,name,\
