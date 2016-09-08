@@ -424,8 +424,15 @@ class GalacticusLuminosityFunction(LuminosityFunction):
                                                                luminosityBins=luminosityBins)
         # Read list of available outputs and datasets
         outputs = list(map(str,f.lsGroups("Outputs")))
+        self.availableDatasets = None
         for out in outputs:
             self.outputs[out] = f.readAttributes("Outputs/"+out)["redshift"]        
+            outputDatasets = f.lsDatasets("Outputs/"+out)
+            if self.availableDatasets is None:
+                self.availableDatasets = copy.copy(outputDatasets)
+            else:
+                self.availableDatasets = list(set(outputDatasets).intersection(self.availableDatasets))            
+        self.availableDatasets = list(map(str,self.availableDatasets))
         f.close()        
         return
     
@@ -433,7 +440,7 @@ class GalacticusLuminosityFunction(LuminosityFunction):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Locate appropriate output by nearest redshift
         redshifts = np.array([self.outputs[key] for key in self.outputs.keys()])        
-        iselect = np.argmin(np.fabs(redshifts-float(z)))
+        iselect = np.argmin(np.fabs(redshifts.astype(float)-float(z)))
         outstr = self.outputs.keys()[iselect]        
         path = "Outputs/"+outstr
         if verbose:

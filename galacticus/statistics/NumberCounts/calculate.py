@@ -22,17 +22,11 @@ class NumberCounts(object):
         # Store objects
         self.luminosityFunction = luminosityFunctionObj
         # Extract list of datasets that have luminosity function data available at all redshifts
-        self.availableDatasets = None
-        for out in self.luminosityFunction.outputs:            
-            datasetNames = self.luminosityFunction.datasets[out]   
-            if self.availableDatasets is None:
-                self.availableDatasets = datasetNames
-            else:
-                self.availableDatasets = list(set(self.availableDatasets).intersection(datasetNames))
+        self.availableDatasets = self.luminosityFunction.availableDatasets
         # Store list of available redshifts
         self.redshifts = np.sort(np.array([self.luminosityFunction.outputs[k] \
                                                for k in self.luminosityFunction.outputs.keys()]))
-        self.redshifts = np.sort(self.redshifts)
+        self.redshifts = np.sort(self.redshifts).astype(float)
         # Create empty array to store redshift integral
         self.redshiftIntegral = np.zeros_like(self.redshifts)
         # Store cosmology
@@ -94,13 +88,13 @@ class NumberCounts(object):
         return kwargsIntegrate
 
 
-    def _integrateLuminosityFunctionAtRedshift(self,iz,datasetName,faintLimit,brightLimit=None,**kwargs):
+    def _integrateLuminosityFunctionAtRedshift(self,iz,datasetName,faintLimit,brightLimit=None,resolutionLimit=None,**kwargs):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name 
         # Get redshift (avoid z=0 exactly)
         redshift = self.redshifts[iz]
         if redshift == 0.0:
             redshift = 1.0e-3
-        # Get
+        # Get counts at this redshift
         hubbleLF = self.luminosityFunction.cosmology["HubbleParameter"]
         if fnmatch.fnmatch(datasetName,"*LineLuminosity*"):   
             zLowLimit,zUppLimit = self.getLuminosityLimits(redshift,faintLimit,brightFluxLimit=brightLimit)                            
@@ -108,10 +102,20 @@ class NumberCounts(object):
             bins = 10.0**self.luminosityFunction.luminosityBins
             bins = adjustHubble(bins,hubbleLF,self.hubble,"luminosity")
             bins = np.log10(bins)
+            if resolutionLimit is not None:
+                mask = bins > resolutionLimit
+            else:
+                mask = np.ones(len(bins)).astype(bool)
         else:
             zUppLimit,zLowLimit = self.getAbsMagnitudeLimits(redshift,faintLimit,brightAppLimit=brightLimit)
             bins = adjustHubble(self.luminosityFunction.magnitudeBins,hubbleLF,self.hubble,"magnitude")               
-        lf = self.luminosityFunction.getDatasets(z,required=[datasetName])[datasetName]
+            if resolutionLimit is not None:
+                mask = bins < resolutionLimit
+            else:
+                mask = np.ones(len(bins)).astype(bool)
+        lf = self.luminosityFunction.getDatasets(redshift,required=[datasetName])[datasetName]
+        lf = lf[mask]
+        bins = bins[mask]        
         lf *= bw
         lf = adjustHubble(lf,hubbleLF,self.hubble,"density")       
         self.redshiftIntegral[iz] = integrateLuminosityFunction(bins,lf,lowerLimit=zLowLimit,\
@@ -168,7 +172,7 @@ class fluxNumberCounts(NumberCounts):
         return
     
 
-    def _countsPerBin(self,datasetName,iBin,zmin,zmax,**kwargs):
+    def _countsPerBin(self,datasetName,iBin,zmin,zmax,cumulative=False,**kwargs):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         kwargsInterpolate = self._get_interpolate_keywords(**kwargs)
         kwargsIntegrate = self._get_integrate_keywords(**kwargs)
@@ -188,10 +192,21 @@ class fluxNumberCounts(NumberCounts):
         return
 
 
-    def _datasetCounts(self,datasetName,zmin,zmax,**kwargs):
+    def _datasetCounts(self,datasetName,zmin,zmax,cumulative=False,**kwargs):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
-        dummy = [self._countsPerBin(self,datasetName,iBin,zmin,zmax,**kwargs) for iBin in self.bins]
+        if "PROG" in kwargs.keys():
+            PROG = kwargs["PROG"]
+        dummy = [self._countsPerBin(datasetName,iBin,zmin,zmax,cumulative=cumulative,**kwargs) \
+                     for iBin in np.arange(len(self.bins))]
+        if PROG is not None:
+            PROG.increment()
+            PROG.print_status_line(task=" dataset = "+datasetName)
         del dummy
+        allsky = 4.0*Pi*(180.0/Pi)**2    
+        self.counts[datasetName] /= allsky        
+        if not cumulative:
+            binWidth = self.bins[1] - self.bins[0]
+            self.counts[datasetName] /= binWidth
         return
 
 
@@ -203,7 +218,7 @@ class fluxNumberCounts(NumberCounts):
         if len(badDatasets) > 0:
             msg = "WARNING! "+funcname+"(): Following datasets cannot be found and will be ignored..."
             msg = "\n        " + "\n        ".join(badDatasets)
-            print(ssg)
+            print(msg)
         # Construct array to store counts
         dtype = [(p,float) for p in goodDatasets]
         self.counts = np.zeros(len(bins),dtype=dtype)
@@ -216,20 +231,19 @@ class fluxNumberCounts(NumberCounts):
         if zmax is None:
             zmax = self.redshifts.max()
         else:
-            zmax = np.minimum(self.redshifts.max(),zmax)            
+            zmax = np.minimum(self.redshifts.max(),zmax)                            
         # Compute counts
         if verbose:
-            print(funcname+"(): Computing number counts in each flux/magnitude bin for dataset '"+datasetName+"'...")
-        dummy = [self._datasetCounts(name,zmin,zmax,**kwargs) for name in goodDatasets]
+            print(funcname+"(): Computing number counts between z = "+str(zmin)+" and z = "+str(zmax)+" ...")
+            PROG = Progress(len(goodDatasets))
+        else:
+            PROG = None
+        dummy = [self._datasetCounts(name,zmin,zmax,PROG=PROG,cumulative=cumulative,**kwargs) \
+                     for name in goodDatasets]
         del dummy
         counts = np.copy(self.counts)
         self.bins = None
         self.counts = None
-        allsky = 4.0*Pi*(180.0/Pi)**2    
-        counts /= allsky
-        if not cumulative:
-            binWidth = bins[1] - bins[0]
-            counts /= binWidth
         return bins,counts
 
 
@@ -241,28 +255,54 @@ class redshiftNumberCounts(NumberCounts):
         super(redshiftNumberCounts,self).__init__(luminosityFunctionObj)
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        self._datasetName = None
-        self._zIintegral = None
-        self._phiIntegral = None
+        # Initialise attribute used to store counts
+        self.bins = None
+        self.counts = None
         return
-    
 
-    
-    def computeCounts(self,datasetName,bins,faintLimit,brightLimit=None,verbose=False,**kwargs):
+
+    def _computeCountsForDataset(self,datasetName,faintLimit,brightLimit=None,verbose=False,**kwargs):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        if datasetName not in self.availableDatasets:
-            raise ValueError(funcname+"(): '"+datasetName+"' not in list of available datasets!")
-
         zIntegral,phiIntegral = self.integrateLuminosityFunctions(datasetName,\
                                                                       faintLimit,brightLimit=brightLimit,\
-                                                                      zmax=bins.max(),cumulative=False,\
+                                                                      zmax=self.bins.max(),cumulative=False,\
                                                                       verbose=False,**kwargs)                        
         kwargsInterpolate = self._get_interpolate_keywords(**kwargs)    
-        binWidth = bins[1] - bins[0]
-        allsky = 4.0*Pi*(180.0/Pi)**2
         fz = interp1d(np.array(zIntegral),np.array(phiIntegral),**kwargsInterpolate)
-        counts = fz(bins)
-        counts /= (allsky*binWidth)
+        self.counts[datasetName] = fz(self.bins)
+        allsky = 4.0*Pi*(180.0/Pi)**2
+        binWidth = self.bins[1] - self.bins[0]
+        self.counts[datasetName] /= (allsky*binWidth)
+        if "PROG" in kwargs.keys():
+            PROG = kwargs["PROG"]
+            if PROG is not None:
+                PROG.increment()
+                PROG.print_status_line(task=" dataset = "+datasetName)
+        return 
+    
+    def computeCounts(self,datasets,bins,faintLimit,brightLimit=None,verbose=False,**kwargs):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Check datasets available in luminosity function file
+        goodDatasets = list(set(datasets).intersection(self.availableDatasets))
+        badDatasets = list(set(datasets).difference(self.availableDatasets))
+        if len(badDatasets) > 0:
+            msg = "WARNING! "+funcname+"(): Following datasets cannot be found and will be ignored..."
+            msg = "\n        " + "\n        ".join(badDatasets)
+            print(msg)
+        # Construct array to store counts
+        dtype = [(p,float) for p in goodDatasets]
+        self.counts = np.zeros(len(bins),dtype=dtype)
+        self.bins = bins
+        # Loop over datasets
+        PROG = Progress(len(goodDatasets))
+        dummy = [ self._computeCountsForDataset(name,faintLimit,brightLimit=brightLimit,verbose=verbose,PROG=PROG,**kwargs)\
+                      for name in goodDatasets]
+        del dummy
+        # Extract values and exit
+        bins = np.copy(self.bins)
+        counts = np.copy(self.counts)
+        self.bins = None
+        self.counts = None        
         return bins,counts
 
 
