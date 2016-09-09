@@ -250,7 +250,7 @@ class fluxNumberCounts(NumberCounts):
         return bins,counts
 
 
-    def writeToHDF5(self,ofile,bins,counts,cumulative=False):
+    def writeToHDF5(self,ofile,bins,counts,cumulative=False,verbose=True):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         fileObj = HDF5(ofile,'w')
         # Write value of cosmological parameters
@@ -280,6 +280,8 @@ class fluxNumberCounts(NumberCounts):
                                compression_opts=6) for name in counts.dtype.names]
         del dummy
         fileObj.close()
+        if verbose:
+            print(funcname+"(): counts written to file "+ofile)
         return
 
 
