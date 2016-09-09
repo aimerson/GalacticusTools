@@ -250,7 +250,7 @@ class fluxNumberCounts(NumberCounts):
         return bins,counts
 
 
-    def writeToHDF5(self,ofile,bins,counts,cumulative=False,verbose=True):
+    def writeToHDF5(self,ofile,bins,counts,cumulative=False,zmin=None,zmax=None,verbose=True):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         fileObj = HDF5(ofile,'w')
         # Write value of cosmological parameters
@@ -274,7 +274,14 @@ class fluxNumberCounts(NumberCounts):
             if len(fnmatch.filter(counts.dtype.names,"*LineLuminosity*"))>0:
                 fileObj.addAttributes("/counts",{"units":"/logflux/deg2"})
             else:
-                fileObj.addAttributes("/counts",{"units":"/mag/deg2"})                
+                fileObj.addAttributes("/counts",{"units":"/mag/deg2"})          
+        # Specify redshift range
+        if zmin is None:
+            zmin = "unknown"
+        fileObj.addAttributes("/counts",{"zmin":str(zmin)})
+        if zmax is None:
+            zmax = "unknown"
+        fileObj.addAttributes("/counts",{"zmax":str(zmax)})
         # Write properties
         dummy = [fileObj.addDataset("/counts",name,np.copy(counts[name]),chunks=True,compression="gzip",\
                                compression_opts=6) for name in counts.dtype.names]
