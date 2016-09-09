@@ -10,7 +10,7 @@ from ...constants import Pi,centi,megaParsec
 from ...cosmology import Cosmology,adjustHubble
 from ..LuminosityFunctions.calculate import GalacticusLuminosityFunction
 from ..LuminosityFunctions.utils import integrateLuminosityFunction
-
+from ...hdf5 import HDF5
 
 
 
@@ -249,6 +249,38 @@ class fluxNumberCounts(NumberCounts):
         self.counts = None
         return bins,counts
 
+
+    def writeToHDF5(self,ofile,bins,counts,cumulative=False):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        fileObj = HDF5(ofile,'w')
+        # Write value of cosmological parameters
+        fileObj.mkGroup("Cosmology")
+        dummy = [fileObj.addAttributes("Cosmology",{key:self.luminosityFunction.cosmology[key]}) \
+                     for key in self.luminosityFunction.cosmology.keys()]
+        # Specify cumulative attribute
+        fileObj.addAttributes("/",{"cumulative":str(int(cumulative))})
+        # Write bins
+        fileObj.addDataset("/","countsBins",bins,chunks=True,compression="gzip",\
+                               compression_opts=6)        
+        if len(fnmatch.filter(counts.dtype.names,"*LineLuminosity*"))>0:
+            fileObj.addAttributes("/countsBins",{"units":"log10(erg/s/cm^2)"})
+        # Create counts group
+        fileObj.mkGroup("counts")        
+        # Specify cumulative attribute
+        fileObj.addAttributes("/counts",{"cumulative":str(int(cumulative))})
+        if cumulative:            
+            fileObj.addAttributes("/counts",{"units":"/deg^2"})
+        else:
+            if len(fnmatch.filter(counts.dtype.names,"*LineLuminosity*"))>0:
+                fileObj.addAttributes("/counts",{"units":"/logflux/deg2"})
+            else:
+                fileObj.addAttributes("/counts",{"units":"/mag/deg2"})                
+        # Write properties
+        dummy = [fileObj.addDataset("/counts",name,np.copy(counts[name]),chunks=True,compression="gzip",\
+                               compression_opts=6) for name in counts.dtype.names]
+        del dummy
+        fileObj.close()
+        return
 
 
 
