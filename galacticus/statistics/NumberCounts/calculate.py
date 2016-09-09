@@ -40,7 +40,7 @@ class NumberCounts(object):
                                        h0=self.luminosityFunction.cosmology["HubbleParameter"],\
                                        sigma8=self.luminosityFunction.cosmology["sigma8"],\
                                        ns=self.luminosityFunction.cosmology["ns"],\
-                                       zmax=self.redshifts.max()*1.1)
+                                       h_independent=False,zmax=self.redshifts.max()*1.1)
         return
 
 
@@ -88,7 +88,8 @@ class NumberCounts(object):
         return kwargsIntegrate
 
 
-    def _integrateLuminosityFunctionAtRedshift(self,iz,datasetName,faintLimit,brightLimit=None,resolutionLimit=None,**kwargs):
+    def _integrateLuminosityFunctionAtRedshift(self,iz,datasetName,faintLimit,brightLimit=None,resolutionLimit=None,\
+                                                   cumulative=False,**kwargs):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name 
         # Get redshift (avoid z=0 exactly)
         redshift = self.redshifts[iz]
@@ -98,7 +99,6 @@ class NumberCounts(object):
         hubbleLF = self.luminosityFunction.cosmology["HubbleParameter"]
         if fnmatch.fnmatch(datasetName,"*LineLuminosity*"):   
             zLowLimit,zUppLimit = self.getLuminosityLimits(redshift,faintLimit,brightFluxLimit=brightLimit)                            
-            bw = self.luminosityFunction.luminosityBins[1] - self.luminosityFunction.luminosityBins[0]
             bins = 10.0**self.luminosityFunction.luminosityBins
             bins = adjustHubble(bins,hubbleLF,self.hubble,"luminosity")
             bins = np.log10(bins)
@@ -115,8 +115,10 @@ class NumberCounts(object):
                 mask = np.ones(len(bins)).astype(bool)
         lf = self.luminosityFunction.getDatasets(redshift,required=[datasetName])[datasetName]
         lf = lf[mask]
-        bins = bins[mask]        
-        lf *= bw
+        bins = bins[mask]       
+        bw = bins[1] - bins[0]
+        if cumulative:
+            lf *= bw
         lf = adjustHubble(lf,hubbleLF,self.hubble,"density")       
         self.redshiftIntegral[iz] = integrateLuminosityFunction(bins,lf,lowerLimit=zLowLimit,\
                                                                     upperLimit=zUppLimit,**kwargs)
@@ -124,7 +126,8 @@ class NumberCounts(object):
         return
 
 
-    def integrateLuminosityFunctions(self,datasetName,faintLimit,brightLimit=None,zmin=None,zmax=None,verbose=False,**kwargs):
+    def integrateLuminosityFunctions(self,datasetName,faintLimit,brightLimit=None,zmin=None,zmax=None,cumulative=False,\
+                                         verbose=False,**kwargs):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name 
         if datasetName not in self.availableDatasets:
             raise ValueError(funcname+"(): '"+datasetName+"' not in list of available datasets!")                
@@ -140,10 +143,10 @@ class NumberCounts(object):
         redshiftRange = np.arange(izLow,izUpp+1)
         # Determine luminosity function integral as function of redshift
         if verbose:
-            print(funcname+"(): Computing luminosity function for Galacticus snapshot outputs...")
+            print(funcname+"(): Integrating luminosity function for Galacticus snapshot outputs...")
         # Clear redshift integral ready for calculation
         self.redshiftIntegral = np.zeros_like(self.redshifts)
-        dummy = [ self._integrateLuminosityFunctionAtRedshift(iz,datasetName,faintLimit,brightLimit=brightLimit,**kwargs)\
+        dummy = [ self._integrateLuminosityFunctionAtRedshift(iz,datasetName,faintLimit,brightLimit=brightLimit,cumulative=cumulative,**kwargs)\
                       for iz in redshiftRange ]
         del dummy
         redshifts = np.copy(self.redshifts[redshiftRange])
@@ -204,9 +207,9 @@ class fluxNumberCounts(NumberCounts):
         del dummy
         allsky = 4.0*Pi*(180.0/Pi)**2    
         self.counts[datasetName] /= allsky        
-        if not cumulative:
-            binWidth = self.bins[1] - self.bins[0]
-            self.counts[datasetName] /= binWidth
+        #if not cumulative:
+        #    binWidth = self.bins[1] - self.bins[0]
+        #    self.counts[datasetName] /= binWidth
         return
 
 
@@ -271,8 +274,7 @@ class redshiftNumberCounts(NumberCounts):
         fz = interp1d(np.array(zIntegral),np.array(phiIntegral),**kwargsInterpolate)
         self.counts[datasetName] = fz(self.bins)
         allsky = 4.0*Pi*(180.0/Pi)**2
-        binWidth = self.bins[1] - self.bins[0]
-        self.counts[datasetName] /= (allsky*binWidth)
+        self.counts[datasetName] /= allsky
         if "PROG" in kwargs.keys():
             PROG = kwargs["PROG"]
             if PROG is not None:
