@@ -124,8 +124,8 @@ def submitSLURM(script,args=None,PARTITION=None,QOS=None,WALLTIME=None,JOBNAME=N
     if LICENSE is not None:
         sjob = sjob + " -L "+LICENSE
     if args is not None:
-        str = ",".join([k+"="+args[k] for k in args.keys()])
-        sjob = sjob + " --export="+str
+        argStr = ",".join([k+"="+args[k] for k in args.keys()])
+        sjob = sjob + " --export="+argStr
     sjob = sjob + " "+script
     if verbose:
         print(" Submitting SLURM job: "+sjob)
