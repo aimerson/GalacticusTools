@@ -5,6 +5,7 @@ import numpy as np
 import xml.etree.ElementTree as ET
 from ..simulations import Simulation
 from ..parameters import formatParametersFile
+from ..constants import Parsec,megaParsec
 from .footprint import KitzbichlerWhite2007
 
 
@@ -45,14 +46,50 @@ class buildGeometry(Geometry):
             ET.SubElement(PARAM,"value").text = "100"
         else:
             ET.SubElement(PARAM,"value").text = str(self.simulation.h0*100.0)        
+        # Write redshifts and distances
+        redshifts = np.sort(self.simulation.snapshots.z)
+        distance = self.simulation.cosmology.comoving_distance(redshifts)
+        minDistance = np.zeros_like(redshifts)
+        maxDistance = np.zeros_like(redshifts)
+        for i in range(len(redshifts)):
+            if i == 0:
+                minDistance[i] = distance[i]
+            else:
+                minDistance[i] = (distance[i] + distance[i-1])/2.0
+            if i == len(redshifts) - 1:
+                maxDistance[i] = distance[i]
+            else:
+                maxDistance[i] = (distance[i] + distance[i+1])/2.0
+        OUT = ET.SubElement(self.root,"outputs")        
+        def addDistance(name,value):
+            ET.SubElement(OUT,name).text = str(value)
+        dummy = [addDistance("maximumDistance",dist) for dist in maxDistance[::-1]]
+        dummy = [addDistance("minimumDistance",dist) for dist in minDistance[::-1]]
+        dummy = [addDistance("redshift",z) for z in redshifts[::-1]]
+        del dummy
+        # Write units
+        UNIT = ET.SubElement(self.root,"units")
+        LEN = ET.SubElement(UNIT,"length")
+        ET.SubElement(LEN,"hubbleExponent").text = str(-1)
+        if "gpc" in self.simulation.boxSizeUnits.lower():
+            siValue = Parsec*1.0e9
+        elif "mpc" in self.simulation.boxSizeUnits.lower():
+            siValue = Parsec*1.0e6
+        elif "kpc" in self.simulation.boxSizeUnits.lower():
+            siValue = Parsec*1.0e3
+        else:
+            siValue = Parsec
+        ET.SubElement(LEN,"unitsInSI").text = str(siValue)
         # Initialise other attributes
         self.maxRedshift = None
         self.fieldSize = None
         return
 
 
-    def setFieldOfView(self,fieldSize,footprint="square"):
+    def setFieldOfView(self,fieldSize=None,footprint="square"):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        if fieldSize is None:
+            raise ValueError(funcname+"(): no field size specified!")
         self.fieldSize = np.radians(fieldSize)
         FOV = ET.SubElement(self.root,"fieldOfView")
         ET.SubElement(FOV,"geometry").text = footprint
@@ -99,7 +136,27 @@ class buildGeometry(Geometry):
             print(funcname+"(): Origin for lightcone:\n"+report)
         return
 
-    def output(self,filePath,verbose=True):
+    def setUnitVectors(self,fieldSize=None,footprint='square',verbose=True):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        KW = KitzbichlerWhite2007(self.simulation.boxSize,boxUnits=self.simulation.boxSizeUnits)
+        if self.fieldSize is None:
+            KW.setFieldOfView(fieldSize=fieldSize,footprint=footprint,verbose=verbose)            
+        KW.createUnitVectors(fieldSize,verbose=verbose)
+        VEC = ET.SubElement(self.root,"unitVector1")
+        ET.SubElement(VEC,"coordinate").text = str(KW.unitX[0])
+        ET.SubElement(VEC,"coordinate").text = str(KW.unitX[1])
+        ET.SubElement(VEC,"coordinate").text = str(KW.unitX[2])
+        VEC = ET.SubElement(self.root,"unitVector2")
+        ET.SubElement(VEC,"coordinate").text = str(KW.unitY[0])
+        ET.SubElement(VEC,"coordinate").text = str(KW.unitY[1])
+        ET.SubElement(VEC,"coordinate").text = str(KW.unitY[2])
+        VEC = ET.SubElement(self.root,"unitVector3")
+        ET.SubElement(VEC,"coordinate").text = str(KW.unitZ[0])
+        ET.SubElement(VEC,"coordinate").text = str(KW.unitZ[1])
+        ET.SubElement(VEC,"coordinate").text = str(KW.unitZ[2])
+        return
+
+    def output(self,filePath='geometry.xml',verbose=True):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         tree = ET.ElementTree(self.root)
         tree.write(filePath)

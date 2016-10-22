@@ -63,4 +63,30 @@ class KitzbichlerWhite2007(object):
         return
 
 
-
+    def createUnitVectors(self,fieldSize,verbose=True):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Compute integer divisors
+        if self.m is None:
+            self.computeIntegers(fieldSize,verbose=verbose)
+        else:
+            self.n = self.m + 1
+        # Construct vectors
+        xAxis = np.array([1.0,0.0,0.0])
+        unitX = np.zeros_like(xAxis)
+        unitX[0] = float(self.n)/np.sqrt(float(self.n**2+self.m**2+(self.n*self.m)**2))
+        unitX[1] = float(self.m)/np.sqrt(float(self.n**2+self.m**2+(self.n*self.m)**2))
+        unitX[2] = float(self.n*self.m)/np.sqrt(float(self.n**2+self.m**2+(self.n*self.m)**2))
+        unitY = np.cross(unitX,xAxis)
+        unitZ = np.cross(unitX,unitY)
+        unitX /= np.sqrt(np.sum(unitX**2))
+        unitY /= np.sqrt(np.sum(unitY**2))
+        unitZ /= np.sqrt(np.sum(unitZ**2))
+        if verbose:
+            print(funcname+"(): Unit vectors:")
+            print("     X = " + ",".join([str(i) for i in unitX]))
+            print("     Y = " + ",".join([str(i) for i in unitY]))
+            print("     Z = " + ",".join([str(i) for i in unitZ]))
+        self.unitX = np.copy(unitX)
+        self.unitY = np.copy(unitY)
+        self.unitZ = np.copy(unitZ)
+        return
