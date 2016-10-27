@@ -12,10 +12,10 @@ from .xmlTree import xmlTree
 
 class GalacticusParameters(xmlTree):
     
-    def __init__(self,xmlfile,verbose=False):
+    def __init__(self,xmlfile,root='parameters',verbose=False):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        super(GalacticusParameters,self).__init__(xmlfile=xmlfile,verbose=verbose)
+        super(GalacticusParameters,self).__init__(xmlfile=xmlfile,root=root,verbose=verbose)
         return
     
     def getParameter(self,param):

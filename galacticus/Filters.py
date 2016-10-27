@@ -9,7 +9,7 @@ import xml.etree.ElementTree as ET
 from .config import *
 from .cloudy import cloudyTable
 from .GalacticusErrors import ParseError
-from .parameters import formatParametersFile
+from .xmlTree import formatFile
 
 
 ###############################################################################
@@ -199,7 +199,7 @@ def createFilter(filePath,name,response,description=None,origin=None,url=None,\
     # Finalise tree and save to file
     tree = ET.ElementTree(root)
     tree.write(filePath)
-    formatParametersFile(filePath)
+    formatFile(filePath)
     return
 
 

@@ -40,7 +40,7 @@ class xmlTree(object):
         self._verbose = verbose
         self.xmlfile = xmlfile         
         if self.xmlfile is None:
-            root = ET.Element("root")
+            root = ET.Element(root)
             self.tree = ET.ElementTree(element=root)
             self.root = self.tree.getroot()                
             self.treeMap = {}
@@ -48,7 +48,6 @@ class xmlTree(object):
             self.tree = ET.parse(self.xmlfile)
             self.root = self.tree.getroot()                
             self.treeMap = mapElements(self.root)
-        print self.treeMap
         if self._verbose:
             print(classname+"(): Root is '"+self.root.tag+"'")            
         return
