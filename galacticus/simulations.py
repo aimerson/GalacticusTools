@@ -102,6 +102,33 @@ class Simulation(object):
         return snapshot
 
 
+    def xmlCosmologicalParametersMethod(self,cosmologicalParametersMethod="simple"):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        COS = ET.Element("cosmologyParametersMethod",attrib={"value":cosmologicalParametersMethod})
+        ET.SubElement(COS,"HubbleConstant",attrib={"value":str(self.h0*100)})
+        ET.SubElement(COS,"OmegaMatter",attrib={"value":str(self.omega0)})
+        ET.SubElement(COS,"OmegaDarkEnergy",attrib={"value":str(self.lambda0)})
+        ET.SubElement(COS,"OmegaBaryon",attrib={"value":str(self.omegaB)})
+        ET.SubElement(COS,"temperatureCMB",attrib={"value":str(self.temperatureCMB)})
+        return COS
+
+    def xmlCosmologicalMassVarianceMethod(self,cosmologicalMassVarianceMethod="filteredPower"):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        COS = ET.Element("cosmologicalMassVarianceMethod",attrib={"value":cosmologicalMassVarianceMethod})
+        ET.SubElement(COS,"sigma_8",attrib={"value":str(self.sigma8)})
+        return COS
+
+    def xmlPowerSpectrumPrimordialMethod(self,powerSpectrumPrimordialMethod="powerLaw",\
+                                       wavenumberReference=1,running=0):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        PK = ET.Element("powerSpectrumPrimordialMethod",attrib={"value":powerSpectrumPrimordialMethod})
+        ET.SubElement(PK,"index",attrib={"value":str(self.ns)})
+        ET.SubElement(PK,"wavenumberReference",attrib={"value":str(wavenumberReference)})
+        ET.SubElement(PK,"running",attrib={"value":str(running)})
+        return PK
+
+
+        
     def set_parameters(self,cosmologicalParametersMethod="simple",\
                            powerSpectrumPrimordialMethod="powerLaw",wavenumberReference=1,running=0,\
                            mergerTreeFile=None,allTreesExistAtFinalTime=True,\

@@ -120,6 +120,9 @@ class xmlTree(object):
                 self.createElement(nodeName,parent=parentNode.tag)
             else:
                 parentNode = node
+        if newBranch.tag in list(node):
+            elem = self.getElement(newBranch.tag)
+            node.remove(elem)
         node.append(newBranch)
         # Update (re-make) element map
         self.updateTreeMap()
