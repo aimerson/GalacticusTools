@@ -41,6 +41,7 @@ erg = 1.0000000000000000e-07 # J
 electronVolt = 1.6020000000000000e-19 # J
 luminositySolar = 3.8390000000000000e+26 # W
 luminosityAB = 4.4659201576470211e+13 # W/Hz
+jansky = 1.0000000000000000e-23 # erg/s/cm^2/Hz
 
 hydrogenOneIonizationEnergy = 13.5990000000000000e+00 # eV
 heliumOneIonizationEnergy   = 24.5880000000000000e+00 # eV
