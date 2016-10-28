@@ -32,7 +32,18 @@ class LightconeParameters(GalacticusParameters):
             self.appendElement(elem,parent="geometry")
         return
 
-    
+    def setPathParameters(self,galacticusDir,lightconeDir=None,\
+                               galacticusPrefix="galacticus",lightconePrefix="lightcone"):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        if lightconeDir is None:
+            lightconeDir = galacticusDir
+        self.createElement("ioPaths")
+        self.createElement("galacticusDir",parent="ioPaths",attrib={"value":galacticusDir})
+        self.createElement("galacticusPrefix",parent="ioPaths",attrib={"value":galacticusPrefix})
+        self.createElement("lightconeDir",parent="ioPaths",attrib={"value":lightconeDir})
+        self.createElement("lightconePrefix",parent="ioPaths",attrib={"value":lightconePrefix})
+        return
+
     
 
 
