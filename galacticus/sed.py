@@ -16,7 +16,26 @@ class GalacticusSED(object):
         self.galacticusOBJ = galObj
         return
 
-    def getSED(self,datasetName):
+
+    def availableSEDs(self,redshift):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Get list of all top hat filers at this redshift
+        allTopHats = fnmatch.filter(self.galacticusOBJ.availableDatasets(redshift),"*LuminositiesStellar:topHat*")
+        # For each top hat filter remove wavelength and rename 'LuminositiesStellar' to 'SED'
+        allSEDs = []
+        for topHat in allTopHats:
+            sed = topHat.split(":")
+            resolution = sed[1].split("_")[-1]
+            sed[1] = resolution
+            sed[0] = sed[0].replace("LuminositiesStellar","SED")
+            sed = ":".join(sed)
+            allSEDs.append(sed)
+        # Return only unique list to avoid duplicates
+        return list(np.unique(np.array(allSEDs)))
+    
+
+
+    def getSED(self,datasetName,selectionMask=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Get redshift
         redshift = float(fnmatch.filter(datasetName.split(":"),"z*")[0].replace("z",""))
@@ -31,8 +50,14 @@ class GalacticusSED(object):
         # Construct 2D array of galaxy SEDs         
         out = self.galacticusOBJ.selectOutput(redshift)
         ngals = len(np.array(out["nodeData/"+topHatNames[0]]))
+        if selectionMask is None:
+            selectionMask = np.ones(ngals,dtype=bool)
+        else:
+            if len(selectionMask) != ngals:
+                raise ValueError(funcname+"(): specified selection mask does not have same shape as datasets!")
         luminosities = []
-        dummy = [luminosities.append(np.array(out["nodeData/"+topHatNames[i]])) for i in range(len(wavelengths))]
+        dummy = [luminosities.append(np.array(out["nodeData/"+topHatNames[i]])[selectionMask]) \
+                     for i in range(len(wavelengths))]
         sed = np.stack(np.copy(luminosities),axis=1)
         del dummy,luminosities
         sed = ergPerSecond(sed)
