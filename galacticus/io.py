@@ -3,6 +3,7 @@
 import os,sys,fnmatch
 import numpy as np
 from .hdf5 import HDF5
+from .cosmology import Cosmology
 
 ######################################################################################
 # FILE I/O
@@ -47,6 +48,15 @@ class GalacticusHDF5(HDF5):
             self.outputs["z"][i] = (1.0/a) - 1.0
         self.outputs = self.outputs.view(np.recarray)
 
+        # Store cosmology object
+        
+        self.cosmology = Cosmology(omega0=float(self.parameters["OmegaMatter"]),\
+                                       lambda0=float(self.parameters["OmegaDarkEnergy"]),\
+                                       omegab=float(self.parameters["OmegaBaryon"]),\
+                                       h0=float(self.parameters["HubbleConstant"])/100.0,\
+                                       sigma8=float(self.parameters["sigma_8"]),\
+                                       ns=float(self.parameters["index"]))
+        
         return
     
     def globalHistory(self,props=None,si=False):        
