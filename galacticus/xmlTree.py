@@ -95,7 +95,7 @@ class xmlTree(object):
             if selfCreate:
                 self.createElement(name,attrib=attrib,parent=parent,text=text)
             else:
-                raise KeyError(funcname+"(): element does not exist!")
+                raise KeyError(funcname+"(): element '"+name+"' does not exist!")
         elem = self.getElement(self.treeMap[name])
         dummy = [elem.set(k,attrib[k]) for k in attrib.keys()]
         del dummy
