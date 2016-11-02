@@ -42,20 +42,6 @@ class GalacticusEmissionLines(object):
             raise IndexError(funcname+"(): Line '"+lineName+"' not found!")
         index = self.CLOUDY.lines.index(lineName)
         return self.CLOUDY.wavelengths[index]
-
-    def getComputableDatasets(self,availableDatasets):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
-        LyDisks = fnmatch.filter(availableDatasets,"diskLymanContinuumLuminosity*")
-        computableDatasets = []
-        components = "disk spheroid total".split()
-        for dataset in LyDisks:
-            haveContinua = fnmatch.filter(availableDataset,dataset.replace("Lyman","Helium"))>0 and \
-                fnmatch.filter(availableDataset,disk.replace("Lyman","Oxygen"))>0                        
-            if haveContinua:
-                suffix = ":".join(dataset.split(":")[1:])                
-                dummy = [computableDatasets.append(comp+"LineLuminosity:"+line+":"+suffix) \
-                             for comp in components for line in self.getLineNames()]
-        return computableDatasets
                 
     def getLuminosityMultiplier(self,datasetName,**kwargs):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
@@ -244,6 +230,20 @@ def getLineNames():
     #             "sulfurII6731","sulfurII6716"]
     lines = GalacticusEmissionLines().getLineNames()
     return lines
+
+def computableLuminosities(availableDatasets):
+    LyDisks = fnmatch.filter(availableDatasets,"diskLymanContinuumLuminosity*")
+    computableDatasets = []
+    components = "disk spheroid total".split()
+    for dataset in LyDisks:
+        haveContinua = fnmatch.filter(availableDataset,dataset.replace("Lyman","Helium"))>0 and \
+            fnmatch.filter(availableDataset,disk.replace("Lyman","Oxygen"))>0                        
+        if haveContinua:
+            suffix = ":".join(dataset.split(":")[1:])                
+            dummy = [computableDatasets.append(comp+"LineLuminosity:"+line+":"+suffix) \
+                         for comp in components for line in getLineNames()]
+    return computableDatasets
+
 
 def availableLines(galHDF5Obj,z,frame=None,component=None,dust=None):    
     # Extract list of all emission line luminosities
