@@ -124,6 +124,7 @@ class GalacticusEmissionLines(object):
         lifetimeHIIRegion = 1.0e-3 
         # Extract information from dataset name
         datasetInfo = datasetName.split(":")
+        suffix = ":".join(datasetInfo[2:])
         component = datasetInfo[0].replace("LineLuminosity","")
         lineName = datasetInfo[1]
         frame = fnmatch.filter(datasetInfo,"rest") + fnmatch.filter(datasetInfo,"observed") 
@@ -134,9 +135,9 @@ class GalacticusEmissionLines(object):
         radius = np.copy(out["nodeData/"+component+"Radius"])
         starFormationRate = np.copy(out["nodeData/"+component+"StarFormationRate"])
         abundanceGasMetals = np.copy(out["nodeData/"+component+"AbundancesGasMetals"])
-        LyContinuum = np.copy(out["nodeData/"+component+"LymanContinuumLuminosity:"+frame+":z"+redshift])
-        HeContinuum = np.copy(out["nodeData/"+component+"HeliumContinuumLuminosity:"+frame+":z"+redshift])
-        OxContinuum = np.copy(out["nodeData/"+component+"OxygenContinuumLuminosity:"+frame+":z"+redshift])
+        LyContinuum = np.copy(out["nodeData/"+component+"LuminositiesStellar:Lyc:"+suffix])
+        HeContinuum = np.copy(out["nodeData/"+component+"LuminositiesStellar:HeliumContinuum:"+suffix])
+        OxContinuum = np.copy(out["nodeData/"+component+"LuminositiesStellar:OxygenContinuum:"+suffix])
         # Useful masks to avoid dividing by zero etc.
         hasGas = gasMass > 0.0
         hasSize = radius > 0.0        
@@ -232,14 +233,15 @@ def getLineNames():
     return lines
 
 def computableLuminosities(availableDatasets):
-    LyDisks = fnmatch.filter(availableDatasets,"diskLymanContinuumLuminosity*")
+    LyDisks = fnmatch.filter(availableDatasets,"diskLuminositiesStellar:Lyc*")
     computableDatasets = []
     components = "disk spheroid total".split()
     for dataset in LyDisks:
-        haveContinua = fnmatch.filter(availableDataset,dataset.replace("Lyman","Helium"))>0 and \
-            fnmatch.filter(availableDataset,disk.replace("Lyman","Oxygen"))>0                        
+        haveContinua = fnmatch.filter(availableDatasets,dataset.replace("Lyc","HeliumContinuum"))>0 and \
+            fnmatch.filter(availableDatasets,dataset.replace("Lyc","OxygenContinuum"))>0                        
         if haveContinua:
-            suffix = ":".join(dataset.split(":")[1:])                
+            suffix = ":".join(dataset.split(":")[2:])                
+            print suffix
             dummy = [computableDatasets.append(comp+"LineLuminosity:"+line+":"+suffix) \
                          for comp in components for line in getLineNames()]
     return computableDatasets
