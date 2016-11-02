@@ -61,7 +61,23 @@ class LightconeHDF5(HDF5):
                 output.append(coord.text)
             self.addDataset("LightconeGeometry/outputs",name,np.copy(np.array(output).astype(float)))
         return
-        
-    
+            
+
+    def addGalaxyProperty(self,datasetName,data):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name     
+        newDatasetName = datasetName.split(":")
+        redshift = fnmatch.filter(newDatasetName,"z*")
+        if len(redshift) > 0:
+            newDatasetName = datasetName.replace(":"+redshift[0],"")
+        else:
+            newDatasetName = datasetName
+        self.addDataset("Output",newDatasetName,data,append=True)
+        return
+
+    def addGalaxies(self,galaxies):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name     
+        dummy = [self.addGalaxyProperty(name,galaxies[name]) for name in galaxies.dtype.names]
+        del dummy
+        return
 
 
