@@ -167,7 +167,7 @@ class GalacticusHDF5(HDF5):
             if self._verbose:
                 print(funcname+"(): calculating starFormationRate (z="+str(z)+")")
             del data
-        
+
         return
 
 
