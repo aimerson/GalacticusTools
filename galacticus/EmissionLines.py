@@ -241,7 +241,6 @@ def computableLuminosities(availableDatasets):
             fnmatch.filter(availableDatasets,dataset.replace("Lyc","OxygenContinuum"))>0                        
         if haveContinua:
             suffix = ":".join(dataset.split(":")[2:])                
-            print suffix
             dummy = [computableDatasets.append(comp+"LineLuminosity:"+line+":"+suffix) \
                          for comp in components for line in getLineNames()]
     return computableDatasets
