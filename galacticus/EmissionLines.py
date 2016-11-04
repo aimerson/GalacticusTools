@@ -24,7 +24,7 @@ from .cloudy import cloudyTable
 # EMISSION LINES CLASS
 ##########################################################
 
-class galacticusEmissionLines(object):
+class GalacticusEmissionLines(object):
     
     def __init__(self):
         classname = self.__class__.__name__
@@ -33,11 +33,8 @@ class galacticusEmissionLines(object):
         self.FILTERS = GalacticusFilters()
         return
 
-
     def getLineNames(self):
         return self.CLOUDY.lines
-
-
 
     def getWavelength(self,lineName):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
@@ -45,9 +42,7 @@ class galacticusEmissionLines(object):
             raise IndexError(funcname+"(): Line '"+lineName+"' not found!")
         index = self.CLOUDY.lines.index(lineName)
         return self.CLOUDY.wavelengths[index]
-
-
-
+                
     def getLuminosityMultiplier(self,datasetName,**kwargs):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Extract information from dataset name
@@ -129,6 +124,7 @@ class galacticusEmissionLines(object):
         lifetimeHIIRegion = 1.0e-3 
         # Extract information from dataset name
         datasetInfo = datasetName.split(":")
+        suffix = ":".join(datasetInfo[2:])
         component = datasetInfo[0].replace("LineLuminosity","")
         lineName = datasetInfo[1]
         frame = fnmatch.filter(datasetInfo,"rest") + fnmatch.filter(datasetInfo,"observed") 
@@ -139,9 +135,9 @@ class galacticusEmissionLines(object):
         radius = np.copy(out["nodeData/"+component+"Radius"])
         starFormationRate = np.copy(out["nodeData/"+component+"StarFormationRate"])
         abundanceGasMetals = np.copy(out["nodeData/"+component+"AbundancesGasMetals"])
-        LyContinuum = np.copy(out["nodeData/"+component+"LymanContinuumLuminosity:z"+redshift])
-        HeContinuum = np.copy(out["nodeData/"+component+"HeliumContinuumLuminosity:z"+redshift])
-        OxContinuum = np.copy(out["nodeData/"+component+"OxygenContinuumLuminosity:z"+redshift])
+        LyContinuum = np.copy(out["nodeData/"+component+"LuminositiesStellar:Lyc:"+suffix])
+        HeContinuum = np.copy(out["nodeData/"+component+"LuminositiesStellar:HeliumContinuum:"+suffix])
+        OxContinuum = np.copy(out["nodeData/"+component+"LuminositiesStellar:OxygenContinuum:"+suffix])
         # Useful masks to avoid dividing by zero etc.
         hasGas = gasMass > 0.0
         hasSize = radius > 0.0        
@@ -233,8 +229,22 @@ def getLineNames():
     #             "oxygenIII4959","oxygenIII5007",\
     #             "nitrogenII6584",\
     #             "sulfurII6731","sulfurII6716"]
-    lines = galacticusEmissionLines().getLineNames()
+    lines = GalacticusEmissionLines().getLineNames()
     return lines
+
+def computableLuminosities(availableDatasets):
+    LyDisks = fnmatch.filter(availableDatasets,"diskLuminositiesStellar:Lyc*")
+    computableDatasets = []
+    components = "disk spheroid total".split()
+    for dataset in LyDisks:
+        haveContinua = fnmatch.filter(availableDatasets,dataset.replace("Lyc","HeliumContinuum"))>0 and \
+            fnmatch.filter(availableDatasets,dataset.replace("Lyc","OxygenContinuum"))>0                        
+        if haveContinua:
+            suffix = ":".join(dataset.split(":")[2:])                
+            dummy = [computableDatasets.append(comp+"LineLuminosity:"+line+":"+suffix) \
+                         for comp in components for line in getLineNames()]
+    return computableDatasets
+
 
 def availableLines(galHDF5Obj,z,frame=None,component=None,dust=None):    
     # Extract list of all emission line luminosities
