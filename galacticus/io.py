@@ -3,6 +3,7 @@
 import os,sys,fnmatch
 import numpy as np
 from .hdf5 import HDF5
+from .utils.datatypes import getDataType
 from .cosmology import Cosmology
 
 ######################################################################################
@@ -121,7 +122,7 @@ class GalacticusHDF5(HDF5):
         for p in props:
             if len(fnmatch.filter(allprops,p))>0:
                 matches = fnmatch.filter(allprops,p)
-                dtype = dtype + [ (str(m),out["nodeData/"+m].dtype) for m in matches ]                
+                dtype = dtype + [ (str(m),getDataType(out["nodeData/"+m])) for m in matches ]                
             else:
                 if p.lower() == "weight":
                     dtype.append((p.lower(),float))
