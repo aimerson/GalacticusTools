@@ -2,6 +2,7 @@
 
 import sys,os,re,fnamtch
 from .io import GalacticusHDF5
+from .GalacticusErrors import ParseError
 from .Luminosities import getLuminosity
 from .Filters import GalacticusFilters
 
