@@ -2,7 +2,7 @@
 
 import sys,os,re,fnamtch
 from .io import GalacticusHDF5
-from .Luminosities import Get_Luminosity
+from .Luminosities import getLuminosity
 from .Filters import GalacticusFilters
 
 
@@ -37,7 +37,7 @@ class GalacticusMagnitudes(object):
         vegaMagnitude = MATCH.group(6) == "vega"
         # Get luminosity dataset
         luminosityDataset = component.lower()+"LuminosityStellar:"+filter+":"+frame+"z"+z+dustExtension
-        luminosity = Get_Luminosity(galHDF5Obj,z,luminosityDataset,overwrite=overwrite)
+        luminosity = getLuminosity(galHDF5Obj,z,luminosityDataset,overwrite=overwrite)
         # Compute magnitude
         magnitude = -2.5*np.log10(luminosity+1.0e-40)
         if vegaMagnitude:

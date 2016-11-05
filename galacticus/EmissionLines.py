@@ -10,7 +10,7 @@ from .hdf5 import HDF5
 from .io import GalacticusHDF5
 from .GalacticusErrors import ParseError
 from .Filters import GalacticusFilters
-from .Luminosities import Get_Luminosity
+from .Luminosities import getLuminosity
 from .constants import massSolar,luminositySolar,luminosityAB
 from .constants import megaParsec,centi,Pi,erg,angstrom,speedOfLight
 from .constants import massAtomic,atomicMassHydrogen,massFractionHydrogen
@@ -308,7 +308,7 @@ def Get_Equivalent_Width(galHDF5Obj,z,datasetName,overwrite=False):
     if len(allFilters) < 3 and datasetName.startswith("total"):
         allFilters = fnmatch.filter(galHDF5Obj.availableDatasets(z),filterSearch.replace("total","disk"))
         for filter in allFilters:
-            luminosity = Get_Luminosity(galHDF5Obj,z,filter.replace("disk","total"))
+            luminosity = getLuminosity(galHDF5Obj,z,filter.replace("disk","total"))
             del luminosity
         allFilters = fnmatch.filter(galHDF5Obj.availableDatasets(z),filterSearch)
 
