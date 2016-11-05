@@ -29,7 +29,7 @@ class GalacticusMagnitudes(object):
             return np.array(out["nodeData/"+datasetName])
         # Extract components
         component = MATCH.group(1)
-        filter = MATCH.group(2)
+        filterName = MATCH.group(2)
         frame = MATCH.group(3)
         redshift = MATCH.group(4)
         dustExtension = MATCH.group(5)
@@ -37,14 +37,14 @@ class GalacticusMagnitudes(object):
             dustExtension = ""
         vegaMagnitude = MATCH.group(6) == "vega"
         # Get luminosity dataset
-        luminosityDataset = component.lower()+"LuminosityStellar:"+filter+":"+frame+"z"+z+dustExtension
+        luminosityDataset = component.lower()+"LuminosityStellar:"+filterName+":"+frame+"z"+z+dustExtension
         luminosity = getLuminosity(galHDF5Obj,z,luminosityDataset,overwrite=overwrite)
         # Compute magnitude
         magnitude = -2.5*np.log10(luminosity+1.0e-40)
         if vegaMagnitude:
-            if filter not in self.FILTERS.vegaOffset.keys():                
-                self.FILTERS.load(filter,path=filterFile)
-            magnitude += self.FILTERS.vegaOffset[filter]
+            if filterName not in self.FILTERS.vegaOffset.keys():                
+                self.FILTERS.load(filterName,path=filterFile)
+            magnitude += self.FILTERS.vegaOffset[filterName]
         # Add magnitude to file and return values 
         galHDF5Obj.addDataset(out.name+"/nodeData/",datasetName,magnitude)
         return magnitude
