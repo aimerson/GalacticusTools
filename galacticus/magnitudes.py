@@ -15,7 +15,7 @@ class GalacticusMagnitudes(object):
         self.FILTERS = GalacticusFilters()
         return
 
-    def getMagnitude(self,galHDF5Obj,z,datasetName,overwrite=False,filterFile=None):
+    def getAbsoluteMagnitude(self,galHDF5Obj,z,datasetName,overwrite=False,filterFile=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Check dataset name corresponds to an absolute magnitude
         MATCH = re.search(r"^magnitude([^:]+):([^:]+):([^:]+):z([\d\.]+)(:dust[^:]+)?(:vega|:AB)?",datasetName)
@@ -47,3 +47,4 @@ class GalacticusMagnitudes(object):
         # Add magnitude to file and return values 
         galHDF5Obj.addDataset(out.name+"/nodeData/",datasetName,magnitude)
         return magnitude
+
