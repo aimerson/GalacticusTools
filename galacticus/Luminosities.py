@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-import sys,fnmatch
+import sys,fnmatch,re
 import numpy as np
 from .io import GalacticusHDF5
 from .constants import luminosityAB
