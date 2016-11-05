@@ -289,6 +289,7 @@ class GalacticusFilters(object):
         else:
             self.filtersDirectory = filtersDirectory
         self.effectiveWavelengths = {}
+        self.vegaOffset = {}
         self.filters = {}
         self.cloudyTableClass = cloudyTable()
         return
@@ -306,6 +307,7 @@ class GalacticusFilters(object):
                     raise IOError(error)
                 FILTER = Filter(path,verbose=verbose)
             self.effectiveWavelengths[filterName] = FILTER.effectiveWavelength
+            self.vegaOffset[filterName] = FILTER.vegaOffset
             if store:
                 self.filters[filterName] = FILTER            
         else:
