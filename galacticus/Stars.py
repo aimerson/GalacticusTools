@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-import sys,fnmatch
+import sys,fnmatch,re
 import numpy as np
 from .io import GalacticusHDF5
 from .GalacticusErrors import ParseError
@@ -39,7 +39,7 @@ def getStellarMass(galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True):
         if not returnDataset:
             return
         else:
-            return np.array(out["nodeData/"+componenet+"MassStellar"])    
+            return np.array(out["nodeData/"+component+"MassStellar"])    
     # Check if total stellar mass already calculated
     if "totalMassStellar" in galHDF5Obj.availableDatasets(z) and not overwrite:        
         if not returnDataset:
@@ -93,7 +93,7 @@ def getStarFormationRate(galHDF5Obj,z,datasetName,overwrite=False,returnDataset=
         if not returnDataset:
             return
         else:
-            return np.array(out["nodeData/"+componenet+"StarFormationRate"])    
+            return np.array(out["nodeData/"+component+"StarFormationRate"])    
     # Get nearest redshift output
     out = galHDF5Obj.selectOutput(z)
     # Check if total SFR already calculated
