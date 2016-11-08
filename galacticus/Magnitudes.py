@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 
 import sys,os,re,fnamtch
+from .utils.progress import Progress
 from .io import GalacticusHDF5
 from .GalacticusErrors import ParseError
 from .Luminosities import getLuminosity
@@ -16,7 +17,7 @@ class GalacticusMagnitudes(object):
         self.FILTERS = GalacticusFilters()
         return
 
-    def getAbsoluteMagnitude(self,galHDF5Obj,z,datasetName,overwrite=False,filterFile=None):
+    def getAbsoluteMagnitude(self,galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True,filterFile=None,progressObj=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Check dataset name corresponds to an absolute magnitude
         MATCH = re.search(r"^magnitude([^:]+):([^:]+):([^:]+):z([\d\.]+)(:dust[^:]+)?(:vega|:AB)?",datasetName)
@@ -26,7 +27,10 @@ class GalacticusMagnitudes(object):
         out = galHDF5Obj.selectOutput(z)
         # Check if magnitude already calculated
         if datasetName in galHDF5Obj.availableDatasets(z) and not overwrite:
-            return np.array(out["nodeData/"+datasetName])
+            if returnDataset:
+                return np.array(out["nodeData/"+datasetName])
+            else:
+                return
         # Extract components
         component = MATCH.group(1)
         filterName = MATCH.group(2)
@@ -47,5 +51,9 @@ class GalacticusMagnitudes(object):
             magnitude += self.FILTERS.vegaOffset[filterName]
         # Add magnitude to file and return values 
         galHDF5Obj.addDataset(out.name+"/nodeData/",datasetName,magnitude)
-        return magnitude
-
+        if progressObj is not None:
+            progressObj.increment()
+            progressObj.print_status_line()
+        if returnDataset:
+            return magnitude
+        return

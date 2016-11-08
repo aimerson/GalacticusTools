@@ -2,10 +2,12 @@
 
 import sys,fnmatch,re
 import numpy as np
+from .utils.progress import Progress
 from .io import GalacticusHDF5
 from .GalacticusErrors import ParseError
 
-def getStellarMass(galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True):    
+
+def getStellarMass(galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True,progressObj=None):    
     """
     getStellarMass(): Calculate and store stellar mass for whole galaxy. This
                        has the property name 'totalMassStellar'.
@@ -20,6 +22,8 @@ def getStellarMass(galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True):
                  overwrite     : Overwrite any existing value for total stellar
                                  mass. (Default value = False)
                  returnDataset : Return array of dataset values? (Default value = True)
+                 progressObj   : Progress object instance to display progress bar if call is inside loop.
+                                 If None, then progress not displayed. (Default value = None)
 
             Outputs:
                  
@@ -54,13 +58,16 @@ def getStellarMass(galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True):
     # Extract appropriate attributes and write to new dataset
     attr = out["nodeData/diskMassStellar"].attrs
     galHDF5Obj.addAttributes(out.name+"/nodeData/totalMassStellar",attr)
+    if progressObj is not None:
+        progressObj.increment()
+        progressObj.print_status_line()
     if returnDataset:
         return totalStellarMass
     return
 
 
 
-def getStarFormationRate(galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True):    
+def getStarFormationRate(galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True,progressObj=None):    
     """
     getStarFormationRate(): Calculate and store star formation rate for whole galaxy. 
                              This has the property name 'totalStarFormationRate'.
@@ -76,6 +83,8 @@ def getStarFormationRate(galHDF5Obj,z,datasetName,overwrite=False,returnDataset=
                  overwrite     : Overwrite any existing value for total star formation 
                                  rate. (Default value = False).
                  returnDataset : Return array of dataset values? (Default value = True)
+                 progressObj   : Progress object instance to display progress bar if call is inside loop.
+                                 If None, then progress not displayed. (Default value = None)
 
             Outputs:
                  
@@ -110,6 +119,9 @@ def getStarFormationRate(galHDF5Obj,z,datasetName,overwrite=False,returnDataset=
     # Extract appropriate attributes and write to new dataset
     attr = out["nodeData/diskStarFormationRate"].attrs
     galHDF5Obj.addAttributes(out.name+"/nodeData/totalStarFormationRate",attr)
+    if progressObj is not None:
+        progressObj.increment()
+        progressObj.print_status_line()
     if returnDataset:
         return totalStellarMass
     return

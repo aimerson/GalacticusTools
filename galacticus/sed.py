@@ -40,7 +40,7 @@ class GalacticusSED(object):
         # Get redshift
         redshift = float(fnmatch.filter(datasetName.split(":"),"z*")[0].replace("z",""))
         # Identify top hat filters
-        search = datasetName.replace("SED:","LuminositiesStellar:topHat_*_")
+        search = datasetName.replace("SED:","LuminositiesStellar:topHat_*_")    
         topHatNames = fnmatch.filter(list(map(str,self.galacticusOBJ.availableDatasets(redshift))),search)
         # Extract wavelengths and then sort wavelengths and top hat names according to wavelength
         wavelengths = np.array([float(topHat.split("_")[1]) for topHat in topHatNames])
