@@ -15,15 +15,17 @@ def ergPerSecond(luminosity):
     return luminosity
 
 
-def getLuminosity(galHDF5Obj,z,datasetName,overwrite=False):
+def getLuminosity(galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True):
     funcname = sys._getframe().f_code.co_name
     # Check dataset name correspnds to a luminosity
     MATCH = re.search(r"^(disk|spheroid|total)LuminositiesStellar:([^:]+):([^:]+):z([\d\.]+)(:dust[^:]+)?",datasetName)    
     if not MATCH:
         raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
+    print datasetName
     # Get nearest redshift output
     out = galHDF5Obj.selectOutput(z)
     # Ensure never overwrite disk/spheroid luminosities
+    component = MATCH.group(1)
     if component.lower() != "total":
         overwrite = False
     # Check if luminosity already calculated
@@ -38,10 +40,12 @@ def getLuminosity(galHDF5Obj,z,datasetName,overwrite=False):
     galHDF5Obj.addDataset(out.name+"/nodeData/",datasetName,totalLuminosity)
     attr = {"unitsInSI":luminosityAB}
     galHDF5Obj.addAttributes(out.name+"/nodeData/"+datasetName,attr)
-    return totalLuminosity
+    if returnDataset:
+        return totalLuminosity
+    return
 
 
-def getBulgeToTotal(galHDF5Obj,z,datasetName,overwrite=False):
+def getBulgeToTotal(galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True):
     funcname = sys._getframe().f_code.co_name
     # Check dataset name correspnds to a bulge-to-total luminosity
     MATCH = re.search(r"^bulgeToTotalLuminosities:([^:]+):([^:]+):z([\d\.]+)(:dust[^:]+)?",datasetName)
@@ -59,4 +63,6 @@ def getBulgeToTotal(galHDF5Obj,z,datasetName,overwrite=False):
         (np.array(out["nodeData/"+diskName])+np.array(out["nodeData/"+spheroidName]))
     # Write luminosity to file
     galHDF5Obj.addDataset(out.name+"/nodeData/",datasetName,ratio)
-    return ratio
+    if returnDataset:
+        return ratio
+    return
