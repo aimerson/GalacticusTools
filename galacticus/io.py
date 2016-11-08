@@ -149,11 +149,10 @@ class GalacticusHDF5(HDF5):
 
         # Galaxy inclination
         if "inclination" in galaxyProperties:            
-            from .Inclination import Get_Inclination
+            from .Inclination import getInclination
             if self._verbose:
                 print(funcname+"(): calculating inclination (z="+str(z)+")")
-            data = Get_Inclination(self,z,overwrite=overwrite)
-            del data
+            getInclination(self,z,overwrite=overwrite,returnDataset=False)
         # Total stellar mass
         if "totalMassStellar" in galaxyProperties:
             from .Stars import getStellarMass
@@ -166,6 +165,9 @@ class GalacticusHDF5(HDF5):
             if self._verbose:
                 print(funcname+"(): calculating starFormationRate (z="+str(z)+")")
             getStarFormationRate(self,z,"totalStarFormationRate",overwrite=overwrite,returnDataset=False)
+
+
+
         return
 
 
