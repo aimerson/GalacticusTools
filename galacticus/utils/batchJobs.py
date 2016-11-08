@@ -93,6 +93,10 @@ def submitSLURM(script,args=None,PARTITION=None,QOS=None,WALLTIME=None,JOBNAME=N
         sjob = sjob + " --time " + WALLTIME
     if JOBNAME is not None:
         sjob = sjob + " -J "+JOBNAME
+    if RUNS is not None:
+        if type(RUNS) is list:
+            RUNS = ",".join(map(str,RUNS))
+        sjob = sjob + " --array="+str(RUNS)
     if LOGDIR is not None:
         subprocess.call(["mkdir","-p",LOGDIR])        
         if JOBNAME is None:
