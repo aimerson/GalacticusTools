@@ -8,7 +8,7 @@ from .GalacticusErrors import ParseError
 def getStellarMass(galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True):    
     """
     getStellarMass(): Calculate and store stellar mass for whole galaxy. This
-                       has the property name 'massStellar'.
+                       has the property name 'totalMassStellar'.
 
     USAGE: mass = getStellarMass(galHDF5Obj,z,datasetName,[overwrite],[returnDataset])
 
@@ -63,7 +63,7 @@ def getStellarMass(galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True):
 def getStarFormationRate(galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True):    
     """
     getStarFormationRate(): Calculate and store star formation rate for whole galaxy. 
-                             This has the property anme 'starFormationRate'.
+                             This has the property name 'totalStarFormationRate'.
 
     USAGE: sfr = getStarFormationRate(galHDF5Obj,z,[overwrite],[returnDataset])
 
