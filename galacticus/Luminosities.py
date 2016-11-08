@@ -30,6 +30,9 @@ def getLuminosity(galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True,pr
         overwrite = False
     # Check if luminosity already calculated
     if datasetName in galHDF5Obj.availableDatasets(z) and not overwrite:
+        if progressObj is not None:
+            progressObj.increment()
+            progressObj.print_status_line()
         if returnDataset:
             return np.array(out["nodeData/"+datasetName])
         else:
@@ -61,6 +64,9 @@ def getBulgeToTotal(galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True,
     out = galHDF5Obj.selectOutput(z)
     # Check if bulge-to-total luminosity already calculated
     if datasetName in galHDF5Obj.availableDatasets(z) and not overwrite:
+        if progressObj is not None:
+            progressObj.increment()
+            progressObj.print_status_line()
         if returnDataset:
             return np.array(out["nodeData/"+datasetName])
         else:

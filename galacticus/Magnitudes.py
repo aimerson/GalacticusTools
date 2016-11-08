@@ -27,6 +27,9 @@ class GalacticusMagnitudes(object):
         out = galHDF5Obj.selectOutput(z)
         # Check if magnitude already calculated
         if datasetName in galHDF5Obj.availableDatasets(z) and not overwrite:
+            if progressObj is not None:
+                progressObj.increment()
+                progressObj.print_status_line()
             if returnDataset:
                 return np.array(out["nodeData/"+datasetName])
             else:

@@ -40,12 +40,18 @@ def getStellarMass(galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True,p
     # Check if computing total stellar mass
     component = MATCH.group(1).lower()
     if component != "total":
+        if progressObj is not None:
+            progressObj.increment()
+            progressObj.print_status_line()
         if not returnDataset:
             return
         else:
             return np.array(out["nodeData/"+component+"MassStellar"])    
     # Check if total stellar mass already calculated
     if "totalMassStellar" in galHDF5Obj.availableDatasets(z) and not overwrite:        
+        if progressObj is not None:
+            progressObj.increment()
+            progressObj.print_status_line()
         if not returnDataset:
             return
         else:
@@ -99,6 +105,9 @@ def getStarFormationRate(galHDF5Obj,z,datasetName,overwrite=False,returnDataset=
     # Check if computing total SFR
     component = MATCH.group(1).lower()
     if component != "total":
+        if progressObj is not None:
+            progressObj.increment()
+            progressObj.print_status_line()
         if not returnDataset:
             return
         else:
@@ -107,6 +116,9 @@ def getStarFormationRate(galHDF5Obj,z,datasetName,overwrite=False,returnDataset=
     out = galHDF5Obj.selectOutput(z)
     # Check if total SFR already calculated
     if "totalStarFormationRate" in galHDF5Obj.availableDatasets(z) and not overwrite:        
+        if progressObj is not None:
+            progressObj.increment()
+            progressObj.print_status_line()
         if not returnDataset:
             return
         else:
