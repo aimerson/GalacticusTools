@@ -6,7 +6,7 @@ from .io import GalacticusHDF5
 from .constants import luminosityAB
 from .constants import luminositySolar,erg
 from .GalacticusErrors import ParseError
-from .uitls.progress import Progress
+from .utils.progress import Progress
 
 def ergPerSecond(luminosity):    
     luminosity = np.log10(luminosity)
