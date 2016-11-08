@@ -21,7 +21,6 @@ def getLuminosity(galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True):
     MATCH = re.search(r"^(disk|spheroid|total)LuminositiesStellar:([^:]+):([^:]+):z([\d\.]+)(:dust[^:]+)?",datasetName)    
     if not MATCH:
         raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
-    print datasetName
     # Get nearest redshift output
     out = galHDF5Obj.selectOutput(z)
     # Ensure never overwrite disk/spheroid luminosities
