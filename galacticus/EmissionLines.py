@@ -150,7 +150,7 @@ class GalacticusEmissionLines(object):
         LyDatasetName = fnmatch.filter(out["nodeData"].keys(),component+"LuminositiesStellar:Lyc"+suffix) + \
             fnmatch.filter(out["nodeData"].keys(),component+"LuminositiesStellar:LymanContinuum"+suffix)
         LyDatasetName = LyDatasetName[0]            
-        LyContinuum = np.copy(out["nodeData/"LyDatasetName])
+        LyContinuum = np.copy(out["nodeData/"+LyDatasetName])
         HeContinuum = np.copy(out["nodeData/"+component+"LuminositiesStellar:HeliumContinuum:"+suffix])
         OxContinuum = np.copy(out["nodeData/"+component+"LuminositiesStellar:OxygenContinuum:"+suffix])
         # Useful masks to avoid dividing by zero etc.
