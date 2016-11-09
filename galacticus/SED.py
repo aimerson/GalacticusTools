@@ -68,7 +68,7 @@ class GalacticusSED(object):
         sed = sed/np.copy(frequency)
         sed / jansky
         del frequency
-        sed *= 1000.0
+        sed *= 1.0e6
         return wavelengths,sed
         
         
