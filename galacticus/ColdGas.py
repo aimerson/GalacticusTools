@@ -4,14 +4,14 @@ import sys,fnmatch,re
 import numpy as np
 from .io import GalacticusHDF5
 from .GalacticusErrors import ParseError
+from .utils.progress import Progress
 
-
-def getColdGasMass(galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True):
+def getColdGasMass(galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True,progressObj=None):
     """
     getColdGasMass: Calculate and store mass of cold gas in galaxy. This property
                     is named (total|disk|spheroid)Mass(Cold)Gas.
 
-    USAGE:  mass = getColdGasMass(galHDF5Obj,z,datasetName,[overwrite],[returnDataset])
+    USAGE:  mass = getColdGasMass(galHDF5Obj,z,datasetName,[overwrite],[returnDataset],[progressObj])
 
       Inputs
 
@@ -20,11 +20,13 @@ def getColdGasMass(galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True):
           datasetName    : Name of dataset to return/process, i.e. (disk|spheroid|total)Mass(Cold)Gas.
           overwrite      : Overwrite any existing value for gas mass. (Default value = False)
           returnDataset  : Return array of dataset values? (Default value = True)
+          progressObj    : Progress object instance to display progress bar if call is inside loop.                                                                 
+                           If None, then progress not displayed. (Default value = None) 
 
       Outputs
 
           mass           : Numpy array of gas masses (if returnDataset=True).
-                                                                                                                                                                                            
+
     """
     funcname = sys._getframe().f_code.co_name
     # Check dataset name is a stellar mass
@@ -44,6 +46,9 @@ def getColdGasMass(galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True):
         gas = ""    
     # Check if simply return disk/spheroid (cold) gas mass
     if component != "total":
+        if progressObj is not None:
+            progressObj.increment()
+            progressObj.print_status_line()
         if not returnDataset:
             return
         else:
@@ -51,6 +56,9 @@ def getColdGasMass(galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True):
     # Check if gas mass already calculated
     datasetName = component.lower()+"Mass"+gas+"Gas"
     if datasetName in galHDF5Obj.availableDatasets(z) and not overwrite:
+        if progressObj is not None:
+            progressObj.increment()
+            progressObj.print_status_line()
         if not returnDataset:
             return
         else:
@@ -63,6 +71,9 @@ def getColdGasMass(galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True):
     # Extract appropriate attributes and write to new dataset
     attr = out["nodeData/diskMassGas"].attrs
     galHDF5Obj.addAttributes(out.name+"/nodeData/"+datasetName,attr)
+    if progressObj is not None:
+        progressObj.increment()
+        progressObj.print_status_line()
     if returnDataset:
         return totalGasMass
     return
