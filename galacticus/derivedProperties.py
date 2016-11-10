@@ -43,6 +43,16 @@ def addDerivedProperties(galHDF5Obj,z,derivedDatasets,overwrite=False,verbose=Tr
         dummy = [getLuminosity(galHDF5Obj,z,name,overwrite=overwrite,\
                                    returnDataset=False,progressObj=PROG) for name in datasets]
         del dummy
+    # Emission line luminosities
+    datasets = fnmatch.filter(derivedDatasets,"*LineLuminosity:*")
+    if len(datasets)>0: 
+        from .EmissionLines import GalacticusEmissionLines
+        if verbose:
+            print("    cold gas...")
+            PROG = Progress(len(datasets))
+        dummy = [GalacticusEmissionLines().getLineLuminosity(galHDF5Obj,z,name,overwrite=overwrite,\
+                                                                 returnDataset=False,progressObj=PROG) for name in datasets]
+        del dummy
     # Cold gas
     datasets = fnmatch.filter(derivedDatasets,"*MassGas") + fnmatch.filter(derivedDatasets,"*MassColdGas")
     if len(datasets)>0: 
@@ -53,3 +63,4 @@ def addDerivedProperties(galHDF5Obj,z,derivedDatasets,overwrite=False,verbose=Tr
         dummy = [getColdGasMass(galHDF5Obj,z,name,overwrite=overwrite,\
                                     returnDataset=False,progressObj=PROG) for name in datasets]
         del dummy
+

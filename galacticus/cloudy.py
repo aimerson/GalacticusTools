@@ -51,11 +51,10 @@ class cloudyTable(HDF5):
             raise IndexError(funcname+"(): Line '"+lineName+"' not found!")
         tableLuminosities = self.luminosities[lineName]
         ngals = len(metallicity)
-        galaxyData = np.zeros((ngals,ngals,ngals,ngals,ngals),dtype=float)
-        galaxyData[0] = metallicity
-        galaxyData[1] = densityHydrogen
-        galaxyData[2] = ionizingFluxHydrogen
-        galaxyData[3] = ionizingFluxHeliumToHydrogen
-        galaxyData[4] = ionizingFluxOxygenToHydrogen
-        luminosities = interpn(points,tableLuminosities,galaxyData,**kwargs)
+        galaxyData = zip(metallicity,densityHydrogen,ionizingFluxHydrogen,ionizingFluxHeliumToHydrogen,ionizingFluxOxygenToHydrogen)
+        if "bounds_error" not in kwargs.keys():
+            kwargs["bounds_error"] = False
+        if "fill_value" not in kwargs.keys():
+            kwargs["fill_value"] = None
+        luminosities = interpn(self.interpolants,tableLuminosities,galaxyData,**kwargs)
         return luminosities

@@ -122,7 +122,7 @@ class GalacticusEmissionLines(object):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         # Check dataset name corresponds to a luminosity
         MATCH = self.parseDatasetName(datasetName)
-        if MATCH.component.lower() == "total":
+        if MATCH.group(1).lower() == "total":
             raise ParseError(funcname+"(): Cannot process total luminosities! Use "+\
                                  classname+".getLineLuminosity().")
         # Extract dataset components
@@ -151,8 +151,8 @@ class GalacticusEmissionLines(object):
             fnmatch.filter(out["nodeData"].keys(),component+"LuminositiesStellar:LymanContinuum"+suffix)
         LyDatasetName = LyDatasetName[0]            
         LyContinuum = np.copy(out["nodeData/"+LyDatasetName])
-        HeContinuum = np.copy(out["nodeData/"+component+"LuminositiesStellar:HeliumContinuum:"+suffix])
-        OxContinuum = np.copy(out["nodeData/"+component+"LuminositiesStellar:OxygenContinuum:"+suffix])
+        HeContinuum = np.copy(out["nodeData/"+component+"LuminositiesStellar:HeliumContinuum"+suffix])
+        OxContinuum = np.copy(out["nodeData/"+component+"LuminositiesStellar:OxygenContinuum"+suffix])
         # Useful masks to avoid dividing by zero etc.
         hasGas = gasMass > 0.0
         hasSize = radius > 0.0        
@@ -164,7 +164,7 @@ class GalacticusEmissionLines(object):
         densityHydrogen = np.zeros_like(gasMass)
         mask = np.logical_and(hasGas,hasSize)
         tmp = gasMass[mask]*massSolar/(radius[mask]*centi/megaParsec)**3
-        tmp = np.log10(tmp/(4.0*Pi*massAtomic*atmicMassHydrogen*massFractionHydrogen))
+        tmp = np.log10(tmp/(4.0*Pi*massAtomic*atomicMassHydrogen*massFractionHydrogen))
         np.place(densityHydrogen,mask,np.copy(tmp))
         del tmp
         # iii) compute Lyman continuum luminosity
@@ -173,11 +173,11 @@ class GalacticusEmissionLines(object):
         np.place(ionizingFluxHydrogen,hasFlux,np.copy(tmp))
         del tmp
         # iv) compute luminosity ratios He/H and Ox/H
-        ionizingFluxHeliumToHydrogen = np.zeros_lime(gasMass)
+        ionizingFluxHeliumToHydrogen = np.zeros_like(gasMass)
         tmp = np.log10(HeContinuum[hasFlux]/LyContinuum[hasFlux])
         np.place(ionizingFluxHeliumToHydrogen,hasFlux,np.copy(tmp))
         del tmp
-        ionizingFluxOxygenToHydrogen = np.zeros_lime(gasMass)
+        ionizingFluxOxygenToHydrogen = np.zeros_like(gasMass)
         tmp = np.log10(OxContinuum[hasFlux]/LyContinuum[hasFlux])
         np.place(ionizingFluxOxygenToHydrogen,hasFlux,np.copy(tmp))
         del tmp
