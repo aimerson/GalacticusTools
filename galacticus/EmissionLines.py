@@ -155,11 +155,13 @@ class GalacticusEmissionLines(object):
         OxContinuum = np.copy(out["nodeData/"+component+"LuminositiesStellar:OxygenContinuum"+suffix])
         # Useful masks to avoid dividing by zero etc.
         hasGas = gasMass > 0.0
+        hasMetals = abundanceGasMetals > 0.0
         hasSize = radius > 0.0        
         hasFlux = LyContinuum > 0.0
         # i) compute metallicity
         metallicity = np.zeros_like(gasMass)
-        np.place(metallicity,hasGas,np.log10(abundanceGasMetals[hasGas]/gasMass[hasGas]))
+        mask = np.logical_and(hasGas,hasMetals)
+        np.place(metallicity,hasGas,np.log10(abundanceGasMetals[mask]/gasMass[mask]))
         # ii) compute hydrogen density
         densityHydrogen = np.zeros_like(gasMass)
         mask = np.logical_and(hasGas,hasSize)
@@ -184,6 +186,8 @@ class GalacticusEmissionLines(object):
         # Check if returning raw line luminosity or luminosity under filter
         if filterName is not None:
             luminosityMultiplier = self.getLuminosityMultiplier(datasetName)
+        else:
+            luminosityMultiplier = 1.0
         # Find number of HII regions
         numberHIIRegion = starFormationRate*lifetimeHIIRegion/massHIIRegion
         # Convert the hydrogen ionizing luminosity to be per HII region
@@ -241,7 +245,7 @@ class GalacticusEmissionLines(object):
         # Print progress if requested
         if progressObj is not None:
             progressObj.increment()
-            progresObj.print_status_line()
+            progressObj.print_status_line()
         # Optionally return dataset array
         if returnDataset:
             return lineLuminosity
