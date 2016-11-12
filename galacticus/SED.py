@@ -5,7 +5,7 @@ import numpy as np
 from galacticus.io import GalacticusHDF5
 from galacticus.Luminosities import ergPerSecond
 from galacticus.constants import erg,luminosityAB,jansky
-from galacticus.constants import angstrom,megaParsec,Pi,speedOfLight
+from galacticus.constants import angstrom,megaParsec,Pi,speedOfLight,centi
 
 
 class GalacticusSED(object):
@@ -62,11 +62,11 @@ class GalacticusSED(object):
         del dummy,luminosities
         sed = ergPerSecond(sed)
         # Convert units to microJanskys
-        comDistance = self.galacticusOBJ.cosmology.comoving_distance(redshift)*megaParsec*100.0
+        comDistance = self.galacticusOBJ.cosmology.comoving_distance(redshift)*megaParsec/centi
         sed /= 4.0*Pi*comDistance**2
         frequency = speedOfLight/np.stack([wavelengths]*ngals)*angstrom
         sed = sed/np.copy(frequency)
-        sed / jansky
+        sed /= jansky
         del frequency
         sed *= 1.0e6
         return wavelengths,sed
