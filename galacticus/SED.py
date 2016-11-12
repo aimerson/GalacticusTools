@@ -36,8 +36,6 @@ class GalacticusSED(object):
         return list(np.unique(np.array(allSEDs)))
 
 
-
-
     def getSEDLuminosity(self,topHatName,redshift,selectionMask=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Get output for redshift
@@ -49,8 +47,6 @@ class GalacticusSED(object):
         return luminosity
         
         
-
-
     def getSED(self,datasetName,selectionMask=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Get redshift
