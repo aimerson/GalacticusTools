@@ -3,6 +3,7 @@
 import sys,os,fnmatch
 import numpy as np
 from galacticus.io import GalacticusHDF5
+from galacticus.EmissionLines import GalacticusEmissionLines
 from galacticus.Luminosities import ergPerSecond
 from galacticus.constants import erg,luminosityAB,jansky
 from galacticus.constants import angstrom,megaParsec,Pi,speedOfLight,centi
@@ -14,6 +15,7 @@ class GalacticusSED(object):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         self.galacticusOBJ = galObj
+        self.EmissionLines = GalacticusEmissionLines()
         return
 
 
@@ -32,7 +34,21 @@ class GalacticusSED(object):
             allSEDs.append(sed)
         # Return only unique list to avoid duplicates
         return list(np.unique(np.array(allSEDs)))
-    
+
+
+
+
+    def getSEDLuminosity(self,topHatName,redshift,selectionMask=None):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Get output for redshift
+        out = self.galacticusOBJ.selectOutput(redshift)
+        # Get stellar luminosity
+        luminosity = np.array(out["nodeData/"+topHatName])
+        if selectionMask is not None:
+            luminosity = luminosity[selectionMask]
+        return luminosity
+        
+        
 
 
     def getSED(self,datasetName,selectionMask=None):
@@ -56,7 +72,7 @@ class GalacticusSED(object):
             if len(selectionMask) != ngals:
                 raise ValueError(funcname+"(): specified selection mask does not have same shape as datasets!")
         luminosities = []
-        dummy = [luminosities.append(np.array(out["nodeData/"+topHatNames[i]])[selectionMask]) \
+        dummy = [luminosities.append(self.getSEDLuminosity(topHatNames[i],redshift,selectionMask=selectionMask))\
                      for i in range(len(wavelengths))]
         sed = np.stack(np.copy(luminosities),axis=1)
         del dummy,luminosities
