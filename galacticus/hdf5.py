@@ -130,7 +130,8 @@ class HDF5(object):
         if name in g.keys():
             write_key = False
             if append:
-                value = np.append(np.copy(g[name]),value)
+                shape = tuple(list(map(int,",".join(map(str,list(maxshape))).replace("None",'-1').split(","))))
+                value = np.append(np.copy(g[name]),value).reshape(shape)
                 del g[name]
                 write_key = True
             if overwrite:
