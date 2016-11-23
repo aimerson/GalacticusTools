@@ -165,7 +165,7 @@ class GalacticusEmissionLines(object):
         # ii) compute hydrogen density
         densityHydrogen = np.zeros_like(gasMass)
         mask = np.logical_and(hasGas,hasSize)
-        tmp = gasMass[mask]*massSolar/(radius[mask]*centi/megaParsec)**3
+        tmp = gasMass[mask]*massSolar/(radius[mask]*megaParsec/centi)**3
         tmp = np.log10(tmp/(4.0*Pi*massAtomic*atomicMassHydrogen*massFractionHydrogen))
         np.place(densityHydrogen,mask,np.copy(tmp))
         del tmp
@@ -193,7 +193,7 @@ class GalacticusEmissionLines(object):
         # Convert the hydrogen ionizing luminosity to be per HII region
         #np.place(numberHIIRegion,numberHIIRegion==0.0,1.0)
         ionizingFluxHydrogen -= np.log10(numberHIIRegion)
-        np.place(ionizingFluxHydrogen,np.isnan(ionizingFluxHydrogen),0.0)
+        np.place(ionizingFluxHydrogen,np.isinf(ionizingFluxHydrogen),0.0)               
         # Interpolate over Cloudy tables to get luminosity per HII region
         lineLuminosity = self.CLOUDY.interpolate(lineName,metallicity,\
                                                      densityHydrogen,ionizingFluxHydrogen,\
