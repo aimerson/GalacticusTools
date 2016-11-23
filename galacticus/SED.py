@@ -47,7 +47,7 @@ class GalacticusSED(object):
         return luminosity
         
         
-    def getSED(self,datasetName,selectionMask=None):
+    def getSED(self,datasetName,selectionMask=None,includeEmissionLines=True):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Get redshift
         redshift = float(fnmatch.filter(datasetName.split(":"),"z*")[0].replace("z",""))

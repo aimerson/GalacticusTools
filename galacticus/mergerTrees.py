@@ -95,7 +95,6 @@ class GalacticusMergerTree(HDF5):
         OUT.addDataset("treeIndex","numberOfNodes",numberNode)
         firstNode = np.cumsum(numberNode) - numberNode
         OUT.addDataset("treeIndex","firstNode",firstNode)
-
         # Extract tree properties
         dummy = [self.extractSingleTree(treeID,OUT) for treeID in treeIndices]    
         del dummy
