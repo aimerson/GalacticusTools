@@ -202,11 +202,14 @@ class GalacticusEmissionLines(object):
         # Convert to line luminosity in Solar luminosities (or AB maggies if a filter was specified)
         lineLuminosity *= luminosityMultiplier*numberHIIRegion*erg/luminositySolar
         np.place(lineLuminosity,OR(np.invert(hasGas),np.invert(hasSize),np.invert(hasFlux),np.invert(formingStars)),0.0)
+        np.place(lineLuminosity,lineLuminosity<0.0,-999.9)
+        np.place(lineLuminosity,np.isnan(lineLuminosity),-999.9)
+        np.place(lineLuminosity,np.isinf(lineLuminosity),-999.9)
         # Add luminosity to file and return values
         galHDF5Obj.addDataset(out.name+"/nodeData/",datasetName,np.copy(lineLuminosity))
         # Add appropriate attributes to new dataset
         attr = {"unitsInSI":luminositySolar}
-        galHDF5Obj.addAttributes(out.name+"/nodeData/"+datasetName,attr)
+        galHDF5Obj.addAttributes(out.name+"/nodeData/"+datasetName,attr)        
         return lineLuminosity
 
 

@@ -6,7 +6,7 @@ from scipy.interpolate import interp1d
 from galacticus.io import GalacticusHDF5
 from galacticus.EmissionLines import GalacticusEmissionLines
 from galacticus.Luminosities import ergPerSecond
-from galacticus.constants import erg,luminosityAB,jansky
+from galacticus.constants import erg,luminosityAB,luminositySolar,jansky
 from galacticus.constants import angstrom,megaParsec,Pi,speedOfLight,centi
 
 
@@ -100,12 +100,20 @@ class GalacticusSED(object):
                 lineLuminosity = np.array(out["nodeData/"+lineDatasetName])
                 if selectionMask is not None:
                     lineLuminosity = lineLuminosity[selectionMask]
-                luminosities[:,iarg] += lineLuminosity
+                np.place(lineLuminosity,lineLuminosity<0.0,0.0)
+                luminosities[:,iarg] += lineLuminosity*(luminositySolar/luminosityAB)
         dummy = [_addLuminosity(linesInRange[i],wavelengthsInRange[i]) for i in range(len(linesInRange))]
         del dummy
         return wavelengths,luminosities        
         
 
+
+    def ergPerSecond(self,luminosity):
+        luminosity = np.log10(luminosity)
+        luminosity += np.log10(luminosityAB)
+        luminosity -= np.log10(erg)
+        luminosity = 10.0**luminosity
+        return luminosity
         
     def getSED(self,datasetName,selectionMask=None,includeEmissionLines=True):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
@@ -140,7 +148,7 @@ class GalacticusSED(object):
         if includeEmissionLines:
             wavelengths,sed = self.addEmissionLines(wavelengths,sed,MATCH,selectionMask=selectionMask)            
         # Convert units to microJanskys
-        sed = ergPerSecond(sed)
+        sed = self.ergPerSecond(sed)
         comDistance = self.galacticusOBJ.cosmology.comoving_distance(redshift)*megaParsec/centi
         sed /= 4.0*Pi*comDistance**2
         frequency = speedOfLight/np.stack([wavelengths]*ngals)*angstrom
