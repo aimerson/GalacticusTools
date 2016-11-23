@@ -41,8 +41,7 @@ class GalacticusEmissionLines(object):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         if lineName not in self.CLOUDY.lines:
             raise IndexError(funcname+"(): Line '"+lineName+"' not found!")
-        index = self.CLOUDY.lines.index(lineName)
-        return self.CLOUDY.wavelengths[index]*(1.0+redshift)
+        return float(self.CLOUDY.wavelengths[lineName])*(1.0+redshift)
                 
     
     def parseDatasetName(self,datasetName):

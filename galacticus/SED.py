@@ -1,7 +1,8 @@
 #! /usr/bin/env python
 
-import sys,os,fnmatch
+import sys,os,fnmatch,re
 import numpy as np
+from scipy.interpolate import interp1d
 from galacticus.io import GalacticusHDF5
 from galacticus.EmissionLines import GalacticusEmissionLines
 from galacticus.Luminosities import ergPerSecond
@@ -11,11 +12,12 @@ from galacticus.constants import angstrom,megaParsec,Pi,speedOfLight,centi
 
 class GalacticusSED(object):
     
-    def __init__(self,galObj):
+    def __init__(self,galObj,verbose=False):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         self.galacticusOBJ = galObj
         self.EmissionLines = GalacticusEmissionLines()
+        self._verbose = verbose
         return
 
 
@@ -46,11 +48,73 @@ class GalacticusSED(object):
             luminosity = luminosity[selectionMask]
         return luminosity
         
+    
+    def addEmissionLines(self,wavelengths,luminosities,MATCH,selectionMask=None):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Extract necessary information from Regex dataset match
+        component = MATCH.group(1)
+        frame = MATCH.group(3)
+        redshift = MATCH.group(4)
+        dust = MATCH.group(5)
+        if dust is None:
+            dust = ""
+        option = MATCH.group(6)
+        if option is None:
+            option = ""
+        # Check for any emission lines inside wavelength range
+        lines = np.array(self.EmissionLines.getLineNames())
+        if frame == "rest":
+            effectiveWavelengths = np.array([self.EmissionLines.getWavelength(name) for name in lines])
+        else:
+            effectiveWavelengths = np.array([self.EmissionLines.getWavelength(name,redshift=float(redshift)) for name in lines])
+        
+        emissionLinesInRange = np.logical_and(effectiveWavelengths>=wavelengths.min(),effectiveWavelengths<=wavelengths.max())
+        # If no emission lines in range, return original wavelengths and luminosities
+        if not any(emissionLinesInRange):
+            return wavelengths,luminosities        
+        # Select names and wavelengths of emission lines in range
+        wavelengthsInRange = effectiveWavelengths[emissionLinesInRange]
+        linesInRange = lines[emissionLinesInRange]
+        if self._verbose:
+            report = funcname+"(): Following emission lines are inside SED wavelength range:"
+            report = report + "\n     " + "\n     ".join(list(linesInRange))
+            print(report)
+        # Construct interpolation object
+        interpLuminosity = interp1d(np.copy(wavelengths),np.copy(luminosities),axis=1)        
+        # Add emission lines wavelengths into wavelengths of SED
+        buffer = 1.0              
+        wavelengths = list(np.copy(wavelengths)) + list(np.copy(wavelengthsInRange)) + \
+            list(np.copy(wavelengthsInRange)+buffer) + list(np.copy(wavelengthsInRange)-buffer)
+        wavelengths = np.sort(np.unique(np.array(wavelengths)))
+        # Interpolate to get continuum luminosity at each wavelength
+        luminosities = interpLuminosity(wavelengths)
+        # Get output for redshift
+        out = self.galacticusOBJ.selectOutput(float(redshift))
+        # Add emission lines in as delta functions
+        def _addLuminosity(lineName,wavelength):            
+            iarg = np.argwhere(np.fabs(wavelengths-wavelength)<buffer)[0][0]
+            lineDatasetName = component+"LineLuminosity:"+lineName+":"+frame+":z"+redshift+dust+option
+            if lineDatasetName not in out["nodeData"].keys():
+                print("WARNING! "+funcname+"(): Cannot locate '"+lineDatasetName+"' for inclusion in SED. Will be skipped.")
+            else:                
+                lineLuminosity = np.array(out["nodeData/"+lineDatasetName])
+                if selectionMask is not None:
+                    lineLuminosity = lineLuminosity[selectionMask]
+                luminosities[:,iarg] += lineLuminosity
+        dummy = [_addLuminosity(linesInRange[i],wavelengthsInRange[i]) for i in range(len(linesInRange))]
+        del dummy
+        return wavelengths,luminosities        
+        
+
         
     def getSED(self,datasetName,selectionMask=None,includeEmissionLines=True):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        # Get redshift
-        redshift = float(fnmatch.filter(datasetName.split(":"),"z*")[0].replace("z",""))
+        # Check dataset name correspnds to an SED
+        MATCH = re.search(r"^(disk|spheroid|total)SED:([^:]+):([^:]+):z([\d\.]+)(:dust[^:]+)?(:recent)?",datasetName)
+        if not MATCH:
+            raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
+        # Extract necessary information
+        redshift = float(MATCH.group(4))
         # Identify top hat filters
         search = datasetName.replace("SED:","LuminositiesStellar:topHat_*_")    
         topHatNames = fnmatch.filter(list(map(str,self.galacticusOBJ.availableDatasets(redshift))),search)
@@ -72,8 +136,11 @@ class GalacticusSED(object):
                      for i in range(len(wavelengths))]
         sed = np.stack(np.copy(luminosities),axis=1)
         del dummy,luminosities
-        sed = ergPerSecond(sed)
+        # Introduce emission lines
+        if includeEmissionLines:
+            wavelengths,sed = self.addEmissionLines(wavelengths,sed,MATCH,selectionMask=selectionMask)            
         # Convert units to microJanskys
+        sed = ergPerSecond(sed)
         comDistance = self.galacticusOBJ.cosmology.comoving_distance(redshift)*megaParsec/centi
         sed /= 4.0*Pi*comDistance**2
         frequency = speedOfLight/np.stack([wavelengths]*ngals)*angstrom
