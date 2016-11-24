@@ -48,112 +48,6 @@ class GalacticusSED(object):
             luminosity = luminosity[selectionMask]
         return luminosity
         
-    
-    def addEmissionLines(self,wavelengths,luminosities,MATCH,selectionMask=None):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        # Extract necessary information from Regex dataset match
-        component = MATCH.group(1)
-        frame = MATCH.group(3)
-        redshift = MATCH.group(4)
-        dust = MATCH.group(5)
-        if dust is None:
-            dust = ""
-        option = MATCH.group(6)
-        if option is None:
-            option = ""
-        # Check for any emission lines inside wavelength range
-        lines = np.array(self.EmissionLines.getLineNames())
-        if frame == "rest":
-            effectiveWavelengths = np.array([self.EmissionLines.getWavelength(name) for name in lines])
-        else:
-            effectiveWavelengths = np.array([self.EmissionLines.getWavelength(name,redshift=float(redshift)) for name in lines])
-        
-        emissionLinesInRange = np.logical_and(effectiveWavelengths>=wavelengths.min(),effectiveWavelengths<=wavelengths.max())
-        # If no emission lines in range, return original wavelengths and luminosities
-        if not any(emissionLinesInRange):
-            return wavelengths,luminosities        
-        # Select names and wavelengths of emission lines in range
-        wavelengthsInRange = effectiveWavelengths[emissionLinesInRange]
-        linesInRange = lines[emissionLinesInRange]
-        if self._verbose:
-            report = funcname+"(): Following emission lines are inside SED wavelength range:"
-            report = report + "\n     " + "\n     ".join(list(linesInRange))
-            print(report)
-        # Construct interpolation object
-        interpLuminosity = interp1d(np.copy(wavelengths),np.copy(luminosities),axis=1)        
-        # Add emission lines wavelengths into wavelengths of SED
-        buffer = 1.0              
-        wavelengths = list(np.copy(wavelengths)) + list(np.copy(wavelengthsInRange)) + \
-            list(np.copy(wavelengthsInRange)+buffer) + list(np.copy(wavelengthsInRange)-buffer)
-        wavelengths = np.sort(np.unique(np.array(wavelengths)))
-        # Interpolate to get continuum luminosity at each wavelength
-        luminosities = interpLuminosity(wavelengths)
-        
-        print wavelengths.shape,luminosities.shape
-
-        # Add emission line luminosities
-        lineLuminosities = self.gaussianProfile(linesInRange,wavelengthsInRange,wavelengths,MATCH,selectionMask=selectionMask,lineWidth=200.0)
-        # Add lines to continuum
-        luminosities += lineLuminosities
-        return wavelengths,luminosities        
-
-
-    def gaussianProfile(self,lineNames,lineWavelengths,wavelengths,MATCH,selectionMask=None,lineWidth=200.0):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name                
-        # Extract dataset information
-        component = MATCH.group(1)
-        frame = MATCH.group(3)
-        redshift = MATCH.group(4)
-        dust = MATCH.group(5)
-        if dust is None:
-            dust = ""
-        option = MATCH.group(6)
-        if option is None:
-            option = ""
-        # Select redshift output
-        out = self.galacticusOBJ.selectOutput(float(redshift))            
-        # Create variable to store sum of Gaussians
-        luminosities = None
-        # Function to compute luminosity
-        def _addLine(lineName,wavelength):
-            # Get dataset name
-            lineDatasetName = component+"LineLuminosity:"+lineName+":"+frame+":z"+redshift+dust+option
-            if lineDatasetName not in out["nodeData"].keys():
-                print("WARNING! "+funcname+"(): Cannot locate '"+lineDatasetName+"' for inclusion in SED. Will be skipped.")
-                return 
-            # Extract line luminosities
-            lineLuminosity = np.array(out["nodeData/"+lineDatasetName])
-            if selectionMask is not None:
-                lineLuminosity = lineLuminosity[selectionMask]
-            np.place(lineLuminosity,lineLuminosity<0.0,0.0)
-            lineLuminosity *= (luminositySolar/luminosityAB)
-            # Initialise array to store luminosities
-            if luminosities is None:
-                luminosities = np.zeros((len(lineLuminosity),len(wavelengths)),dtype=np.float64)
-                print luminosities.shape
-                quit()
-
-            # Extract rest wavelength            
-            restWavelength = self.EmissionLines.getWavelength(lineName)
-            # Compute FWHM (use fixed line width in km/s)
-            FWHM = restWavelength*(lineWidth/(speedOfLight/kilo))
-            # Compute sigma for Gaussian
-            sigma = FWHM/2.355
-            # Compute amplitude for Gaussian
-            amplitude = np.concatenate([lineLuminosity]*len(wavelengths)).reshape(len(lineLuminosity),-1)
-            amplitude /= (sigma*np.sqrt(2.0*Pi))
-            # Compute luminosity:
-            wavelengths = np.concatenate([wavelengths]*len(lineLuminosity)).reshape(-1,len(wavelengths))
-            luminosity = amplitude*np.exp(-((wavelengths-lineWavelength)**2)/(2.0*(sigma**2)))
-            # Add to sum of line luminosities
-            luminosities += luminosity 
-            # End of function
-            return
-        # Sum Gaussians
-        dummy = [_addLine(lineNames[i],lineWavelengths) for i in range(len(lineNames))]
-        del dummy
-        return luminosities
-
 
     def ergPerSecond(self,luminosity):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
@@ -249,18 +143,72 @@ class EmissionLineProfiles(object):
         return
 
     
-    def sumLineProfiles(self,MATCH,type='gaussian',lineWidth='fixed',fixedWidth=200.0):
+    def sumLineProfiles(self,MATCH,profile='gaussian',lineWidth='fixed',fixedWidth=200.0):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Sum profiles
-        dummy = [self.addLine(lineName,MATCH) for lineName in self.emissionLinesInRange]
+        dummy = [self.addLine(lineName,MATCH,profile=profile,lineWidth=lineWidth,fixedWidth=fixedWidth)\
+                     for lineName in self.emissionLinesInRange]
         # Return sum
         return self.profileSum
 
 
-
-    
-    
+    def addLine(self,lineName,MATCH,profile='gaussian',lineWidth='fixed',fixedWidth=200.0):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Extract dataset information
+        component = MATCH.group(1)
+        frame = MATCH.group(3)
+        redshift = MATCH.group(4)
+        dust = MATCH.group(5)
+        if dust is None:
+            dust = ""
+        option = MATCH.group(6)
+        if option is None:
+            option = ""
+        # Get dataset name
+        lineDatasetName = component+"LineLuminosity:"+lineName+":"+frame+":z"+redshift+dust+option
+        if lineDatasetName not in out["nodeData"].keys():
+            print("WARNING! "+funcname+"(): Cannot locate '"+lineDatasetName+"' for inclusion in SED. Will be skipped.")
+            return
+        # Get wavelength line is found at
+        iline = self.linesInRange.index(lineName)
+        lineWavelength = self.wavelengthsInRange[iline]
+        # Extract line luminosity
+        lineLuminosity = np.array(out["nodeData/"+lineDatasetName])
+        if selectionMask is not None:
+            lineLuminosity = lineLuminosity[selectionMask]
+        np.place(lineLuminosity,lineLuminosity<0.0,0.0)
+        lineLuminosity *= (luminositySolar/luminosityAB)        
+        # Compute FWHM (use fixed line width in km/s)
+        FWHM = self.getFWHM(lineName)
+        # Compute line profile
+        if fnmatch.fnmatch(profile.lower(),"gaus*"):
+            self.profileSum += self.gaussian(lineWavelength,lineLuminosity,FWHM)
+        else:
+            raise ValueError(funcname+"(): line profile must be Gaussian! Other profiles not yet implemented!")
+        return 
         
 
+    def getFWHM(self,lineName,lineWidth='fixed',fixedWidth=200.0):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Extract rest wavelength
+        restWavelength = self.EmissionLines.getWavelength(lineName)
+        # Compute FWHM
+        if lineWidth.lower() == "fixed":
+            FWHM = restWavelength*(fixedWidth/(speedOfLight/kilo))
+        else:
+            raise ValueError(funcname+"(): line width method must be 'fixed'! Other methods not yet implemented!")
+        return FWHM
+    
 
+    def gaussian(self,lineWavelength,lineLuminosity,FWHM):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Compute sigma for Gaussian
+        sigma = FWHM/2.355
+        # Compute amplitude for Gaussian
+        amplitude = np.concatenate([lineLuminosity]*len(self.sedWavelengths)).reshape(len(lineLuminosity),-1)
+        amplitude /= (sigma*np.sqrt(2.0*Pi))
+        # Compute luminosity
+        wavelengths = np.concatenate([self.sedWavelengths]*len(lineLuminosity)).reshape(-1,len(self.sedWavelengths))
+        luminosity = amplitude*np.exp(-((wavelengths-lineWavelength)**2)/(2.0*(sigma**2)))
+        return luminosity
 
