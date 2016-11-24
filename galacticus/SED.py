@@ -6,7 +6,7 @@ from scipy.interpolate import interp1d
 from galacticus.io import GalacticusHDF5
 from galacticus.EmissionLines import GalacticusEmissionLines
 from galacticus.Luminosities import ergPerSecond
-from galacticus.constants import erg,luminosityAB,luminositySolar,jansky
+from galacticus.constants import erg,luminosityAB,luminositySolar,jansky,kilo
 from galacticus.constants import angstrom,megaParsec,Pi,speedOfLight,centi
 
 
@@ -88,27 +88,75 @@ class GalacticusSED(object):
         wavelengths = np.sort(np.unique(np.array(wavelengths)))
         # Interpolate to get continuum luminosity at each wavelength
         luminosities = interpLuminosity(wavelengths)
-        # Get output for redshift
-        out = self.galacticusOBJ.selectOutput(float(redshift))
-        # Add emission lines in as delta functions
-        def _addLuminosity(lineName,wavelength):            
-            iarg = np.argwhere(np.fabs(wavelengths-wavelength)<buffer)[0][0]
+        
+        print wavelengths.shape,luminosities.shape
+
+        # Add emission line luminosities
+        lineLuminosities = self.gaussianProfile(linesInRange,wavelengthsInRange,wavelengths,MATCH,selectionMask=selectionMask,lineWidth=200.0)
+        # Add lines to continuum
+        luminosities += lineLuminosities
+        return wavelengths,luminosities        
+
+
+    def gaussianProfile(self,lineNames,lineWavelengths,wavelengths,MATCH,selectionMask=None,lineWidth=200.0):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name                
+        # Extract dataset information
+        component = MATCH.group(1)
+        frame = MATCH.group(3)
+        redshift = MATCH.group(4)
+        dust = MATCH.group(5)
+        if dust is None:
+            dust = ""
+        option = MATCH.group(6)
+        if option is None:
+            option = ""
+        # Select redshift output
+        out = self.galacticusOBJ.selectOutput(float(redshift))            
+        # Create variable to store sum of Gaussians
+        luminosities = None
+        # Function to compute luminosity
+        def _addLine(lineName,wavelength):
+            # Get dataset name
             lineDatasetName = component+"LineLuminosity:"+lineName+":"+frame+":z"+redshift+dust+option
             if lineDatasetName not in out["nodeData"].keys():
                 print("WARNING! "+funcname+"(): Cannot locate '"+lineDatasetName+"' for inclusion in SED. Will be skipped.")
-            else:                
-                lineLuminosity = np.array(out["nodeData/"+lineDatasetName])
-                if selectionMask is not None:
-                    lineLuminosity = lineLuminosity[selectionMask]
-                np.place(lineLuminosity,lineLuminosity<0.0,0.0)
-                luminosities[:,iarg] += lineLuminosity*(luminositySolar/luminosityAB)
-        dummy = [_addLuminosity(linesInRange[i],wavelengthsInRange[i]) for i in range(len(linesInRange))]
+                return 
+            # Extract line luminosities
+            lineLuminosity = np.array(out["nodeData/"+lineDatasetName])
+            if selectionMask is not None:
+                lineLuminosity = lineLuminosity[selectionMask]
+            np.place(lineLuminosity,lineLuminosity<0.0,0.0)
+            lineLuminosity *= (luminositySolar/luminosityAB)
+            # Initialise array to store luminosities
+            if luminosities is None:
+                luminosities = np.zeros((len(lineLuminosity),len(wavelengths)),dtype=np.float64)
+                print luminosities.shape
+                quit()
+
+            # Extract rest wavelength            
+            restWavelength = self.EmissionLines.getWavelength(lineName)
+            # Compute FWHM (use fixed line width in km/s)
+            FWHM = restWavelength*(lineWidth/(speedOfLight/kilo))
+            # Compute sigma for Gaussian
+            sigma = FWHM/2.355
+            # Compute amplitude for Gaussian
+            amplitude = np.concatenate([lineLuminosity]*len(wavelengths)).reshape(len(lineLuminosity),-1)
+            amplitude /= (sigma*np.sqrt(2.0*Pi))
+            # Compute luminosity:
+            wavelengths = np.concatenate([wavelengths]*len(lineLuminosity)).reshape(-1,len(wavelengths))
+            luminosity = amplitude*np.exp(-((wavelengths-lineWavelength)**2)/(2.0*(sigma**2)))
+            # Add to sum of line luminosities
+            luminosities += luminosity 
+            # End of function
+            return
+        # Sum Gaussians
+        dummy = [_addLine(lineNames[i],lineWavelengths) for i in range(len(lineNames))]
         del dummy
-        return wavelengths,luminosities        
-        
+        return luminosities
 
 
     def ergPerSecond(self,luminosity):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         luminosity = np.log10(luminosity)
         luminosity += np.log10(luminosityAB)
         luminosity -= np.log10(erg)
@@ -123,6 +171,7 @@ class GalacticusSED(object):
             raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
         # Extract necessary information
         redshift = float(MATCH.group(4))
+        frame = MATCH.group(3)
         # Identify top hat filters
         search = datasetName.replace("SED:","LuminositiesStellar:topHat_*_")    
         topHatNames = fnmatch.filter(list(map(str,self.galacticusOBJ.availableDatasets(redshift))),search)
@@ -146,7 +195,9 @@ class GalacticusSED(object):
         del dummy,luminosities
         # Introduce emission lines
         if includeEmissionLines:
-            wavelengths,sed = self.addEmissionLines(wavelengths,sed,MATCH,selectionMask=selectionMask)            
+            LINES = EmissionLineProfiles(self.galacticusOBJ,frame,redshift,wavelengths,selectionMask=selectionMask,verbose=self._verbose)
+            if not len(LINES.emissionLinesInRange) == 0:
+                sed += LINES.sumLineProfiles(MATCH,type='gaussian')
         # Convert units to microJanskys
         sed = self.ergPerSecond(sed)
         comDistance = self.galacticusOBJ.cosmology.comoving_distance(redshift)*megaParsec/centi
@@ -161,7 +212,54 @@ class GalacticusSED(object):
         
         
 
+class EmissionLineProfiles(object):
+    
+    def __init_(self,galObj,frame,redshift,wavelengths,selectionMask=None,verbose=False):
+        classname = self.__class__.__name__
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Store GalacticusHDF5 object
+        self.galacticusOBJ = galObj
+        # Store redshift
+        self.redshift = redshift
+        # Store frame
+        self.frame = frame
+        # Store wavelengths
+        self.sedWavelengths = wavelengths
+        # Crete emission lines object
+        self.EmissionLines = GalacticusEmissionLines()        
+        # Check for any emission lines inside wavelength range
+        lines = np.array(self.EmissionLines.getLineNames())
+        if self.frame == "rest":
+            effectiveWavelengths = np.array([self.EmissionLines.getWavelength(name) for name in lines])
+        else:
+            effectiveWavelengths = np.array([self.EmissionLines.getWavelength(name,redshift=float(redshift)) for name in lines])
+        self.emissionLinesInRange = np.logical_and(effectiveWavelengths>=self.sedWavelengths.min(),effectiveWavelengths<=sedWavelengths.max())
+        # Exit here if no lines in range
+        if len(self.emissionLinesInRange) == 0:
+            return
+        # Store wavelengths the lines appear at
+        self.wavelengthsInRange = effectiveWavelengths[emissionLinesInRange]
+        # Store selection mask to apply to galaxies
+        self.selectionMask = selectionMask
+        # Store redshift output
+        self.OUT = self.galacticusOBJ.selectOutput(redshift)
+        # Create 2D array to store sum of line profiles 
+        ngals = len(np.array(self.OUT["nodeData/nodeIndex"]))
+        self.profileSum = np.zeros(ngals,len(self.wavelengths))
+        return
 
+    
+    def sumLineProfiles(self,MATCH,type='gaussian',lineWidth='fixed',fixedWidth=200.0):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Sum profiles
+        dummy = [self.addLine(lineName,MATCH) for lineName in self.emissionLinesInRange]
+        # Return sum
+        return self.profileSum
+
+
+
+    
+    
         
 
 
