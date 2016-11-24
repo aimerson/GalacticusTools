@@ -2,7 +2,6 @@
 
 import sys,os,fnmatch,re
 import numpy as np
-from scipy.interpolate import interp1d
 from galacticus.io import GalacticusHDF5
 from galacticus.EmissionLines import GalacticusEmissionLines
 from galacticus.Luminosities import ergPerSecond
@@ -92,6 +91,7 @@ class GalacticusSED(object):
             LINES = EmissionLineProfiles(self.galacticusOBJ,frame,redshift,wavelengths,selectionMask=selectionMask,verbose=self._verbose)
             if not len(LINES.linesInRange) == 0:
                 sed += LINES.sumLineProfiles(MATCH,profile='gaussian')
+                #sed = np.maximum(sed,LINES.sumLineProfiles(MATCH,profile='gaussian'))
         # Convert units to microJanskys
         sed = self.ergPerSecond(sed)
         comDistance = self.galacticusOBJ.cosmology.comoving_distance(redshift)*megaParsec/centi
