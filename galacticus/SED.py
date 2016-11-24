@@ -90,8 +90,8 @@ class GalacticusSED(object):
         # Introduce emission lines
         if includeEmissionLines:
             LINES = EmissionLineProfiles(self.galacticusOBJ,frame,redshift,wavelengths,selectionMask=selectionMask,verbose=self._verbose)
-            if not len(LINES.emissionLinesInRange) == 0:
-                sed += LINES.sumLineProfiles(MATCH,type='gaussian')
+            if not len(LINES.linesInRange) == 0:
+                sed += LINES.sumLineProfiles(MATCH,profile='gaussian')
         # Convert units to microJanskys
         sed = self.ergPerSecond(sed)
         comDistance = self.galacticusOBJ.cosmology.comoving_distance(redshift)*megaParsec/centi
@@ -108,7 +108,7 @@ class GalacticusSED(object):
 
 class EmissionLineProfiles(object):
     
-    def __init_(self,galObj,frame,redshift,wavelengths,selectionMask=None,verbose=False):
+    def __init__(self,galObj,frame,redshift,wavelengths,selectionMask=None,verbose=False):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Store GalacticusHDF5 object
@@ -127,9 +127,10 @@ class EmissionLineProfiles(object):
             effectiveWavelengths = np.array([self.EmissionLines.getWavelength(name) for name in lines])
         else:
             effectiveWavelengths = np.array([self.EmissionLines.getWavelength(name,redshift=float(redshift)) for name in lines])
-        self.emissionLinesInRange = np.logical_and(effectiveWavelengths>=self.sedWavelengths.min(),effectiveWavelengths<=sedWavelengths.max())
+        emissionLinesInRange = np.logical_and(effectiveWavelengths>=self.sedWavelengths.min(),effectiveWavelengths<=self.sedWavelengths.max())
+        self.linesInRange = lines[emissionLinesInRange]
         # Exit here if no lines in range
-        if len(self.emissionLinesInRange) == 0:
+        if len(self.linesInRange) == 0:
             return
         # Store wavelengths the lines appear at
         self.wavelengthsInRange = effectiveWavelengths[emissionLinesInRange]
@@ -139,7 +140,7 @@ class EmissionLineProfiles(object):
         self.OUT = self.galacticusOBJ.selectOutput(redshift)
         # Create 2D array to store sum of line profiles 
         ngals = len(np.array(self.OUT["nodeData/nodeIndex"]))
-        self.profileSum = np.zeros(ngals,len(self.wavelengths))
+        self.profileSum = np.zeros((ngals,len(self.sedWavelengths)),dtype=np.float64)
         return
 
     
@@ -147,7 +148,7 @@ class EmissionLineProfiles(object):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Sum profiles
         dummy = [self.addLine(lineName,MATCH,profile=profile,lineWidth=lineWidth,fixedWidth=fixedWidth)\
-                     for lineName in self.emissionLinesInRange]
+                     for lineName in self.linesInRange]
         # Return sum
         return self.profileSum
 
@@ -166,16 +167,16 @@ class EmissionLineProfiles(object):
             option = ""
         # Get dataset name
         lineDatasetName = component+"LineLuminosity:"+lineName+":"+frame+":z"+redshift+dust+option
-        if lineDatasetName not in out["nodeData"].keys():
+        if lineDatasetName not in self.OUT["nodeData"].keys():
             print("WARNING! "+funcname+"(): Cannot locate '"+lineDatasetName+"' for inclusion in SED. Will be skipped.")
             return
         # Get wavelength line is found at
-        iline = self.linesInRange.index(lineName)
-        lineWavelength = self.wavelengthsInRange[iline]
+        iline = np.argwhere(self.linesInRange==lineName)[0]
+        lineWavelength = self.wavelengthsInRange[iline][0]
         # Extract line luminosity
-        lineLuminosity = np.array(out["nodeData/"+lineDatasetName])
-        if selectionMask is not None:
-            lineLuminosity = lineLuminosity[selectionMask]
+        lineLuminosity = np.array(self.OUT["nodeData/"+lineDatasetName])
+        if self.selectionMask is not None:
+            lineLuminosity = lineLuminosity[self.selectionMask]
         np.place(lineLuminosity,lineLuminosity<0.0,0.0)
         lineLuminosity *= (luminositySolar/luminosityAB)        
         # Compute FWHM (use fixed line width in km/s)
@@ -194,7 +195,8 @@ class EmissionLineProfiles(object):
         restWavelength = self.EmissionLines.getWavelength(lineName)
         # Compute FWHM
         if lineWidth.lower() == "fixed":
-            FWHM = restWavelength*(fixedWidth/(speedOfLight/kilo))
+            c = speedOfLight/kilo
+            FWHM = restWavelength*(fixedWidth/c)
         else:
             raise ValueError(funcname+"(): line width method must be 'fixed'! Other methods not yet implemented!")
         return FWHM
@@ -205,7 +207,7 @@ class EmissionLineProfiles(object):
         # Compute sigma for Gaussian
         sigma = FWHM/2.355
         # Compute amplitude for Gaussian
-        amplitude = np.concatenate([lineLuminosity]*len(self.sedWavelengths)).reshape(len(lineLuminosity),-1)
+        amplitude = np.stack([lineLuminosity]*len(self.sedWavelengths),axis=1).reshape(len(lineLuminosity),-1)                
         amplitude /= (sigma*np.sqrt(2.0*Pi))
         # Compute luminosity
         wavelengths = np.concatenate([self.sedWavelengths]*len(lineLuminosity)).reshape(-1,len(self.sedWavelengths))
