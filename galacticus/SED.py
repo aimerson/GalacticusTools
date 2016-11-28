@@ -63,8 +63,9 @@ class GalacticusSED(object):
         if not MATCH:
             raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
         # Extract necessary information
-        redshift = float(MATCH.group(4))
+        resolution = float(MATCH.group(2))
         frame = MATCH.group(3)
+        redshift = float(MATCH.group(4))
         # Identify top hat filters
         search = datasetName.replace("SED:","LuminositiesStellar:topHat_*_")    
         topHatNames = fnmatch.filter(list(map(str,self.galacticusOBJ.availableDatasets(redshift))),search)
@@ -88,7 +89,8 @@ class GalacticusSED(object):
         del dummy,luminosities
         # Introduce emission lines
         if includeEmissionLines:
-            LINES = EmissionLineProfiles(self.galacticusOBJ,frame,redshift,wavelengths,selectionMask=selectionMask,verbose=self._verbose)
+            LINES = EmissionLineProfiles(self.galacticusOBJ,frame,redshift,wavelengths,resolution=resolution,\
+                                             selectionMask=selectionMask,verbose=self._verbose)
             if not len(LINES.linesInRange) == 0:
                 sed += LINES.sumLineProfiles(MATCH,profile='gaussian')
                 #sed = np.maximum(sed,LINES.sumLineProfiles(MATCH,profile='gaussian'))
@@ -108,7 +110,7 @@ class GalacticusSED(object):
 
 class EmissionLineProfiles(object):
     
-    def __init__(self,galObj,frame,redshift,wavelengths,selectionMask=None,verbose=False):
+    def __init__(self,galObj,frame,redshift,wavelengths,resolution=None,selectionMask=None,verbose=False):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Store GalacticusHDF5 object
@@ -119,6 +121,8 @@ class EmissionLineProfiles(object):
         self.frame = frame
         # Store wavelengths
         self.sedWavelengths = wavelengths
+        # Store SED resolution (if desired)
+        self.resolution = resolution
         # Crete emission lines object
         self.EmissionLines = GalacticusEmissionLines()        
         # Check for any emission lines inside wavelength range
@@ -180,7 +184,11 @@ class EmissionLineProfiles(object):
         np.place(lineLuminosity,lineLuminosity<0.0,0.0)
         lineLuminosity *= (luminositySolar/luminosityAB)        
         # Compute FWHM (use fixed line width in km/s)
-        FWHM = self.getFWHM(lineName)
+        FWHM = self.getFWHM(lineName)        
+        # Check if FWHM larger than resolution (if resolution speciied)
+        if self.resolution is not None:
+            resolutionLimit = lineWavelength/self.resolution
+            FWHM = np.maxiumum(FMWH,resolutionLimit)
         # Compute line profile
         if fnmatch.fnmatch(profile.lower(),"gaus*"):
             self.profileSum += self.gaussian(lineWavelength,lineLuminosity,FWHM)
@@ -195,10 +203,11 @@ class EmissionLineProfiles(object):
         restWavelength = self.EmissionLines.getWavelength(lineName)
         # Compute FWHM
         if lineWidth.lower() == "fixed":
-            c = speedOfLight/kilo
-            FWHM = restWavelength*(fixedWidth/c)
+            widthVelocity = fixedWidth
         else:
             raise ValueError(funcname+"(): line width method must be 'fixed'! Other methods not yet implemented!")
+        c = speedOfLight/kilo
+        FWHM = restWavelength*(widthVelocity/c)            
         return FWHM
     
 
