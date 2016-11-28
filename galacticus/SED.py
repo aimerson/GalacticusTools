@@ -188,7 +188,7 @@ class EmissionLineProfiles(object):
         # Check if FWHM larger than resolution (if resolution speciied)
         if self.resolution is not None:
             resolutionLimit = lineWavelength/self.resolution
-            FWHM = np.maximum(FMWH,resolutionLimit)
+            FWHM = np.maximum(FWHM,resolutionLimit)
         # Compute line profile
         if fnmatch.fnmatch(profile.lower(),"gaus*"):
             self.profileSum += self.gaussian(lineWavelength,lineLuminosity,FWHM)
