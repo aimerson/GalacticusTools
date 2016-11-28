@@ -56,7 +56,8 @@ class GalacticusSED(object):
         luminosity = 10.0**luminosity
         return luminosity
         
-    def getSED(self,datasetName,selectionMask=None,includeEmissionLines=True):
+    def getSED(self,datasetName,selectionMask=None,includeEmissionLines=True,\
+                   lineProfile="gaussian",lineWidth='fixed',fixedWidth=200.0):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Check dataset name correspnds to an SED
         MATCH = re.search(r"^(disk|spheroid|total)SED:([^:]+):([^:]+):z([\d\.]+)(:dust[^:]+)?(:recent)?",datasetName)
@@ -92,7 +93,7 @@ class GalacticusSED(object):
             LINES = EmissionLineProfiles(self.galacticusOBJ,frame,redshift,wavelengths,resolution=resolution,\
                                              selectionMask=selectionMask,verbose=self._verbose)
             if not len(LINES.linesInRange) == 0:
-                sed += LINES.sumLineProfiles(MATCH,profile='gaussian')
+                sed += LINES.sumLineProfiles(MATCH,profile=lineProfile,lineWidth=lineWidth,fixedWidth=fixedWidth)
                 #sed = np.maximum(sed,LINES.sumLineProfiles(MATCH,profile='gaussian'))
         # Convert units to microJanskys
         sed = self.ergPerSecond(sed)
