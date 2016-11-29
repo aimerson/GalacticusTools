@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 
-import sys,os,re,fnamtch
+import sys,os,re,fnmatch
+import numpy as np
 from .utils.progress import Progress
 from .io import GalacticusHDF5
 from .GalacticusErrors import ParseError
@@ -44,7 +45,7 @@ class GalacticusMagnitudes(object):
             dustExtension = ""
         vegaMagnitude = MATCH.group(6) == "vega"
         # Get luminosity dataset
-        luminosityDataset = component.lower()+"LuminosityStellar:"+filterName+":"+frame+"z"+z+dustExtension
+        luminosityDataset = component.lower()+"LuminositiesStellar:"+filterName+":"+frame+":z"+redshift+dustExtension
         luminosity = getLuminosity(galHDF5Obj,z,luminosityDataset,overwrite=overwrite)
         # Compute magnitude
         magnitude = -2.5*np.log10(luminosity+1.0e-40)
