@@ -2,12 +2,12 @@
 
 import sys,os,fnmatch,re
 import numpy as np
-from galacticus.io import GalacticusHDF5
-from galacticus.EmissionLines import GalacticusEmissionLines
-from galacticus.Luminosities import ergPerSecond
-from galacticus.constants import erg,luminosityAB,luminositySolar,jansky,kilo
-from galacticus.constants import angstrom,megaParsec,Pi,speedOfLight,centi
-
+from .io import GalacticusHDF5
+from .EmissionLines import GalacticusEmissionLines
+from .Luminosities import ergPerSecond
+from .constants import erg,luminosityAB,luminositySolar,jansky,kilo
+from .constants import angstrom,megaParsec,Pi,speedOfLight,centi
+from .Inclination import getInclination
 
 class GalacticusSED(object):
     
@@ -196,7 +196,34 @@ class EmissionLineProfiles(object):
         else:
             raise ValueError(funcname+"(): line profile must be Gaussian! Other profiles not yet implemented!")
         return 
+
+
+    def getApproximateVelocityDispersion(self,scaleVelocityRatio=0.1):
+        """
         
+        diskVelocityDispersion = diskVelocity * SQRT(sin(inclination)**2+(scaleVelocityRatio*cos(inclination))**2)
+
+        """
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Approximate spheroid velocity dispersion using spheroid 'rotation velocity'
+        approximateVelocityDispersion = np.copy(np.array(self.OUT["nodeData/spheroidVelocity"]))
+        # Determine spheroid-to-total mass ratio
+        baryonicSpheroidMass = np.copy(np.array(self.OUT["nodeData/spheroidMassStellar"])) + \
+            np.copy(np.array(self.OUT["nodeData/spheroidMassGas"]))
+        baryonicDiskMass = np.copy(np.array(self.OUT["nodeData/diskMassStellar"])) + \
+            np.copy(np.array(self.OUT["nodeData/diskMassGas"]))
+        baryonicSpheroidToTotalRatio = baryonicSpheroidMass/(baryonicSpheroidMass+baryonicDiskMass)
+        # Check if any disk-dominated galaxies in dataset and replace corresponding velocities
+        diskDominated = baryonicSpheroidToTotalRatio<0.5
+        if any(diskDominated):
+            # Approximate disk velocity dispersion using combiantion of disk rotational velocity
+            # and disk vertical velocity (computed as fraction of rotation velocity)
+            diskVelocity = np.copy(np.array(self.OUT["nodeData/diskVelocity"]))
+            inclination = getInclination(self.galacticusOBJ,self.redshift)*Pi/180.0
+            diskVelocity *= np.sqrt(np.sin(inclination)**2+(scaleVelocityRatio*np.cos(inclination))**2)            
+            np.place(approximateVelocityDispersion,diskDominated,diskVelocity[diskDominated])
+        return approximateVelocityDispersion
+
 
     def getFWHM(self,lineName,lineWidth='fixed',fixedWidth=200.0):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
