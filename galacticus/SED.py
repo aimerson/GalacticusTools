@@ -186,7 +186,7 @@ class EmissionLineProfiles(object):
         np.place(lineLuminosity,lineLuminosity<0.0,0.0)
         lineLuminosity *= (luminositySolar/luminosityAB)        
         # Compute FWHM (use fixed line width in km/s)
-        FWHM = self.getFWHM(lineName)        
+        FWHM = self.getFWHM(lineName,lineWidth=lineWidth,fixedWidth=fixedWidth)        
         # Check if FWHM larger than resolution (if resolution speciied)
         if self.resolution is not None:
             resolutionLimit = lineWavelength/self.resolution
