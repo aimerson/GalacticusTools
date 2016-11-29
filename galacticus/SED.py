@@ -55,6 +55,7 @@ class GalacticusSED(object):
         luminosity -= np.log10(erg)
         luminosity = 10.0**luminosity
         return luminosity
+
         
     def getSED(self,datasetName,selectionMask=None,includeEmissionLines=True,\
                    lineProfile="gaussian",lineWidth='fixed',fixedWidth=200.0):
@@ -99,10 +100,10 @@ class GalacticusSED(object):
         sed = self.ergPerSecond(sed)
         comDistance = self.galacticusOBJ.cosmology.comoving_distance(redshift)*megaParsec/centi
         sed /= 4.0*Pi*comDistance**2
-        frequency = speedOfLight/np.stack([wavelengths]*ngals)*angstrom
-        sed = sed/np.copy(frequency)
+        #frequency = speedOfLight/np.stack([wavelengths]*ngals)*angstrom
+        #sed = sed/np.copy(frequency)
         sed /= jansky
-        del frequency
+        #del frequency
         sed *= 1.0e6
         return wavelengths,sed
         

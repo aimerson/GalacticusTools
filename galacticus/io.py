@@ -56,7 +56,8 @@ class GalacticusHDF5(HDF5):
                                        omegab=float(self.parameters["OmegaBaryon"]),\
                                        h0=float(self.parameters["HubbleConstant"])/100.0,\
                                        sigma8=float(self.parameters["sigma_8"]),\
-                                       ns=float(self.parameters["index"]))
+                                       ns=float(self.parameters["index"]),\
+                                       h_independent=False)
         
         return
     
