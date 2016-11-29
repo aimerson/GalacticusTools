@@ -145,7 +145,10 @@ class EmissionLineProfiles(object):
         # Store redshift output
         self.OUT = self.galacticusOBJ.selectOutput(redshift)
         # Create 2D array to store sum of line profiles 
-        ngals = len(np.array(self.OUT["nodeData/nodeIndex"]))
+        if self.selectionMask is None:
+            ngals = len(np.array(self.OUT["nodeData/nodeIndex"]))
+        else:
+            ngals = len(np.array(self.OUT["nodeData/nodeIndex"])[self.selectionMask])
         self.profileSum = np.zeros((ngals,len(self.sedWavelengths)),dtype=np.float64)
         return
 
@@ -156,6 +159,8 @@ class EmissionLineProfiles(object):
         dummy = [self.addLine(lineName,MATCH,profile=profile,lineWidth=lineWidth,fixedWidth=fixedWidth)\
                      for lineName in self.linesInRange]
         # Return sum
+        frequency = speedOfLight/np.stack([self.sedWavelengths]*self.profileSum.shape[0])*angstrom
+        self.profileSum /= frequency
         return self.profileSum
 
 
@@ -176,7 +181,7 @@ class EmissionLineProfiles(object):
         if lineDatasetName not in self.OUT["nodeData"].keys():
             print("WARNING! "+funcname+"(): Cannot locate '"+lineDatasetName+"' for inclusion in SED. Will be skipped.")
             return
-        # Get wavelength line is found at
+        # Get observed wavelength of line 
         iline = np.argwhere(self.linesInRange==lineName)[0]
         lineWavelength = self.wavelengthsInRange[iline][0]
         # Extract line luminosity
@@ -184,10 +189,9 @@ class EmissionLineProfiles(object):
         if self.selectionMask is not None:
             lineLuminosity = lineLuminosity[self.selectionMask]
         np.place(lineLuminosity,lineLuminosity<0.0,0.0)
-        lineLuminosity *= (luminositySolar/luminosityAB)        
         # Compute FWHM (use fixed line width in km/s)
         FWHM = self.getFWHM(lineName,lineWidth=lineWidth,fixedWidth=fixedWidth)        
-        # Check if FWHM larger than resolution (if resolution speciied)
+        # Check if FWHM larger than resolution (if resolution specified)
         if self.resolution is not None:
             resolutionLimit = lineWavelength/self.resolution
             FWHM = np.maximum(FWHM,resolutionLimit)
@@ -249,7 +253,7 @@ class EmissionLineProfiles(object):
         sigma = FWHM/(2.0*np.sqrt(2.0*np.log(2.0)))
         # Compute amplitude for Gaussian
         amplitude = np.stack([lineLuminosity]*len(self.sedWavelengths),axis=1).reshape(len(lineLuminosity),-1)                
-        amplitude /= (sigma*np.sqrt(2.0*Pi))
+        amplitude /= (sigma*np.sqrt(2.0*Pi))        
         # Compute luminosity
         wavelengths = np.concatenate([self.sedWavelengths]*len(lineLuminosity)).reshape(-1,len(self.sedWavelengths))
         luminosity = amplitude*np.exp(-((wavelengths-lineWavelength)**2)/(2.0*(sigma**2)))
