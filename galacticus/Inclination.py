@@ -23,7 +23,7 @@ def Generate_Random_Inclinations(N,degrees=True):
     angles = np.arccos(np.random.rand(N))
     if degrees:
         angles *= 180.0/Pi
-    return 
+    return angles
 
 
 def getInclination(galHDF5Obj,z,overwrite=False,returnDataset=True):
@@ -53,7 +53,7 @@ def getInclination(galHDF5Obj,z,overwrite=False,returnDataset=True):
     N = len(np.array(out["nodeData/nodeIndex"]))
     inclination = Generate_Random_Inclinations(N)
     # Write dataset to file
-    galHDF5Obj.addDataset(out.name+"/nodeData/","inclination",inclination)
+    galHDF5Obj.addDataset(out.name+"/nodeData/","inclination",inclination,overwrite=overwrite)
     if returnDataset:
         return inclination
     return
