@@ -233,6 +233,9 @@ class EmissionLineProfiles(object):
         # Compute FWHM
         if lineWidth.lower() == "fixed":
             widthVelocity = fixedWidth
+        elif fnmatch.fnmatch(lineWidth.lower(),"approx*"):
+            widthVelocity = self.getApproximateVelocityDispersion(scaleVelocityRatio=0.1)
+            widthVelocity = np.stack([widthVelocity]*len(self.sedWavelengths),axis=1).reshape(len(widthVelocity),-1)
         else:
             raise ValueError(funcname+"(): line width method must be 'fixed'! Other methods not yet implemented!")
         c = speedOfLight/kilo
@@ -243,7 +246,7 @@ class EmissionLineProfiles(object):
     def gaussian(self,lineWavelength,lineLuminosity,FWHM):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Compute sigma for Gaussian
-        sigma = FWHM/2.355
+        sigma = FWHM/(2.0*np.sqrt(2.0*np.log(2.0)))
         # Compute amplitude for Gaussian
         amplitude = np.stack([lineLuminosity]*len(self.sedWavelengths),axis=1).reshape(len(lineLuminosity),-1)                
         amplitude /= (sigma*np.sqrt(2.0*Pi))
