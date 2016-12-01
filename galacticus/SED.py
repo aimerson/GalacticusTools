@@ -8,6 +8,7 @@ from .Luminosities import ergPerSecond
 from .constants import erg,luminosityAB,luminositySolar,jansky,kilo
 from .constants import angstrom,megaParsec,Pi,speedOfLight,centi
 from .Inclination import getInclination
+from .GalacticusErrors import ParseError
 
 class GalacticusSED(object):
     
@@ -40,7 +41,7 @@ class GalacticusSED(object):
     def getSEDLuminosity(self,topHatName,redshift,selectionMask=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Get output for redshift
-        out = self.galacticusOBJ.selectOutput(redshift)
+        out = self.galacticusOBJ.selectOutput(float(redshift))
         # Get stellar luminosity
         luminosity = np.array(out["nodeData/"+topHatName])
         if selectionMask is not None:
@@ -61,23 +62,36 @@ class GalacticusSED(object):
                    lineProfile="gaussian",lineWidth='fixed',fixedWidth=200.0):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Check dataset name correspnds to an SED
-        MATCH = re.search(r"^(disk|spheroid|total)SED:([^:]+):([^:]+):z([\d\.]+)(:dust[^:]+)?(:recent)?",datasetName)
+        MATCH = re.search(r"^(disk|spheroid|total)SED:([^:]+):([^:]+)(:[^:]+)?:z([\d\.]+)(:dust[^:]+)?(:recent)?",datasetName)
         if not MATCH:
             raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
         # Extract necessary information
-        resolution = float(MATCH.group(2))
-        frame = MATCH.group(3)
-        redshift = float(MATCH.group(4))
+        component = MATCH.group(1)
+        resolution = MATCH.group(2)
+        frame = MATCH.group(3)        
+        lineInformation = MATCH.group(4)        
+        if lineInformation is None:
+            lineInformation = ""
+            includeEmissionLines = False
+        else:
+            includeEmissionLines = True
+        redshift = MATCH.group(5)
+        dust = MATCH.group(6)
+        if dust is None:
+            dust = ""
+        option = MATCH.group(7)
+        if option is None:
+            option = ""
         # Identify top hat filters
-        search = datasetName.replace("SED:","LuminositiesStellar:topHat_*_")    
-        topHatNames = fnmatch.filter(list(map(str,self.galacticusOBJ.availableDatasets(redshift))),search)
+        search = component + "LuminositiesStellar:topHat_*_" + resolution + ":" + frame + ":z" + redshift + dust + option
+        topHatNames = fnmatch.filter(list(map(str,self.galacticusOBJ.availableDatasets(float(redshift)))),search)
         # Extract wavelengths and then sort wavelengths and top hat names according to wavelength
         wavelengths = np.array([float(topHat.split("_")[1]) for topHat in topHatNames])
         isort = np.argsort(wavelengths)
         wavelengths = wavelengths[isort]
         topHatNames = list(np.array(topHatNames)[isort])
         # Construct 2D array of galaxy SEDs         
-        out = self.galacticusOBJ.selectOutput(redshift)
+        out = self.galacticusOBJ.selectOutput(float(redshift))
         ngals = len(np.array(out["nodeData/"+topHatNames[0]]))
         if selectionMask is None:
             selectionMask = np.ones(ngals,dtype=bool)
@@ -94,16 +108,13 @@ class GalacticusSED(object):
             LINES = EmissionLineProfiles(self.galacticusOBJ,frame,redshift,wavelengths,resolution=resolution,\
                                              selectionMask=selectionMask,verbose=self._verbose)
             if not len(LINES.linesInRange) == 0:
-                sed += LINES.sumLineProfiles(MATCH,profile=lineProfile,lineWidth=lineWidth,fixedWidth=fixedWidth)
+                sed += LINES.sumLineProfiles(MATCH)
                 #sed = np.maximum(sed,LINES.sumLineProfiles(MATCH,profile='gaussian'))
         # Convert units to microJanskys
         sed = self.ergPerSecond(sed)
-        comDistance = self.galacticusOBJ.cosmology.comoving_distance(redshift)*megaParsec/centi
+        comDistance = self.galacticusOBJ.cosmology.comoving_distance(float(redshift))*megaParsec/centi
         sed /= 4.0*Pi*comDistance**2
-        #frequency = speedOfLight/np.stack([wavelengths]*ngals)*angstrom
-        #sed = sed/np.copy(frequency)
         sed /= jansky
-        #del frequency
         sed *= 1.0e6
         return wavelengths,sed
         
@@ -143,7 +154,7 @@ class EmissionLineProfiles(object):
         # Store selection mask to apply to galaxies
         self.selectionMask = selectionMask
         # Store redshift output
-        self.OUT = self.galacticusOBJ.selectOutput(redshift)
+        self.OUT = self.galacticusOBJ.selectOutput(float(redshift))
         # Create 2D array to store sum of line profiles 
         if self.selectionMask is None:
             ngals = len(np.array(self.OUT["nodeData/nodeIndex"]))
@@ -156,26 +167,31 @@ class EmissionLineProfiles(object):
     def sumLineProfiles(self,MATCH,profile='gaussian',lineWidth='fixed',fixedWidth=200.0):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Sum profiles
-        dummy = [self.addLine(lineName,MATCH,profile=profile,lineWidth=lineWidth,fixedWidth=fixedWidth)\
-                     for lineName in self.linesInRange]
+        dummy = [self.addLine(lineName,MATCH) for lineName in self.linesInRange]
         # Return sum
         frequency = speedOfLight/np.stack([self.sedWavelengths]*self.profileSum.shape[0])*angstrom
         self.profileSum /= frequency
         return self.profileSum
 
 
-    def addLine(self,lineName,MATCH,profile='gaussian',lineWidth='fixed',fixedWidth=200.0):
+    def addLine(self,lineName,MATCH):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Extract dataset information
         component = MATCH.group(1)
+        resolution = MATCH.group(2)
         frame = MATCH.group(3)
-        redshift = MATCH.group(4)
-        dust = MATCH.group(5)
+        lineInformation = MATCH.group(4)
+        redshift = MATCH.group(5)
+        dust = MATCH.group(6)
         if dust is None:
             dust = ""
-        option = MATCH.group(6)
+        option = MATCH.group(7)
         if option is None:
             option = ""
+        # Extra line profile information
+        INFO = re.search(r"^:([^_]+)_([^_]+)",lineInformation)
+        profile = INFO.group(1)
+        lineWidth = INFO.group(2)
         # Get dataset name
         lineDatasetName = component+"LineLuminosity:"+lineName+":"+frame+":z"+redshift+dust+option
         if lineDatasetName not in self.OUT["nodeData"].keys():
@@ -190,10 +206,10 @@ class EmissionLineProfiles(object):
             lineLuminosity = lineLuminosity[self.selectionMask]
         np.place(lineLuminosity,lineLuminosity<0.0,0.0)
         # Compute FWHM (use fixed line width in km/s)
-        FWHM = self.getFWHM(lineName,lineWidth=lineWidth,fixedWidth=fixedWidth)        
+        FWHM = self.getFWHM(lineName,lineWidth)
         # Check if FWHM larger than resolution (if resolution specified)
         if self.resolution is not None:
-            resolutionLimit = lineWavelength/self.resolution
+            resolutionLimit = lineWavelength/float(self.resolution)
             FWHM = np.maximum(FWHM,resolutionLimit)
         # Compute line profile
         if fnmatch.fnmatch(profile.lower(),"gaus*"):
@@ -230,14 +246,14 @@ class EmissionLineProfiles(object):
         return approximateVelocityDispersion
 
 
-    def getFWHM(self,lineName,lineWidth='fixed',fixedWidth=200.0):
+    def getFWHM(self,lineName,lineWidth):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Extract rest wavelength
         restWavelength = self.EmissionLines.getWavelength(lineName)
-        # Compute FWHM
-        if lineWidth.lower() == "fixed":
-            widthVelocity = fixedWidth
-        elif fnmatch.fnmatch(lineWidth.lower(),"approx*"):
+        # Compute FWHM        
+        if fnmatch.fnmatch(lineWidth.lower(),"fixedwidth*"):            
+            widthVelocity = float(lineWidth.replace("fixedWidth",""))
+        elif lineWidth.lower() == "velocityapprox":
             widthVelocity = self.getApproximateVelocityDispersion(scaleVelocityRatio=0.1)
             widthVelocity = np.stack([widthVelocity]*len(self.sedWavelengths),axis=1).reshape(len(widthVelocity),-1)
         else:
