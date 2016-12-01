@@ -2,6 +2,7 @@
 
 import sys,os,fnmatch,re
 import numpy as np
+from scipy.interpolate import interp1d
 from .io import GalacticusHDF5
 from .EmissionLines import GalacticusEmissionLines
 from .Luminosities import ergPerSecond
@@ -49,6 +50,14 @@ class GalacticusSED(object):
         return luminosity
         
 
+    def interpolateContinuum(self,wavelengths,luminosities,wavelengthDifference=10.0):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        f = interp1d(wavelengths,luminosities,axis=1)
+        newWavelengths = np.arange(wavelengths.min(),wavelengths.max(),wavelengthDifference)
+        newLuminosities = f(newWavelengths)
+        return newWavelengths,newLuminosities
+
+
     def ergPerSecond(self,luminosity):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         luminosity = np.log10(luminosity)
@@ -58,8 +67,7 @@ class GalacticusSED(object):
         return luminosity
 
         
-    def getSED(self,datasetName,selectionMask=None,includeEmissionLines=True,\
-                   lineProfile="gaussian",lineWidth='fixed',fixedWidth=200.0):
+    def getSED(self,datasetName,selectionMask=None,ignoreResolution=False,resampleLimit=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Check dataset name correspnds to an SED
         MATCH = re.search(r"^(disk|spheroid|total)SED:([^:]+):([^:]+)(:[^:]+)?:z([\d\.]+)(:dust[^:]+)?(:recent)?",datasetName)
@@ -103,12 +111,15 @@ class GalacticusSED(object):
                      for i in range(len(wavelengths))]
         sed = np.stack(np.copy(luminosities),axis=1)
         del dummy,luminosities
+        # Change wavelength sampling?
+        if resampleLimit is not None:
+            wavelengths,sed = self.interpolateContinuum(wavelengths,sed,wavelengthDifference=resampleLimit)
         # Introduce emission lines
         if includeEmissionLines:
-            LINES = EmissionLineProfiles(self.galacticusOBJ,frame,redshift,wavelengths,resolution=resolution,\
+            LINES = EmissionLineProfiles(self.galacticusOBJ,frame,redshift,wavelengths,\
                                              selectionMask=selectionMask,verbose=self._verbose)
             if not len(LINES.linesInRange) == 0:
-                sed += LINES.sumLineProfiles(MATCH)
+                sed += LINES.sumLineProfiles(MATCH,ignoreResolution=ignoreResolution)
                 #sed = np.maximum(sed,LINES.sumLineProfiles(MATCH,profile='gaussian'))
         # Convert units to microJanskys
         sed = self.ergPerSecond(sed)
@@ -123,7 +134,7 @@ class GalacticusSED(object):
 
 class EmissionLineProfiles(object):
     
-    def __init__(self,galObj,frame,redshift,wavelengths,resolution=None,selectionMask=None,verbose=False):
+    def __init__(self,galObj,frame,redshift,wavelengths,selectionMask=None,verbose=False):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Store GalacticusHDF5 object
@@ -134,8 +145,6 @@ class EmissionLineProfiles(object):
         self.frame = frame
         # Store wavelengths
         self.sedWavelengths = wavelengths
-        # Store SED resolution (if desired)
-        self.resolution = resolution
         # Crete emission lines object
         self.EmissionLines = GalacticusEmissionLines()        
         # Check for any emission lines inside wavelength range
@@ -164,17 +173,17 @@ class EmissionLineProfiles(object):
         return
 
     
-    def sumLineProfiles(self,MATCH,profile='gaussian',lineWidth='fixed',fixedWidth=200.0):
+    def sumLineProfiles(self,MATCH,ignoreResolution=False):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Sum profiles
-        dummy = [self.addLine(lineName,MATCH) for lineName in self.linesInRange]
+        dummy = [self.addLine(lineName,MATCH,ignoreResolution=ignoreResolution) for lineName in self.linesInRange]
         # Return sum
         frequency = speedOfLight/np.stack([self.sedWavelengths]*self.profileSum.shape[0])*angstrom
         self.profileSum /= frequency
         return self.profileSum
 
 
-    def addLine(self,lineName,MATCH):
+    def addLine(self,lineName,MATCH,ignoreResolution=False):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Extract dataset information
         component = MATCH.group(1)
@@ -208,8 +217,8 @@ class EmissionLineProfiles(object):
         # Compute FWHM (use fixed line width in km/s)
         FWHM = self.getFWHM(lineName,lineWidth)
         # Check if FWHM larger than resolution (if resolution specified)
-        if self.resolution is not None:
-            resolutionLimit = lineWavelength/float(self.resolution)
+        if not ignoreResolution:
+            resolutionLimit = lineWavelength/float(resolution)
             FWHM = np.maximum(FWHM,resolutionLimit)
         # Compute line profile
         if fnmatch.fnmatch(profile.lower(),"gaus*"):
@@ -240,7 +249,7 @@ class EmissionLineProfiles(object):
             # Approximate disk velocity dispersion using combiantion of disk rotational velocity
             # and disk vertical velocity (computed as fraction of rotation velocity)
             diskVelocity = np.copy(np.array(self.OUT["nodeData/diskVelocity"]))
-            inclination = getInclination(self.galacticusOBJ,self.redshift)*Pi/180.0
+            inclination = getInclination(self.galacticusOBJ,float(self.redshift))*Pi/180.0
             diskVelocity *= np.sqrt(np.sin(inclination)**2+(scaleVelocityRatio*np.cos(inclination))**2)            
             np.place(approximateVelocityDispersion,diskDominated,diskVelocity[diskDominated])
         return approximateVelocityDispersion
