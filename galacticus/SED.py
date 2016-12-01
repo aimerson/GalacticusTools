@@ -223,8 +223,10 @@ class EmissionLineProfiles(object):
         # Compute line profile
         if fnmatch.fnmatch(profile.lower(),"gaus*"):
             self.profileSum += self.gaussian(lineWavelength,lineLuminosity,FWHM)
+        elif fnmatch.fnmatch(profile.lower(),"cauchy*"):
+            self.profileSum += self.cauchy(lineWavelength,lineLuminosity,FWHM)
         else:
-            raise ValueError(funcname+"(): line profile must be Gaussian! Other profiles not yet implemented!")
+            raise ValueError(funcname+"(): line profile must be Gaussian or Cauchy! Other profiles not yet implemented!")
         return 
 
 
@@ -284,3 +286,15 @@ class EmissionLineProfiles(object):
         luminosity = amplitude*np.exp(-((wavelengths-lineWavelength)**2)/(2.0*(sigma**2)))
         return luminosity
 
+
+    def cauchy(self,lineWavelength,lineLuminosity,FWHM):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Compute sigma for Gaussian
+        gamma = FWHM/2.0
+        # Compute amplitude for Gaussian
+        amplitude = np.stack([lineLuminosity]*len(self.sedWavelengths),axis=1).reshape(len(lineLuminosity),-1)                
+        amplitude /= Pi*gamma
+        # Compute luminosity
+        wavelengths = np.concatenate([self.sedWavelengths]*len(lineLuminosity)).reshape(-1,len(self.sedWavelengths))
+        luminosity = amplitude*(gamma**2)/(((wavelengths-lineWavelength)**2)+gamma**2)
+        return luminosity
