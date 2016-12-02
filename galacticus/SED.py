@@ -60,13 +60,13 @@ class GalacticusSED(object):
         return newWavelengths,newLuminosities
 
     
-    def addContinuumNoise(self,wavelengths,luminosities,noiseFactor=1.0):
+    def addContinuumNoise(self,wavelengths,luminosities,SNR):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Get Poisson error on count rate of photons
         energy = speedOfLight*plancksConstant/np.stack([wavelengths]*luminosities.shape[0])*angstrom
         counts = luminosities*luminosityAB/energy
         # Perturb counts and convert back to luminosities
-        counts = norm.rvs(loc=counts,scale=counts*noiseFactor)
+        counts = norm.rvs(loc=counts,scale=counts/SNR)
         return counts*energy/luminosityAB
 
 
@@ -79,7 +79,7 @@ class GalacticusSED(object):
         return luminosity
 
         
-    def getSED(self,datasetName,selectionMask=None,ignoreResolution=False,resampleLimit=None,noiseFactor=None):
+    def getSED(self,datasetName,selectionMask=None,ignoreResolution=False,resampleLimit=None,SNR=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Check dataset name correspnds to an SED
         MATCH = re.search(r"^(disk|spheroid|total)SED:([^:]+):([^:]+)(:[^:]+)?:z([\d\.]+)(:dust[^:]+)?(:recent)?",datasetName)
@@ -124,8 +124,8 @@ class GalacticusSED(object):
         sed = np.stack(np.copy(luminosities),axis=1)
         del dummy,luminosities
         # Add noise?
-        if noiseFactor is not None:
-            sed = self.addContinuumNoise(wavelengths,sed,noiseFactor=noiseFactor)
+        if SNR is not None:
+            sed = self.addContinuumNoise(wavelengths,sed,SNR)
         # Change wavelength sampling?
         if resampleLimit is not None:
             wavelengths,sed = self.interpolateContinuum(wavelengths,sed,wavelengthDifference=resampleLimit)
