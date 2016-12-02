@@ -3,11 +3,13 @@
 import sys,os,fnmatch,re
 import numpy as np
 from scipy.interpolate import interp1d
+from scipy.stats import norm
 from .io import GalacticusHDF5
 from .EmissionLines import GalacticusEmissionLines
 from .Luminosities import ergPerSecond
 from .constants import erg,luminosityAB,luminositySolar,jansky,kilo
 from .constants import angstrom,megaParsec,Pi,speedOfLight,centi
+from .constants import plancksConstant
 from .Inclination import getInclination
 from .GalacticusErrors import ParseError
 
@@ -57,6 +59,16 @@ class GalacticusSED(object):
         newLuminosities = f(newWavelengths)
         return newWavelengths,newLuminosities
 
+    
+    def addContinuumNoise(self,wavelengths,luminosities,noiseFactor=1.0):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Get Poisson error on count rate of photons
+        energy = speedOfLight*plancksConstant/np.stack([wavelengths]*luminosities.shape[0])*angstrom
+        counts = luminosities*luminosityAB/energy
+        # Perturb counts and convert back to luminosities
+        counts = norm.rvs(loc=counts,scale=counts*noiseFactor)
+        return counts*energy/luminosityAB
+
 
     def ergPerSecond(self,luminosity):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
@@ -67,7 +79,7 @@ class GalacticusSED(object):
         return luminosity
 
         
-    def getSED(self,datasetName,selectionMask=None,ignoreResolution=False,resampleLimit=None):
+    def getSED(self,datasetName,selectionMask=None,ignoreResolution=False,resampleLimit=None,noiseFactor=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Check dataset name correspnds to an SED
         MATCH = re.search(r"^(disk|spheroid|total)SED:([^:]+):([^:]+)(:[^:]+)?:z([\d\.]+)(:dust[^:]+)?(:recent)?",datasetName)
@@ -111,6 +123,9 @@ class GalacticusSED(object):
                      for i in range(len(wavelengths))]
         sed = np.stack(np.copy(luminosities),axis=1)
         del dummy,luminosities
+        # Add noise?
+        if noiseFactor is not None:
+            sed = self.addContinuumNoise(wavelengths,sed,noiseFactor=noiseFactor)
         # Change wavelength sampling?
         if resampleLimit is not None:
             wavelengths,sed = self.interpolateContinuum(wavelengths,sed,wavelengthDifference=resampleLimit)
