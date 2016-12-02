@@ -79,10 +79,10 @@ class GalacticusSED(object):
         return luminosity
 
         
-    def getSED(self,datasetName,selectionMask=None,ignoreResolution=False,resampleLimit=None,SNR=None):
+    def getSED(self,datasetName,selectionMask=None,ignoreResolution=False,resampleLimit=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Check dataset name correspnds to an SED
-        MATCH = re.search(r"^(disk|spheroid|total)SED:([^:]+):([^:]+)(:[^:]+)?:z([\d\.]+)(:dust[^:]+)?(:recent)?",datasetName)
+        MATCH = re.search(r"^(disk|spheroid|total)SED:([^:]+):([^:]+)(:[^:]+)?(:snr[\d\.]+)?:z([\d\.]+)(:dust[^:]+)?(:recent)?",datasetName)
         if not MATCH:
             raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
         # Extract necessary information
@@ -95,11 +95,14 @@ class GalacticusSED(object):
             includeEmissionLines = False
         else:
             includeEmissionLines = True
-        redshift = MATCH.group(5)
-        dust = MATCH.group(6)
+        snr = MATCH.group(5)
+        if snr is not None:
+            snr = snr.replace(":snr","")
+        redshift = MATCH.group(6)
+        dust = MATCH.group(7)
         if dust is None:
             dust = ""
-        option = MATCH.group(7)
+        option = MATCH.group(8)
         if option is None:
             option = ""
         # Identify top hat filters
@@ -124,8 +127,8 @@ class GalacticusSED(object):
         sed = np.stack(np.copy(luminosities),axis=1)
         del dummy,luminosities
         # Add noise?
-        if SNR is not None:
-            sed = self.addContinuumNoise(wavelengths,sed,SNR)
+        if snr is not None:
+            sed = self.addContinuumNoise(wavelengths,sed,float(snr))
         # Change wavelength sampling?
         if resampleLimit is not None:
             wavelengths,sed = self.interpolateContinuum(wavelengths,sed,wavelengthDifference=resampleLimit)
@@ -205,11 +208,14 @@ class EmissionLineProfiles(object):
         resolution = MATCH.group(2)
         frame = MATCH.group(3)
         lineInformation = MATCH.group(4)
-        redshift = MATCH.group(5)
-        dust = MATCH.group(6)
+        snr = MATCH.group(5)
+        if snr is not None:
+            snr = snr.replace(":snr","")
+        redshift = MATCH.group(6)
+        dust = MATCH.group(7)
         if dust is None:
             dust = ""
-        option = MATCH.group(7)
+        option = MATCH.group(8)
         if option is None:
             option = ""
         # Extra line profile information
