@@ -120,7 +120,10 @@ class radialGeometry(object):
 
     def getTicks(self,minDistance,maxDistance,diffDistance,sigFig=2):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        tickValues = list(np.arange(minDistance,maxDistance,diffDistance))
+        if minDistance == 0:
+            tickValues = list(np.arange(minDistance,maxDistance,diffDistance)[1:])
+        else:
+            tickValues = list(np.arange(minDistance,maxDistance,diffDistance))
         tickLabels = [sigfig(value,sigFig)+self.latex for value in tickValues]
         return list(zip(list(tickValues),tickLabels))
 
@@ -215,7 +218,9 @@ class conePlot(object):
         else:
             self.angularAxis.major_ticklabels.set_axis_direction("bottom")
             self.angularAxis.label.set_axis_direction("bottom")
-
+        if angularLabel is not None:                                                                                                                                                                                    
+            self.angularAxis.label.set_text(angularLabel)
+            self.angularAxis.label.set_size(20.0)        
         # Adjust radial tick marks and labels according to orientation
         if rotate <= 90.0 or rotate >= 270.0:
             self.radialAxis1 = self.ax.axis["left"]
