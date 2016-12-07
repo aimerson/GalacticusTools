@@ -130,7 +130,7 @@ class FiltersParameters(object):
         self.recentUnabsorbedMethods = ["recent"]
         return
 
-    def addFilter(self,name,filterType=["rest observed"],postProcess=["default"],redshift=["all"]):
+    def addFilter(self,name,filterType=["rest","observed"],postProcess=["default"],redshift=["all"]):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Ensure options are list
         if type(filterType) is not list:
