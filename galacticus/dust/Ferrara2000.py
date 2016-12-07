@@ -93,6 +93,10 @@ class dustAtlas(DustProperties):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Set verbosity
         self._verbose = verbose        
+
+        # Initialise DustProperties class
+        super(dustAtlas,self).__init__()
+
         # Load dust atlas file
         self.dustFile = pkg_resources.resource_filename(__name__,"data/dust/atlasFerrara2000/attenuations_MilkyWay_dustHeightRatio1.0.xml")
         if not os.path.exists(self.dustFile):
