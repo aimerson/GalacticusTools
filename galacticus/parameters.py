@@ -151,6 +151,8 @@ class FiltersParameters(object):
 
     def addToGalacticusParameters(galacticusParametersObj):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        if len(self.luminosityFilter) == 0:
+            return
         # Add filter set to parameters tree
         galacticusParametersObj.setElement("luminosityFilter",attrib={"value":" ".join(self.luminosityFilter)})
         galacticusParametersObj.setElement("luminosityType",attrib={"value":" ".join(self.luminosityType)})
