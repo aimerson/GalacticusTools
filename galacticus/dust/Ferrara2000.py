@@ -3,7 +3,10 @@
 import sys,os,fnmatch
 import numpy as np
 import xml.etree.ElementTree as ET
+import pkg_resources
+from scipy.interpolate import RegularGridInterpolator
 
+from .utils import DustProperties
 from ..io import GalacticusHDF5
 from ..EmissionLines import emissionLines
 from ..GalacticusErrors import ParseError
@@ -83,17 +86,15 @@ def loadSpheroidAttenuation(component,verbose=False):
 
 
 
-class dustAtlas(object):
+class dustAtlas(DustProperties):
     
-    def __init__(self,verbose=False,debug=False,interpolateBoundsError=False,interpolateFillValue=None):        
-        from scipy.interpolate import RegularGridInterpolator
+    def __init__(self,verbose=False,interpolateBoundsError=False,interpolateFillValue=None):        
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Set verbosity
-        self.verbose = verbose        
-        self.debug = debug
+        self._verbose = verbose        
         # Load dust atlas file
-        self.dustFile = galacticusPath + "/data/dust/atlasFerrara2000/attenuations_MilkyWay_dustHeightRatio1.0.xml"
+        self.dustFile = pkg_resources.resource_filename(__name__,"data/dust/atlasFerrara2000/attenuations_MilkyWay_dustHeightRatio1.0.xml")
         if not os.path.exists(self.dustFile):
             raise IOError(classname+"(): Cannot find Ferrara et al. (2000) dust atlas file!")
         else:
@@ -163,7 +164,7 @@ class dustAtlas(object):
         
         ####################################################################
         # Compute attenuation
-        if self.debug:
+        if self._verbose:
             print(funcname+"(): Processing dataset '"+datasetName+"'")
         if not fnmatch.fnmatch(datasetName,"*:dustAtlas*"):
             raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
@@ -195,7 +196,7 @@ class dustAtlas(object):
         filter = datasetInfo[1]
         frame = datasetInfo[2]
         redshift = datasetInfo[3].replace("z","")
-        if self.debug:
+        if self._verbose:
             infoLine = "filter={0:s}  frame={1:s}  redshift={2:s}".format(filter,frame,redshift)
             print(funcname+"(): Filter information:\n        "+infoLine)
         # Construct filter label
@@ -204,15 +205,15 @@ class dustAtlas(object):
         if emissionLineFlag:
             # i) emission lines
             effectiveWavelength = self.emissionLinesClass.getWavelength(filter)
-            if debug:
+            if self._verbose:
                 infoLine = "filter={0:s}  effectiveWavelength={1:s}".format(filter,effectiveWavelength)
                 print(funcname+"(): Emission line filter information:\n        "+infoLine)
         else:
             # ii) photometric filters
-            effectiveWavelength = self.filtersDatabase.getEffectiveWavelength(filter,verbose=self.debug)
+            effectiveWavelength = self.filtersDatabase.getEffectiveWavelength(filter,verbose=self._verbose)
             if frame == "observed":
                 effectiveWavelength /= (1.0+float(redshift))
-            if self.debug:
+            if self._verbose:
                 infoLine = "filter={0:s}  effectiveWavelength={1:s}".format(filter,effectiveWavelength)
                 print(funcname+"(): Photometric filter information:\n        "+infoLine)
         # Get inclinations
