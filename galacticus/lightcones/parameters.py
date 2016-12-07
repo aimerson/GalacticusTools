@@ -6,8 +6,6 @@ import xml.etree.ElementTree as ET
 from ..xmlTree import xmlTree
 from ..parameters import GalacticusParameters
 
-
-
 class LightconeParameters(GalacticusParameters):
     
     def __init__(self,xmlfile=None,root='lightcone',verbose=False):
