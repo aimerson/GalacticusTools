@@ -88,6 +88,92 @@ class GalacticusParameters(xmlTree):
         return
 
 ####################################################################            
+# FILTERS CLASS
+####################################################################            
+
+class FiltersParameters(object):
+
+    def __init__(self,defaultAbsorptionMethods=["inoue2014"],recentAbsorptionMethods=["inoue2014"],recentTimeLimit=1.0e-2,\
+                     quitOnError=True):
+        classname = self.__class__.__name__
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Create lists to store filter information
+        self.luminosityFilter = []
+        self.luminosityType = []
+        self.luminosityRedshift = []
+        self.luminosityPostProcessSet = []
+        # Set lists of allowed values
+        self.allowedPostProcessSets = ["default","recent","unabsorbed","recentUnabsorbed"]
+        self.allowedAbsorptionMethods = ["inoue2014","meiksin2006","madau1995","lycSuppress","identity"]
+        # Set list of methods for default post-processing
+        goodMethods = list(set(defaultAbsorptionMethods).intersection(self.allowedAbsorptionMethods))
+        badMethods = list(set(defaultAbsorptionMethods).difference(self.allowedAbsorptionMethods))
+        if len(badMethods>0):
+            if quitOnError:
+                report = classname+"(): defaultMethods: some methods not recognised!" +\
+                    "\n     Not recognised  = "+" ,".join(badMethods)+\
+                    "\n     Allowed methods = "+" ,".join(self.allowedAbsorptionMethods)
+                raise ValueError(report)
+        self.defaultMethods = goodMethods
+        # Set list of methods for recent star formation
+        goodMethods = list(set(recentAbsorptionMethods).intersection(self.allowedAbsorptionMethods))
+        badMethods = list(set(recentAbsorptionMethods).difference(self.allowedAbsorptionMethods))
+        if len(badMethods>0):
+            if quitOnError:
+                report = classname+"(): recentMethods: some methods not recognised!" +\
+                    "\n     Not recognised  = "+" ,".join(badMethods)+\
+                    "\n     Allowed methods = "+" ,".join(self.allowedAbsorptionMethods)
+                raise ValueError(report)
+        self.recentMethods = goodMethods + ["recent"]
+        # Set methods for unabsorbed cases
+        self.unabsorbedMethods = ["identity"]
+        self.recentUnabsorbedMethods = ["recent"]
+        return
+
+    def addFilter(self,name,filterType=["rest observed"],postProcess=["default"],redshift=["all"]):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Ensure options are list
+        if type(filterType) is not list:
+            filterType = [filterType]
+        if type(postProcess) is not list:
+            postProcess = [postProcess]
+        if type(redshift) is not list:
+            redshift = [redshift]
+        # Append filter to stored list
+        for luminosityType in filterType:
+            for luminosityPostProcess in postProcess:
+                for luminosityRedshift in redshift:
+                    self.luminosityFilter.append(name)
+                    self.luminosityType.append(luminosityType)
+                    self.luminosityRedshift.append(luminosityRedshift)
+                    self.luminosityPostProcessSet.append(luminosityPostProcess)
+        return
+
+    def addToGalacticusParameters(galacticusParametersObj):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Add filter set to parameters tree
+        galacticusParametersObj.setElement("luminosityFilter",attrib={"value":" ".join(self.luminosityFilter)})
+        galacticusParametersObj.setElement("luminosityType",attrib={"value":" ".join(self.luminosityType)})
+        galacticusParametersObj.setElement("luminosityRedshift",attrib={"value":" ".join(self.luminosityRedshift)})
+        galacticusParametersObj.setElement("luminosityPostprocessSet",attrib={"value":" ".join(self.luminosityPostProcessSet)})
+        # Add methods to parameters tree
+        galacticusParametersObj.setElement("stellarPopulationSpectraPostprocessDefaultMethods",\
+                                               attrib={"value":" ".join(self.defaultMethods)})
+        if "recent" in list(np.unique(self.luminosityPostProcessSet)):
+            galacticusParametersObj.setElement("stellarPopulationSpectraPostprocessRecentMethods",\
+                                                   attrib={"value":" ".join(self.recentMethods)})
+        if "unabsorbed" in list(np.unique(self.luminosityPostProcessSet)):
+            galacticusParametersObj.setElement("stellarPopulationSpectraPostprocessUnabsorbedMethods",\
+                                                   attrib={"value":" ".join(self.unabsorbedMethods)})
+        if "recentUnabsorbed" in list(np.unique(self.luminosityPostProcessSet)):
+            galacticusParametersObj.setElement("stellarPopulationSpectraPostprocessRecentUnabsorbedMethods",\
+                                                   attrib={"value":" ".join(self.recentUnabsorbedMethods)})
+        return
+
+
+####################################################################            
+# MISC FUNCTIONS
+####################################################################            
 
 def validate_parameters(xmlfile,GALACTICUS_ROOT):
     script = GALACTICUS_ROOT+"/scripts/aux/validateParameters.pl"
@@ -110,26 +196,3 @@ def formatParametersFile(ifile,ofile=None):
 
 ####################################################################
 
-
-def simulationParameters(simulation):
-    
-    params = []
-    if simulation.lower() in ["millennium","milli-millennium"]:
-        params.append(("treeNodeMethodSatellite","preset"))
-        params.append(("treeNodeMethodPosition","preset"))
-        params.append(("mergerTreeConstructMethod","read"))
-        params.append(("allTreesExistAtFinalTime","false"))
-        params.append(("cosmologyParametersMethod","simple"))
-        params.append(("HubbleConstant",73.0,"cosmologyParametersMethod"))
-        params.append(("OmegaMatter",0.25,"cosmologyParametersMethod"))
-        params.append(("OmegaDarkEnergy",0.75,"cosmologyParametersMethod"))
-        params.append(("OmegaBaryon",0.0455,"cosmologyParametersMethod"))
-        params.append(("sigma_8",0.9,"cosmologicalMassVarianceMethod"))
-        params.append(("powerSpectrumPrimordialMethod","powerLaw"))
-        params.append(("index",0.961,"powerSpectrumPrimordialMethod"))
-        params.append(("wavenumberReference",1,"powerSpectrumPrimordialMethod"))
-        params.append(("running",0,"powerSpectrumPrimordialMethod"))
-        params.append(("mergerTreeReadPresetScaleRadiiMinimumMass",2.5e11))
-        params.append(("virialDensityContrastMethod","percolation"))
-        params.append(("virialDensityContrastPercolationLinkingLength","0.2"))
-    return params
