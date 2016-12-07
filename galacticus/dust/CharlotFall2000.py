@@ -1,11 +1,13 @@
 #! /usr/bin/env python
 
-import fnmatch
+
+import sys,os,re,fnmatch
 import numpy as np
 from ..config import *
 from ..GalacticusErrors import ParseError
 from ..EmissionLines import emissionLines
 from ..Filters import GalacticusFilters
+from ..constants import mega
 from ..constants import Pi,Parsec,massAtomic,massSolar,massFractionHydrogen
 
 
@@ -14,9 +16,10 @@ class CharlotFall2000(object):
     
     def __init__(self,opticalDepthISMFactor=1.0,opticalDepthCloudsFactor=1.0,\
                      wavelengthZeroPoint=5500,wavelengthExponent=0.7,\
-                     verbose=False,debug=False):
-        self.verbose = verbose        
-        self.debug = debug        
+                     verbose=False):
+        classname = self.__class__.__name__
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        self._verbose = verbose        
         # Specify constants in extinction model 
         # -- "wavelengthExponent" is set to the value of 0.7 found by Charlot & Fall (2000). 
         # -- "opticalDepthCloudsFactor" is set to unity, such that in gas with Solar metallicity the cloud optical depth will be 1.
@@ -30,6 +33,28 @@ class CharlotFall2000(object):
         self.emissionLinesClass = emissionLines()
         self.filtersDatabase = GalacticusFilters()
         return
+
+
+
+
+    def getGasMetallicitySurfaceDensity(self,galHDF5Obj,z,component):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        # Get nearest redshift output
+        out = galHDF5Obj.selectOutput(z)
+        # Compute central surface density in M_Solar/pc^2
+        gasMass = np.array(out["nodeData/"+component+"MassGas"])
+        gasMetalMass = np.array(out["nodeData/"+component+"AbundancesGasMetals"])
+        noGasMetals = gasMetalMass <= 0.0
+        scaleLength = np.array(out["nodeData/"+component+"Radius"])
+        notPresent = scaleLength <= 0.0
+        gasMetallicity = gasMetalMass/gasMass
+        np.place(gasMetallicity,noGasMetals,0.0)
+        mega = 1.0e6
+        gasMetalsSurfaceDensityCentral = gasMetalMass/(2.0*Pi*(mega*scaleLength)**2)
+        np.place(gasMetalsSurfaceDensityCentral,notPresent,0.0)        
+        
+
+
 
 
     def attenuate(self,galHDF5Obj,z,datasetName,overwrite=False):
