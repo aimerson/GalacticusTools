@@ -35,6 +35,9 @@ class DustProperties(object):
             effectiveWavelength = self.filtersDatabase.getEffectiveWavelength(name,verbose=verbose)
             if redshift is None:
                 effectiveWavelength /= (1.0+float(redshift))
+            if verbose:
+                infoLine = "filter={0:s}  effectiveWavelength={1:s}".format(name,effectiveWavelength)
+                print(funcname+"(): Photometric filter information:\n        "+infoLine)
         return effectiveWavelength
     
         
