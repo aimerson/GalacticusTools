@@ -103,6 +103,7 @@ class xmlTree(object):
             elem.text = text
         return
 
+
     def appendElement(self,newBranch,parent=None,updateMap=True):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         if parent is None:
