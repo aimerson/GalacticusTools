@@ -154,22 +154,22 @@ class FiltersParameters(object):
         if len(self.luminosityFilter) == 0:
             return
         # Add filter set to parameters tree
-        galacticusParametersObj.setElement("luminosityFilter",attrib={"value":" ".join(self.luminosityFilter)})
-        galacticusParametersObj.setElement("luminosityType",attrib={"value":" ".join(self.luminosityType)})
-        galacticusParametersObj.setElement("luminosityRedshift",attrib={"value":" ".join(self.luminosityRedshift)})
-        galacticusParametersObj.setElement("luminosityPostprocessSet",attrib={"value":" ".join(self.luminosityPostProcessSet)})
+        galacticusParametersObj.setElement("luminosityFilter",attrib={"value":" ".join(self.luminosityFilter)},selfCreate=True)
+        galacticusParametersObj.setElement("luminosityType",attrib={"value":" ".join(self.luminosityType)},selfCreate=True)
+        galacticusParametersObj.setElement("luminosityRedshift",attrib={"value":" ".join(self.luminosityRedshift)},selfCreate=True)
+        galacticusParametersObj.setElement("luminosityPostprocessSet",attrib={"value":" ".join(self.luminosityPostProcessSet)},selfCreate=True)
         # Add methods to parameters tree
         galacticusParametersObj.setElement("stellarPopulationSpectraPostprocessDefaultMethods",\
-                                               attrib={"value":" ".join(self.defaultMethods)})
+                                               attrib={"value":" ".join(self.defaultMethods)},selfCreate=True)
         if "recent" in list(np.unique(self.luminosityPostProcessSet)):
             galacticusParametersObj.setElement("stellarPopulationSpectraPostprocessRecentMethods",\
-                                                   attrib={"value":" ".join(self.recentMethods)})
+                                                   attrib={"value":" ".join(self.recentMethods)},selfCreate=True)
         if "unabsorbed" in list(np.unique(self.luminosityPostProcessSet)):
             galacticusParametersObj.setElement("stellarPopulationSpectraPostprocessUnabsorbedMethods",\
-                                                   attrib={"value":" ".join(self.unabsorbedMethods)})
+                                                   attrib={"value":" ".join(self.unabsorbedMethods)},selfCreate=True)
         if "recentUnabsorbed" in list(np.unique(self.luminosityPostProcessSet)):
             galacticusParametersObj.setElement("stellarPopulationSpectraPostprocessRecentUnabsorbedMethods",\
-                                                   attrib={"value":" ".join(self.recentUnabsorbedMethods)})
+                                                   attrib={"value":" ".join(self.recentUnabsorbedMethods)},selfCreate=True)
         return
 
 
