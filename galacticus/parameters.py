@@ -149,7 +149,7 @@ class FiltersParameters(object):
                     self.luminosityPostProcessSet.append(luminosityPostProcess)
         return
 
-    def addToGalacticusParameters(galacticusParametersObj):
+    def addToGalacticusParameters(self,galacticusParametersObj):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         if len(self.luminosityFilter) == 0:
             return
