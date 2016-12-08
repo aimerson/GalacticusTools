@@ -108,7 +108,7 @@ class FiltersParameters(object):
         # Set list of methods for default post-processing
         goodMethods = list(set(defaultAbsorptionMethods).intersection(self.allowedAbsorptionMethods))
         badMethods = list(set(defaultAbsorptionMethods).difference(self.allowedAbsorptionMethods))
-        if len(badMethods>0):
+        if len(badMethods)>0:
             if quitOnError:
                 report = classname+"(): defaultMethods: some methods not recognised!" +\
                     "\n     Not recognised  = "+" ,".join(badMethods)+\
@@ -118,7 +118,7 @@ class FiltersParameters(object):
         # Set list of methods for recent star formation
         goodMethods = list(set(recentAbsorptionMethods).intersection(self.allowedAbsorptionMethods))
         badMethods = list(set(recentAbsorptionMethods).difference(self.allowedAbsorptionMethods))
-        if len(badMethods>0):
+        if len(badMethods)>0:
             if quitOnError:
                 report = classname+"(): recentMethods: some methods not recognised!" +\
                     "\n     Not recognised  = "+" ,".join(badMethods)+\
