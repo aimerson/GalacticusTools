@@ -77,6 +77,8 @@ class xmlTree(object):
             path = self.root.tag
             parent = self.root
         else:
+            if parent not in self.treeMap.keys():
+                self.createBranch(parent)
             path = self.treeMap[parent]
             parent = self.getElement(path)
         if parent is None:
@@ -103,26 +105,34 @@ class xmlTree(object):
             elem.text = text
         return
 
-
+    def createBranch(self,path,parent=None):        
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        if parent is None or parent==self.root.tag:
+            parent = self.root
+            parentPath = "root"
+        else:            
+            parentPath = self.treeMap[parent]
+            parent = self.getElement(parentPath)
+        nodes = path.split("/")        
+        for node in nodes:
+            if parent.find(node) is None:
+                self.createElement(node,parent=parent.tag)
+                self.treeMap[node] = parentPath + "/" + node                
+            parent = parent.find(node)
+            parentPath = self.treeMap[node]
+        return
+                            
     def appendElement(self,newBranch,parent=None,updateMap=True):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        if parent is None:
-            node = self.root
-        elif type(parent) == str:
-            if parent.endswith("/"):
-                parent = parent[:-1]
-            nodes = parent.split("/")
-            if nodes[0] == self.root.tag:
-                nodes = nodes[1:]
-            parentNode = self.root
-            for nodeName in nodes:
-                node = parentNode.find(nodeName)
-                if node is None:
-                    self.createElement(nodeName,parent=parentNode.tag)
-                else:
-                    parentNode = node            
+        if parent is not None:
+            if parent not in self.treeMap.keys():
+                self.createBranch(parent,parent=None)                
+            parentPath = self.treeMap[parent]
+            print self.treeMap["hello2"]
+            print self.treeMap["world2"]
+            node = self.getElement(parentPath)
         else:
-            node = parent
+            node = self.root
         if newBranch.tag in list(node):
             elem = self.getElement(newBranch.tag)
             node.remove(elem)
