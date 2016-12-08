@@ -83,8 +83,7 @@ class geometryLightconeMethod(Geometry):
     def setUnitVectors(self,verbose=True):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         KW = KitzbichlerWhite2007(self.simulation.boxSize,boxUnits=self.simulation.boxSizeUnits)
-        KW.setFieldOfView(fieldSize=self._fieldOfView,footprint=self._method,verbose=verbose)            
-        KW.createUnitVectors(fieldSize,verbose=verbose)
+        KW.createUnitVectors(self._fieldOfView,verbose=verbose)
         ET.SubElement(self.root,"unitVector1",attrib={"value":" ".join([str(i) for i in KW.unitX])})
         ET.SubElement(self.root,"unitVector2",attrib={"value":" ".join([str(i) for i in KW.unitY])})
         ET.SubElement(self.root,"unitVector3",attrib={"value":" ".join([str(i) for i in KW.unitZ])})

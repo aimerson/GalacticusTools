@@ -106,19 +106,22 @@ class xmlTree(object):
     def appendElement(self,newBranch,parent=None,updateMap=True):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         if parent is None:
-            parent = self.root
-        if parent.endswith("/"):
-            parent = parent[:-1]
-        nodes = parent.split("/")
-        if nodes[0] == self.root.tag:
-            nodes = nodes[1:]
-        parentNode = self.root
-        for nodeName in nodes:
-            node = parentNode.find(nodeName)
-            if node is None:
-                self.createElement(nodeName,parent=parentNode.tag)
-            else:
-                parentNode = node
+            node = self.root
+        elif type(parent) == str:
+            if parent.endswith("/"):
+                parent = parent[:-1]
+            nodes = parent.split("/")
+            if nodes[0] == self.root.tag:
+                nodes = nodes[1:]
+            parentNode = self.root
+            for nodeName in nodes:
+                node = parentNode.find(nodeName)
+                if node is None:
+                    self.createElement(nodeName,parent=parentNode.tag)
+                else:
+                    parentNode = node            
+        else:
+            node = parent
         if newBranch.tag in list(node):
             elem = self.getElement(newBranch.tag)
             node.remove(elem)
