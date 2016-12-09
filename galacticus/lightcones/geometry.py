@@ -93,7 +93,7 @@ class geometryLightconeMethod(Geometry):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         if redshifts is None:
             redshifts = self.simulation.snapshots.z
-            mask = np.logical_and(redshifts>=zmin,redshfits<=zmax)
+            mask = np.logical_and(redshifts>=zmin,redshifts<=zmax)
             redshifts = np.sort(redshifts[mask])
         ET.SubElement(self.root,"redshift",attrib={"value":" ".join([str(z) for z in redshifts])})
         return
