@@ -264,7 +264,7 @@ class GalacticusEmissionLines(object):
             wavelength = lineWavelength
         else:
             MATCH = re.search("^(disk|spheroid|total)LuminositiesStellar:emissionLineContinuumOffset_([^_]+)_([\d\.]+)_([\d\.]+):([^:]+):z([\d\.]+)(:dust[^:]+)?(:[^:]+)?$",datasetName)
-            wavelength = float(MATCH.group(4))
+            wavelength = float(MATCH.group(3))
         return wavelength
 
 
@@ -282,9 +282,10 @@ class GalacticusEmissionLines(object):
             iUpp = np.argmax(topHatWavelengths)
             lowContinuum = np.array(out["nodeData/"+topHatDatasetNames[iLow]])
             uppContinuum = np.array(out["nodeData/"+topHatDatasetNames[iUpp]])
-            luminosity = np.copy(uppContinuum) - np.copy(lowContinuum)
-            luminosity *= (float(lineWavelength)-topHatWavelengths[iLow])/(topHatWavelengths[iUpp]-topHatWavelengths[iLow])
-            luminosity -= np.copy(lowContinuum)
+            diffContinuum = np.copy(uppContinuum) - np.copy(lowContinuum)
+            wavelengthRatio = (float(lineWavelength)-topHatWavelengths[iLow])/(topHatWavelengths[iUpp]-topHatWavelengths[iLow])
+            luminosity = diffContinuum*wavelengthRatio
+            luminosity += np.copy(lowContinuum)
             del lowContinuum,uppContinuum
         elif len(topHatDatasetNames) == 1:
             luminosity = np.array(out["nodeData/"+topHatDatasetNames[0]])
@@ -339,8 +340,9 @@ class GalacticusEmissionLines(object):
         continuumLuminosity = self.computeContinuumLuminosity(galHDF5Obj,z,searchPattern,lineWavelength)
         # Compute equivalent width        
         nonZeroContinuum = continuumLuminosity>0.0
-        equivalentWidth = np.zeros_like(lineLuminosity)
-        np.place(equivalentWidth,nonZeroContinuum,(lineLuminosity[nonZeroContinuum]/continuumLuminosity[nonZeroContinuum]))
+        equivalentWidth = np.ones_like(lineLuminosity)*-999.9
+        mask = np.logical_and(nonZeroContinuum,lineLuminosity>=0.0)
+        np.place(equivalentWidth,mask,(lineLuminosity[mask]/continuumLuminosity[mask]))
         equivalentWidth /= angstrom
         # Write equivalent width to file
         galHDF5Obj.addDataset(out.name+"/nodeData/",datasetName,equivalentWidth,overwrite=overwrite)
