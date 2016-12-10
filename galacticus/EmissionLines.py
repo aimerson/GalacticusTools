@@ -258,10 +258,14 @@ class GalacticusEmissionLines(object):
         return
 
     
-    def getTopHatWavelength(self,datasetName):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
-        MATCH = re.search("^(disk|spheroid|total)LuminositiesStellar:emissionLineContinuum([^_]+)_([^_]+)_([\d\.]+)_([\d\.]+):([^:]+):z([\d\.]+)(:dust[^:]+)?(:[^:]+)?$",datasetName)
-        return MATCH.group(4)
+    def getTopHatWavelength(self,datasetName,lineWavelength):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name                
+        if "emissionLineContinuumCentral" in datasetName:
+            wavelength = lineWavelength
+        else:
+            MATCH = re.search("^(disk|spheroid|total)LuminositiesStellar:emissionLineContinuumOffset_([^_]+)_([\d\.]+)_([\d\.]+):([^:]+):z([\d\.]+)(:dust[^:]+)?(:[^:]+)?$",datasetName)
+            wavelength = float(MATCH.group(4))
+        return wavelength
 
 
     def computeContinuumLuminosity(self,galHDF5Obj,z,searchPattern,lineWavelength):
@@ -271,7 +275,7 @@ class GalacticusEmissionLines(object):
         # Extract filters
         topHatDatasetNames = fnmatch.filter(galHDF5Obj.availableDatasets(z),searchPattern)        
         # Extract wavelengths
-        topHatWavelengths = np.array([float(self.getTopHatWavelength(topHatName)) for topHatName in topHatDatasetNames])
+        topHatWavelengths = np.array([float(self.getTopHatWavelength(topHatName,lineWavelength)) for topHatName in topHatDatasetNames])
         if len(topHatDatasetNames) == 2:
             # Working with pair of top hat filters either side of emission line            
             iLow = np.argmin(topHatWavelengths)
@@ -295,7 +299,7 @@ class GalacticusEmissionLines(object):
     def getEquivalentWidth(self,galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True,progressObj=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         # Check property corresponds to equivalent width        
-        MATCH = re.search("^(disk|spheroid|total)EquivalentWidth:([^:]+):([^:]+)_([\d\.]+):([^:]+):z([\d\.]+)(:dust[^:]+)?(:[^:]+)?$",datasetName)
+        MATCH = re.search("^(disk|spheroid|total)EquivalentWidth:([^:]+):([^:]+)_([\d\.]+):([^:]+):z([\d\.]+)(:dust[^:]+)?(:[^:]+)?$",datasetName)        
         if not MATCH:
             raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
         # Extract dataset information
@@ -328,15 +332,15 @@ class GalacticusEmissionLines(object):
             searchPattern = component+"LuminositiesStellar:emissionLineContinuumOffset_"+lineName+"_*_"+\
                 resolution+":"+frame+":z"+redshift+dust+option
         elif calculationMethod.lower() in ["central"]:
-            searchPattern = component+"LuminositiesStellar:emissionLineContinuumCentral_"+lineName+"_*_"+\
+            searchPattern = component+"LuminositiesStellar:emissionLineContinuumCentral_"+lineName+"_"+\
                 resolution+":"+frame+":z"+redshift+dust+option
         else:
             raise ValueError(funcname+"(): calculation method not recognised! Should be 'Central' or 'Offset',")
-        continuumLuminosity = self.computeContinuumLuminosity(galHDF5Obj,z,searchPattern)
+        continuumLuminosity = self.computeContinuumLuminosity(galHDF5Obj,z,searchPattern,lineWavelength)
         # Compute equivalent width        
         nonZeroContinuum = continuumLuminosity>0.0
         equivalentWidth = np.zeros_like(lineLuminosity)
-        np.place(equivalentWidth,nonZeroContinuum,(lineLuminosity[nonZeroContinuum]/continuum[nonZeroContinuum]))
+        np.place(equivalentWidth,nonZeroContinuum,(lineLuminosity[nonZeroContinuum]/continuumLuminosity[nonZeroContinuum]))
         equivalentWidth /= angstrom
         # Write equivalent width to file
         galHDF5Obj.addDataset(out.name+"/nodeData/",datasetName,equivalentWidth,overwrite=overwrite)

@@ -47,13 +47,14 @@ class derivedProperties(object):
         datasets = fnmatch.filter(derivedDatasets,"*LuminositiesStellar:*")
         datasets = list(set(datasets).difference(fnmatch.filter(datasets,"*:dust*")))
         if len(datasets)>0: 
-            from .Stars import getLuminosity
+            from .Luminosities import getLuminosity
             if self._verbose:
                 print("    stellar luminosity...")
                 PROG = Progress(len(datasets))
             dummy = [getLuminosity(self.galHDF5Obj,z,name,overwrite=overwrite,\
                                        returnDataset=False,progressObj=PROG) for name in datasets]
             del dummy
+        
         # Emission line luminosities
         datasets = fnmatch.filter(derivedDatasets,"*LineLuminosity:*")
         if len(datasets)>0:         
@@ -64,6 +65,17 @@ class derivedProperties(object):
                 PROG = Progress(len(datasets))
             dummy = [self.EmissionLines.getLineLuminosity(self.galHDF5Obj,z,name,overwrite=overwrite,\
                                                               returnDataset=False,progressObj=PROG) for name in datasets]
+            del dummy
+        # Emission line equivalent widths
+        datasets = fnmatch.filter(derivedDatasets,"*EquivalentWidth:*")
+        if len(datasets)>0:         
+            if self.EmissionLines is None:
+                self.EmissionLines = GalacticusEmissionLines()
+            if self._verbose:
+                print("    emission line equivalent widths...")
+                PROG = Progress(len(datasets))
+            dummy = [self.EmissionLines.getEquivalentWidth(self.galHDF5Obj,z,name,overwrite=overwrite,\
+                                                               returnDataset=False,progressObj=PROG) for name in datasets]
             del dummy
         # Cold gas
         datasets = fnmatch.filter(derivedDatasets,"*MassGas") + fnmatch.filter(derivedDatasets,"*MassColdGas")
@@ -76,3 +88,4 @@ class derivedProperties(object):
                                         returnDataset=False,progressObj=PROG) for name in datasets]
             del dummy
 
+        return
