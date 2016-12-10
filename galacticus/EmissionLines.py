@@ -258,24 +258,31 @@ class GalacticusEmissionLines(object):
         return
 
     
-    def getTopHatWavelength(self,datasetName,lineWavelength):
+    def getTopHatWavelength(self,datasetName,lineWavelength,frame,z):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name                
         if "emissionLineContinuumCentral" in datasetName:
             wavelength = lineWavelength
         else:
             MATCH = re.search("^(disk|spheroid|total)LuminositiesStellar:emissionLineContinuumOffset_([^_]+)_([\d\.]+)_([\d\.]+):([^:]+):z([\d\.]+)(:dust[^:]+)?(:[^:]+)?$",datasetName)
             wavelength = float(MATCH.group(3))
+            if frame == "observed":
+                wavelength *= (1.0+float(z))
         return wavelength
 
 
-    def computeContinuumLuminosity(self,galHDF5Obj,z,searchPattern,lineWavelength):
+    def computeContinuumLuminosity(self,galHDF5Obj,z,frame,searchPattern,lineName):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         # Select redshift output
         out = galHDF5Obj.selectOutput(z)
+        z = galHDF5Obj.nearestRedshift(z)
+        # Get emission line wavelength        
+        lineWavelength = self.getWavelength(lineName)
+        if frame == "observed":
+            lineWavelength *= (1.0+float(z))
         # Extract filters
         topHatDatasetNames = fnmatch.filter(galHDF5Obj.availableDatasets(z),searchPattern)        
         # Extract wavelengths
-        topHatWavelengths = np.array([float(self.getTopHatWavelength(topHatName,lineWavelength)) for topHatName in topHatDatasetNames])
+        topHatWavelengths = np.array([float(self.getTopHatWavelength(topHatName,lineWavelength,frame,z)) for topHatName in topHatDatasetNames])
         if len(topHatDatasetNames) == 2:
             # Working with pair of top hat filters either side of emission line            
             iLow = np.argmin(topHatWavelengths)
@@ -337,9 +344,9 @@ class GalacticusEmissionLines(object):
                 resolution+":"+frame+":z"+redshift+dust+option
         else:
             raise ValueError(funcname+"(): calculation method not recognised! Should be 'Central' or 'Offset',")
-        continuumLuminosity = self.computeContinuumLuminosity(galHDF5Obj,z,searchPattern,lineWavelength)
+        continuumLuminosity = self.computeContinuumLuminosity(galHDF5Obj,float(redshift),frame,searchPattern,lineName)
         # Compute equivalent width        
-        nonZeroContinuum = continuumLuminosity>0.0
+        nonZeroContinuum = continuumLuminosity>0.0    
         equivalentWidth = np.ones_like(lineLuminosity)*-999.9
         mask = np.logical_and(nonZeroContinuum,lineLuminosity>=0.0)
         np.place(equivalentWidth,mask,(lineLuminosity[mask]/continuumLuminosity[mask]))

@@ -88,6 +88,14 @@ class GalacticusHDF5(HDF5):
                         history[p] = history[p]*unit
         return history.view(np.recarray)
 
+
+    def nearestRedshift(self,z):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Select epoch closest to specified redshift
+        iselect = np.argmin(np.fabs(self.outputs.z-z))
+        return self.outputs.z[iselect]
+
+
     def selectOutput(self,z):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Select epoch closest to specified redshift
