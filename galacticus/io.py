@@ -38,18 +38,6 @@ class GalacticusHDF5(HDF5):
                 d = { a:k for a in self.fileObj["Parameters/"+k].attrs.keys()}
                 self.parameters_parents.update(d)
 
-        # Store output epochs
-        Outputs = self.fileObj["Outputs"]
-        nout = len(Outputs.keys())
-        isort = np.argsort(np.array([ int(key.replace("Output","")) for key in Outputs.keys()]))
-        self.outputs = np.zeros(nout,dtype=[("iout",int),("a",float),("z",float)])
-        for i,out in enumerate(np.array(Outputs.keys())[isort]):
-            self.outputs["iout"][i] = int(out.replace("\n","").replace("Output",""))
-            a = float(Outputs[out].attrs["outputExpansionFactor"])
-            self.outputs["a"][i] = a
-            self.outputs["z"][i] = (1.0/a) - 1.0
-        self.outputs = self.outputs.view(np.recarray)
-
         # Store cosmology object        
         self.cosmology = Cosmology(omega0=float(self.parameters["OmegaMatter"]),\
                                        lambda0=float(self.parameters["OmegaDarkEnergy"]),\
@@ -59,6 +47,20 @@ class GalacticusHDF5(HDF5):
                                        ns=float(self.parameters["index"]),\
                                        h_independent=False)
         
+        # Store output epochs
+        self.outputs = None
+        if "Outputs" in self.fileObj:
+            Outputs = self.fileObj["Outputs"]
+            nout = len(Outputs.keys())
+            isort = np.argsort(np.array([ int(key.replace("Output","")) for key in Outputs.keys()]))
+            self.outputs = np.zeros(nout,dtype=[("iout",int),("a",float),("z",float)])
+            for i,out in enumerate(np.array(Outputs.keys())[isort]):
+                self.outputs["iout"][i] = int(out.replace("\n","").replace("Output",""))
+                a = float(Outputs[out].attrs["outputExpansionFactor"])
+                self.outputs["a"][i] = a
+                self.outputs["z"][i] = (1.0/a) - 1.0
+            self.outputs = self.outputs.view(np.recarray)
+
         return
     
     def globalHistory(self,props=None,si=False):        
