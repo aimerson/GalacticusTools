@@ -177,6 +177,25 @@ class FiltersParameters(object):
 # MISC FUNCTIONS
 ####################################################################            
 
+def compareParameterSets(paramsA,paramsB,ignore=[],verbose=False):
+    paramsMatch = True   
+    keysA = list(set(paramsA.keys()).difference(ignore))
+    keysB = list(set(paramsB.keys()).difference(ignore))    
+    commonParams = list(set(keysA).intersection(keysB))
+    dummy = commonParams.pop(commonParams.index("galacticusOutputFileName"))
+    commonMatch = [fnmatch.fnmatch(paramsA[p],paramsB[p]) for p in commonParams]    
+    differenceParams = []
+    if not all(commonMatch):
+        differenceParams = [] + list(np.array(commonParams)[np.invert(commonMatch)])
+    uncommonParams = list(set(keysA).symmetric_difference(keysB))
+    differenceParams = differenceParams + uncommonParams
+    if verbose:
+        if len(differenceParams)>0:
+            diffStr = "compareParameterSets(): following parameters do not match:\n    "+"\n    ".join(differenceParams)
+            print(diffStr)
+    return len(differenceParams)>0
+    
+
 def validate_parameters(xmlfile,GALACTICUS_ROOT):
     script = GALACTICUS_ROOT+"/scripts/aux/validateParameters.pl"
     os.system(script+" "+xmlfile)
