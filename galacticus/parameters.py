@@ -183,7 +183,7 @@ def compareParameterSets(paramsA,paramsB,ignore=[],verbose=False):
     keysB = list(set(paramsB.keys()).difference(ignore))    
     commonParams = list(set(keysA).intersection(keysB))
     dummy = commonParams.pop(commonParams.index("galacticusOutputFileName"))
-    commonMatch = [fnmatch.fnmatch(paramsA[p],paramsB[p]) for p in commonParams]    
+    commonMatch = [paramsA[p]==paramsB[p] for p in commonParams]    
     differenceParams = []
     if not all(commonMatch):
         differenceParams = [] + list(np.array(commonParams)[np.invert(commonMatch)])

@@ -7,6 +7,17 @@ from ..hdf5 import HDF5
 from ..parameters import compareParameterSets
 
 
+def copyHDF5File(ifile,ofile,overwrite=False):
+    if not os.path.exists(ifile):
+        raise IOError("compyHDF5File(): input file '"+ifile+"' does NOT exist!")
+    if os.path.exists(ofile) and not overwrite:
+        return
+    OUT = HDF5(ofile,'w')
+    GAL = GalacticusHDF5(ifile,'r')
+    dummy = [OUT.cpGroup(ifile,group) for group in GAL.fileObj.keys()]
+    return
+
+
 class mergeHDF5Outputs(HDF5):
 
     def __init__(self,outfile):        
@@ -25,7 +36,7 @@ class mergeHDF5Outputs(HDF5):
             raise ValueError(funcname+"(): cannot append outputs -- expansion factors do not match!")
         propsSelf = self.fileObj["Outputs/"+outName+"/nodeData"].keys()
         propsGAL = GAL.fileObj["Outputs/"+outName+"/nodeData"].keys()
-        missingProps = list(set(propsSelf).difference(propsGAL)))
+        missingProps = list(set(propsSelf).difference(propsGAL))
         if len(missingProps)>0:
             self.fileObj.close()
             missingStr = "\n    MISSING PROPERTIES:\n    "+"\n    ".join(missingProps)
@@ -39,7 +50,7 @@ class mergeHDF5Outputs(HDF5):
         GAL = GalacticusHDF5(ifile,"r")
         if GAL.outputs is None:
             if progressOBJ is not None:
-                progresOBJ.increment()
+                progressOBJ.increment()
                 progressOBJ.print_status_line()
             return
         if self._initialCopy:
@@ -56,9 +67,11 @@ class mergeHDF5Outputs(HDF5):
             self._initialCopy = False
         else:
             outputNames = self.fileObj["Outputs"].keys()
-        if not compareParameterSet(GAL.parameters,self.parameters,ignore=ingoreParameters):
+        if not compareParameterSets(GAL.parameters,self.parameters,ignore=ignoreParameters):
             self.fileObj.close()
-            raise ValueError(funcname+"(): cannot add file -- parameters not consistent!")
-        
+            raise ValueError(funcname+"(): cannot add file -- parameters not consistent!")        
         dummy = [self.addOutput(self,GAL,outName) for outName in GAL["Outputs"].keys()]
+        if progressOBJ is not None:
+            progressOBJ.increment()
+            progressOBJ.print_status_line()
         return
