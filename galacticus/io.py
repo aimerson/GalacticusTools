@@ -177,8 +177,6 @@ class GalacticusHDF5(HDF5):
                 print(funcname+"(): calculating starFormationRate (z="+str(z)+")")
             getStarFormationRate(self,z,"totalStarFormationRate",overwrite=overwrite,returnDataset=False)
 
-
-
         return
 
 
