@@ -33,15 +33,17 @@ class mergeHDF5Outputs(HDF5):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         aSelf = self.fileObj["Outputs/"+outName].attrs["outputExpansionFactor"]
         aGAL = GAL.fileObj["Outputs/"+outName].attrs["outputExpansionFactor"]
-        if not fnmatch(aSelf,aGAL):
+        if aSelf != aGAL:
             raise ValueError(funcname+"(): cannot append outputs -- expansion factors do not match!")
-        propsSelf = self.fileObj["Outputs/"+outName+"/nodeData"].keys()
-        propsGAL = GAL.fileObj["Outputs/"+outName+"/nodeData"].keys()
+        propsSelf = list(map(str,self.fileObj["Outputs/"+outName+"/nodeData"].keys()))        
+        propsGAL = list(map(str,GAL.fileObj["Outputs/"+outName+"/nodeData"].keys()))
+        if len(propsGAL) == 0:
+            return
         missingProps = list(set(propsSelf).difference(propsGAL))
         if len(missingProps)>0:
             self.fileObj.close()
             missingStr = "\n    MISSING PROPERTIES:\n    "+"\n    ".join(missingProps)
-            raise KeyError(funcname+"(): cannot append output -- some datasets are missing!"+missingStr)
+            raise KeyError(funcname+"(): cannot append output -- some datasets are missing!"+str(missingStr))
         dummy = [self.addDataset("Outputs/"+outName+"/nodeData/",datasetName,np.array(GAL.fileObj["Outputs/"+outName+"/nodeData/"+datasetName]),append=True)\
                      for datasetName in propsGAL]
         return
@@ -72,7 +74,7 @@ class mergeHDF5Outputs(HDF5):
             if not compareParameterSets(GAL.parameters,self.parameters,ignore=ignoreParameters):
                 self.fileObj.close()
                 raise ValueError(funcname+"(): cannot add file -- parameters not consistent!")        
-        dummy = [self.addOutput(self,GAL,outName) for outName in GAL["Outputs"].keys()]
+        dummy = [self.addOutput(GAL,outName) for outName in GAL.fileObj["Outputs"].keys()]
         if progressOBJ is not None:
             progressOBJ.increment()
             progressOBJ.print_status_line()
