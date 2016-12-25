@@ -20,12 +20,13 @@ def copyHDF5File(ifile,ofile,overwrite=False):
 
 class mergeHDF5Outputs(HDF5):
 
-    def __init__(self,outfile):        
+    def __init__(self,outfile,checkParameters=True):        
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Initalise HDF5 class
         super(mergeHDF5Outputs, self).__init__(outfile,"a")        
         self._initialCopy = True
+        self._checkParameters = checkParameters
         return
 
     def addOutput(self,GAL,outName):
@@ -67,9 +68,10 @@ class mergeHDF5Outputs(HDF5):
             self._initialCopy = False
         else:
             outputNames = self.fileObj["Outputs"].keys()
-        if not compareParameterSets(GAL.parameters,self.parameters,ignore=ignoreParameters):
-            self.fileObj.close()
-            raise ValueError(funcname+"(): cannot add file -- parameters not consistent!")        
+        if self._checkParameters:
+            if not compareParameterSets(GAL.parameters,self.parameters,ignore=ignoreParameters):
+                self.fileObj.close()
+                raise ValueError(funcname+"(): cannot add file -- parameters not consistent!")        
         dummy = [self.addOutput(self,GAL,outName) for outName in GAL["Outputs"].keys()]
         if progressOBJ is not None:
             progressOBJ.increment()
