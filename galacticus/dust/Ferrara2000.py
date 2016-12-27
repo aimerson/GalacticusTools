@@ -153,6 +153,21 @@ class dustAtlas(DustProperties):
         return attenuation
 
 
+    def getCloudGasMetalsSurfaceDensity(self,galHDF5Obj,z,component,mcloud=1.0e6,rcloud=16.0e-6):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        # Get nearest redshift output
+        out = galHDF5Obj.selectOutput(z)
+        # Get metal mass
+        gasMetalMass = np.array(out["nodeData/"+component+"AbundancesGasMetals"])
+        gasMass = np.array(out["nodeData/"+component+"massStellar"])
+        metallicity = gasMetalMass/gasMass
+        # Compute surface density
+        mega = 1.0e6
+        gasMetalsSurfaceDensityCentral = metallicity*mcloud/(2.0*Pi*(mega*rcloud)**2)
+        np.place(gasMetalsSurfaceDensityCentral,np.isnan(scaleLength),0.0)
+        return gasMetalsSurfaceDensityCentral
+    
+
 
 
     

@@ -106,6 +106,10 @@ class GalacticusHDF5(HDF5):
         if self._verbose:
             print(funcname+"(): Nearest output is "+outstr+" (redshift = "+str(self.outputs.z[iselect])+")")
         return self.fileObj["Outputs/"+outstr]
+
+    def getRedshiftString(self,z):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        return fnmatch.filter(fnmatch.filter(self.availableDatasets(z),"*z[0-9].[0-9]*")[0].split(":"),"z*")[0]
         
     def availableDatasets(self,z):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
