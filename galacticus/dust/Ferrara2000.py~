@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-import sys,os,fnmatch
+import sys,os,fnmatch,re
 import numpy as np
 import xml.etree.ElementTree as ET
 import pkg_resources
@@ -8,7 +8,7 @@ from scipy.interpolate import RegularGridInterpolator
 
 from .utils import DustProperties
 from ..io import GalacticusHDF5
-from ..EmissionLines import emissionLines
+from ..EmissionLines import GalacticusEmissionLines
 from ..Inclination import getInclination
 from ..GalacticusErrors import ParseError
 from ..Filters import GalacticusFilters
@@ -95,20 +95,21 @@ class dustAtlas(DustProperties):
         # Set verbosity
         self._verbose = verbose        
         # Initialise DustProperties class
-        super(dustAtlas,self).__init__()
+        super(dustAtlas, self).__init__()
         # Load dust atlas file
-        self.dustFile = pkg_resources.resource_filename(__name__,"data/dust/atlasFerrara2000/attenuations_MilkyWay_dustHeightRatio1.0.xml")
+        self.dustFile = pkg_resources.resource_filename(__name__,"../data/dust/Ferrara2000/attenuations_MilkyWay_dustHeightRatio1.0.xml")
+        print self.dustFile
         if not os.path.exists(self.dustFile):
             raise IOError(classname+"(): Cannot find Ferrara et al. (2000) dust atlas file!")
         else:
-            if self.verbose:
+            if self._verbose:
                 print(classname+"(): Loading Ferrara et al. (2000) dust atlas file...")
         self.dustData = ET.parse(self.dustFile)
         # Construct map of XML parents/descendents
         self.dustRoot = self.dustData.getroot()
         self.dustMap = {c.tag:p for p in self.dustRoot.iter() for c in p}        
         # Load wavelengths
-        if self.verbose:
+        if self._verbose:
             print(classname+"(): Extracting wavelengths...")
         self.wavelengths = np.copy([ float(lam.text) for lam in self.dustMap["wavelengths"].iter("lambda")])        
         # Load attenuations for components
@@ -116,24 +117,24 @@ class dustAtlas(DustProperties):
         self.spheroidAttenuation = None
         for comp in self.dustData.iter("components"):
             if comp.find("name").text == "bulge":                
-                if self.verbose:
+                if self._verbose:
                     print(classname+"(): Loading spheroid attenuations...")
-                self.spheroidAttenuation = loadSpheroidAttenuation(comp,verbose=self.verbose)                
+                self.spheroidAttenuation = loadSpheroidAttenuation(comp,verbose=self._verbose)                
                 axes = (self.spheroidAttenuation["size"],self.spheroidAttenuation["inclination"],\
                             self.spheroidAttenuation["opticalDepth"],self.wavelengths)                
                 self.spheroidInterpolator = RegularGridInterpolator(axes,self.spheroidAttenuation["attenuation"],\
                                                                         bounds_error=interpolateBoundsError,\
                                                                         fill_value=interpolateFillValue)
             else:
-                if self.verbose:
+                if self._verbose:
                     print(classname+"(): Loading disk attenuations...")
-                self.diskAttenuation = loadDiskAttenuation(comp,verbose=self.verbose)
+                self.diskAttenuation = loadDiskAttenuation(comp,verbose=self._verbose)
                 axes = (self.diskAttenuation["inclination"],self.diskAttenuation["opticalDepth"],self.wavelengths)
                 self.diskInterpolator = RegularGridInterpolator(axes,self.diskAttenuation["attenuation"],\
                                                                     bounds_error=interpolateBoundsError,\
                                                                     fill_value=interpolateFillValue)                                                                
         # Initialise classes for emission lines and filters
-        self.emissionLinesClass = emissionLines()
+        self.emissionLinesClass = GalacticusEmissionLines()
         self.filtersDatabase = GalacticusFilters()
         return
 
@@ -152,6 +153,21 @@ class dustAtlas(DustProperties):
         #np.place(attenuation,attenuation<0.0,0.0)
         return attenuation
 
+
+    def getCloudGasMetalsSurfaceDensity(self,galHDF5Obj,z,component,mcloud=1.0e6,rcloud=16.0e-6):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        # Get nearest redshift output
+        out = galHDF5Obj.selectOutput(z)
+        # Get metal mass
+        gasMetalMass = np.array(out["nodeData/"+component+"AbundancesGasMetals"])
+        gasMass = np.array(out["nodeData/"+component+"massStellar"])
+        metallicity = gasMetalMass/gasMass
+        # Compute surface density
+        mega = 1.0e6
+        gasMetalsSurfaceDensityCentral = metallicity*mcloud/(2.0*Pi*(mega*rcloud)**2)
+        np.place(gasMetalsSurfaceDensityCentral,np.isnan(scaleLength),0.0)
+        return gasMetalsSurfaceDensityCentral
+    
 
 
 
@@ -225,6 +241,8 @@ class dustAtlas(DustProperties):
             print(funcname+"(): Filter information:\n        "+infoLine)
         dustExtension = ":dustAtlas"
         dustOption = MATCH.group(6)
+        faceOn = False
+        includeClouds = True
         if dustOption is not None:
             dustExtension = dustExtension + dustOption
             if "noclouds" in dustOption.lower():
@@ -234,7 +252,7 @@ class dustAtlas(DustProperties):
             if "faceon" in dustOption.lower():
                 faceOn = True
             else:
-                faceOn = False
+                faceOn = False            
         # Get name of unattenuated dataset
         luminosityDataset = datasetName.replace(dustExtension,"")
         # Construct filter label

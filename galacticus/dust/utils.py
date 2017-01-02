@@ -4,12 +4,13 @@ import sys,os,re,fnmatch
 import numpy as np
 from ..io import GalacticusHDF5
 from ..constants import Pi,Parsec,massAtomic,massSolar,massFractionHydrogen
-from ..EmissionLines import getLineNames
+from ..EmissionLines import getLineNames,GalacticusEmissionLines
+from ..Filters import GalacticusFilters
 
 
 class DustProperties(object):
     
-    def ___init__(self):
+    def __init__(self):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name    
         # Compute and store optical depth normalisation
@@ -21,7 +22,7 @@ class DustProperties(object):
         self.opticalDepthNormalization = (1.0/self.opticalDepthToMagnitudes)*(self.AV_to_EBV/self.NH_to_EBV)
         self.opticalDepthNormalization *= (massFractionHydrogen/massAtomic)*(massSolar/(Parsec*hecto)**2)/self.localISMMetallicity
         # Create objects to store filter and emission line information
-        self.emissionLinesClass = emissionLines()
+        self.emissionLinesClass = GalacticusEmissionLines()
         self.filtersDatabase = GalacticusFilters()
         return
 
@@ -29,7 +30,7 @@ class DustProperties(object):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name            
         if name in self.emissionLinesClass.getLineNames():
             # Emission line:
-            effectiveWavelength = self.emissionLinesClass.getWavelength(filter)
+            effectiveWavelength = self.emissionLinesClass.getWavelength(name)
         else:
             # Photometric band
             effectiveWavelength = self.filtersDatabase.getEffectiveWavelength(name,verbose=verbose)
