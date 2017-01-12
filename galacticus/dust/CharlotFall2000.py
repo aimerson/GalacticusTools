@@ -5,20 +5,18 @@ import sys,os,re,fnmatch
 import numpy as np
 from ..config import *
 from ..GalacticusErrors import ParseError
-from ..EmissionLines import emissionLines
-from ..Filters import GalacticusFilters
-from ..constants import mega
-from ..constants import Pi,Parsec,massAtomic,massSolar,massFractionHydrogen
+from ..utils.progress import Progress
+from .utils import DustProperties
 
 
-
-class CharlotFall2000(object):
+class CharlotFall2000(DustProperties):
     
     def __init__(self,opticalDepthISMFactor=1.0,opticalDepthCloudsFactor=1.0,\
                      wavelengthZeroPoint=5500,wavelengthExponent=0.7,\
                      verbose=False):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        super(CharlotFall2000,self).__init__()
         self._verbose = verbose        
         # Specify constants in extinction model 
         # -- "wavelengthExponent" is set to the value of 0.7 found by Charlot & Fall (2000). 
@@ -29,122 +27,74 @@ class CharlotFall2000(object):
         self.opticalDepthCloudsFactor = opticalDepthCloudsFactor
         self.wavelengthZeroPoint = wavelengthZeroPoint
         self.wavelengthExponent = wavelengthExponent
-        # Initialise classes for emission lines and filters
-        self.emissionLinesClass = emissionLines()
-        self.filtersDatabase = GalacticusFilters()
         return
 
 
-
-
-    def getGasMetallicitySurfaceDensity(self,galHDF5Obj,z,component):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
-        # Get nearest redshift output
-        out = galHDF5Obj.selectOutput(z)
-        # Compute central surface density in M_Solar/pc^2
-        gasMass = np.array(out["nodeData/"+component+"MassGas"])
-        gasMetalMass = np.array(out["nodeData/"+component+"AbundancesGasMetals"])
-        noGasMetals = gasMetalMass <= 0.0
-        scaleLength = np.array(out["nodeData/"+component+"Radius"])
-        notPresent = scaleLength <= 0.0
-        gasMetallicity = gasMetalMass/gasMass
-        np.place(gasMetallicity,noGasMetals,0.0)
-        mega = 1.0e6
-        gasMetalsSurfaceDensityCentral = gasMetalMass/(2.0*Pi*(mega*scaleLength)**2)
-        np.place(gasMetalsSurfaceDensityCentral,notPresent,0.0)        
-        
-
-
-
-
-    def attenuate(self,galHDF5Obj,z,datasetName,overwrite=False):
+    def attenuate(self,galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True,progressObj=None)):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         # Get nearest redshift output
         out = galHDF5Obj.selectOutput(z)
         # Check if dust attenuated luminosity already calculated
         if datasetName in galHDF5Obj.availableDatasets(z) and not overwrite:
             return np.array(out["nodeData/"+datasetName])        
-        ####################################################################
-        # Compute attenuation 
-        if self.debug:
-            print(funcname+"(): Processing dataset '"+datasetName+"'")                    
-        if not fnmatch.fnmatch(datasetName,"*:dustCharlotFall2000*"):
+        # Check is a luminosity for attenuation
+        MATCH = re.search(r"^(disk|spheroid)([^:]+):([^:]+):([^:]+):z([\d\.]+):dustCharlotFall2000([^:]+)?",datasetName)
+        if not MATCH:
             raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
-        # Check whether to include attenuation by molecular clouds and get name of unattenuated dataset
+        # Extract dataset information
+        component = MATCH.group(1)
+        if component not in ["disk","spheroid"]:
+            raise ParseError(funcname+"(): Cannot identify if '"+datasetName+"' corresponds to disk or spheroid!")
+        luminosityOrOpticalDepth = MATCH.group(2)
+        if luminosityOrOpticalDepth not in ["CentralOpticalDepthISM","CentralOpticalDepthClouds","LuminositiesStellar","LineLuminosity"]:
+            raise ParseError(funcname+"(): Cannot identify type of luminosity or optical depth from '"+datasetName+"'!")
+        filter = MATCH.group(3)
+        frame = MATCH.group(4)
+        redshift = MATCH.group(5)
+        if self._verbose:
+            infoLine = "filter={0:s}  frame={1:s}  redshift={2:s}".format(filter,frame,redshift)
+            print(funcname+"(): Filter information:\n        "+infoLine)
+        dustExtension = ":dustCharlotFall"
+        dustOption = MATCH.group(6)
+        faceOn = False
         includeClouds = True
-        dustExtension = ":dustCharlotFall2000"
-        if "noClouds" in datasetName:
-            opticalDepthCloudsFactor = 0.0
-            dustExtension = dustExtension + "noClouds"
-        else:
-            opticalDepthCloudsFactor = self.opticalDepthCloudsFactor
-        luminosityDataset = datasetName.replace(dustExtension,"")
+        if dustOption is not None:
+            dustExtension = dustExtension + dustOption
+            if "noclouds" in dustOption.lower():
+                includeClouds = False
+                opticalDepthCloudsFactor = 0.0
+            else:
+                includeClouds = True
+                opticalDepthCloudsFactor = self.opticalDepthCloudsFactor
+            if "faceon" in dustOption.lower():
+                faceOn = True
+            else:
+                faceOn = False
         # Get name for luminosity from recent star formation
+        luminosityDataset = datasetName.replace(dustExtension,"")
         recentLuminosityDataset = luminosityDataset+":recent"
         if not recentLuminosityDataset in out["nodeData"].keys():
             raise IOError(funcname+"(): Missing luminosity for recent star formation for filter '"+luminosityDataset+"'!")
-        # Get component of dataset (disk or spheroid)
-        if luminosityDataset.startswith("disk"):
-            component = "disk"
-        elif luminosityDataset.startswith("spheroid"):
-            component = "spheroid"
-        else:
-            raise ParseError(funcname+"(): Cannot identify if '"+datasetName+"' corresponds to disk or spheroid!")        
-        # Extract dataset information        
-        datasetInfo = luminosityDataset.split(":")
-        opticalDepthOrLuminosity = datasetInfo[0].replace(component,"")
-        if opticalDepthOrLuminosity == "LineLuminosity":
-            emissionLineFlag = True
-        else:
-            emissionLineFlag = False
-        filter = datasetInfo[1]
-        frame = datasetInfo[2]
-        redshift = datasetInfo[3].replace("z","")
-        if self.debug:
-            infoLine = "filter={0:s}  frame={1:s}  redshift={2:s}".format(filter,frame,redshift)
-            print(funcname+"(): Filter information:\n        "+infoLine)            
         # Construct filter label
         filterLabel = filter+":"+frame+":z"+redshift
         # Compute effective wavelength for filter/line
-        if emissionLineFlag:
-            # i) emission lines
-            effectiveWavelength = self.emissionLinesClass.getWavelength(filter)
-            if debug:
-                infoLine = "filter={0:s}  effectiveWavelength={1:s}".format(filter,effectiveWavelength)
-                print(funcname+"(): Emission line filter information:\n        "+infoLine)            
+        if frame == "observed":
+            effectiveWavelength = self.effectiveWavelength(filter,redshift=float(redshift),verbose=self._verbose)
         else:
-            # ii) photometric filters
-            effectiveWavelength = self.filtersDatabase.getEffectiveWavelength(filter,verbose=self.debug)
-            if frame == "observed":
-                effectiveWavelength /= (1.0+float(redshift))
-            if self.debug:
-                infoLine = "filter={0:s}  effectiveWavelength={1:s}".format(filter,effectiveWavelength)
-                print(funcname+"(): Photometric filter information:\n        "+infoLine)            
-        # Specify required constants
-        localISMMetallicity = 0.02  # ... Metallicity in the local ISM.
-        AV_to_EBV = 3.10            # ... (A_V/E(B-V); Savage & Mathis 1979)                                                                                                                           
-        NH_to_EBV = 5.8e21          # ... (N_H/E(B-V); atoms/cm^2/mag; Savage & Mathis 1979)  
-        opticalDepthToMagnitudes = 2.5*np.log10(np.exp(1.0)) # Conversion factor from optical depth to magnitudes of extinction.
-        hecto = 1.0e2
-        opticalDepthNormalization = (1.0/opticalDepthToMagnitudes)*(AV_to_EBV/NH_to_EBV)
-        opticalDepthNormalization *= (massFractionHydrogen/massAtomic)*(massSolar/(Parsec*hecto)**2)/localISMMetallicity
-        # Compute central surface density in M_Solar/pc^2
+            effectiveWavelength = self.effectiveWavelength(filter,redshift=None,verbose=self._verbose)
+        # Compute gas metallicity and central surface density in M_Solar/pc^2
         gasMass = np.array(out["nodeData/"+component+"MassGas"])
         gasMetalMass = np.array(out["nodeData/"+component+"AbundancesGasMetals"])
-        noGasMetals = gasMetalMass <= 0.0
+        gasMetallicity = self.computeGasMetallicity(np.copy(gasMass),np.copy(gasMetalMass))
         scaleLength = np.array(out["nodeData/"+component+"Radius"])
-        notPresent = scaleLength <= 0.0
-        gasMetallicity = gasMetalMass/gasMass
-        np.place(gasMetallicity,noGasMetals,0.0)
-        mega = 1.0e6
-        gasMetalsSurfaceDensityCentral = gasMetalMass/(2.0*Pi*(mega*scaleLength)**2)
-        np.place(gasMetalsSurfaceDensityCentral,notPresent,0.0)
+        gasMetalsSurfaceDensityCentral = self.computeCentralGasMetalsSurfaceDensity(np.copy(gasMetalMass),np.copy(scaleLength))
+        del gasMass,gasMetalMass,scaleLength
         # Compute central optical depths
         wavelengthFactor = (effectiveWavelength/self.wavelengthZeroPoint)**self.wavelengthExponent
-        opticalDepth = opticalDepthNormalization*np.copy(gasMetalsSurfaceDensityCentral)/wavelengthFactor
+        opticalDepth = self.opticalDepthNormalization*np.copy(gasMetalsSurfaceDensityCentral)/wavelengthFactor
         opticalDepthISM = self.opticalDepthISMFactor*opticalDepth
-        opticalDepthClouds = opticalDepthCloudsFactor*np.copy(gasMetallicity)/localISMMetallicity/wavelengthFactor
-        del gasMetalsSurfaceDensityCentral,gasMetallicity,gasMass,gasMetalMass,noGasMetals,scaleLength,noPresent
+        opticalDepthClouds = self.opticalDepthCloudsFactor*np.copy(gasMetallicity)/self.localISMMetallicity/wavelengthFactor
+        del gasMetalsSurfaceDensityCentral,gasMetallicity
         # Compute the attenutations of ISM and clouds
         attenuationsISM = np.exp(-opticalDepthISM)
         attenuationsClouds = np.exp(-opticalDepthClouds)
@@ -166,6 +116,12 @@ class CharlotFall2000(object):
         ####################################################################
         # Write property to file and return result
         galHDF5Obj.addDataset(out.name+"/nodeData/",datasetName,result)
-        return result
+        if progressObj is not None:
+            progressObj.increment()
+            progressObj.print_status_line()
+        if returnDataset:
+            return result
+        return
+
 
 

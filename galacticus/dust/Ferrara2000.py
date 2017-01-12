@@ -268,10 +268,14 @@ class dustAtlas(DustProperties):
             inclinations = getInclination(galHDF5Obj,z,overwrite=overwrite,returnDataset=True)
         # Get bulge sizes
         sizes = self.getBulgeSizes(galHDF5Obj,z,component)
-        # Compute central surface density in M_Solar/pc^2
-        gasMetalsSurfaceDensityCentral = self.getCentralGasMetalsSurfaceDensity(galHDF5Obj,z,component)
+        # Compute gas metallicity and central surface density in M_Solar/pc^2
+        gasMetalMass = np.array(out["nodeData/"+component+"AbundancesGasMetals"])
+        scaleLength = np.array(out["nodeData/"+component+"Radius"])
+        gasMetalsSurfaceDensityCentral = self.computeCentralGasMetalsSurfaceDensity(np.copy(gasMetalMass),np.copy(scaleLength))
+        del gasMetalMass,scaleLength        
         # Compute central optical depths
-        opticalDepthCentral = self.opticalDepthNormalization*gasMetalsSurfaceDensityCentral
+        opticalDepthCentral = self.opticalDepthNormalization*np.copy(gasMetalsSurfaceDensityCentral)        
+        del gasMetalsSurfaceDensityCentral
         if not extrapolateInTau:
             if fnmatch.fnmatch(component,"spheroid"):
                 tauMinimum = self.spheroidAttenuation["opticalDepth"].min()
@@ -286,7 +290,7 @@ class dustAtlas(DustProperties):
         # Interpolate dustAtlas table to get attenuations
         wavelengths = effectiveWavelength*np.ones_like(inclinations)
         attenuations = self.InterpolateDustTable(component,wavelengths,inclinations,opticalDepthCentral,bulgeSize=sizes)
-        np.place(attenuations,np.isnan(scaleLength),1.0)
+        np.place(attenuations,np.isnan(sizes),1.0)
         if any(attenuations>1.0):
             print("WARNING! "+funcname+"(): Some attenuations greater than unity! This is not physical!")
         if any(attenuations<0.0):

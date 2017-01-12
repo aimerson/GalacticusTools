@@ -3,7 +3,7 @@
 import sys,os,re,fnmatch
 import numpy as np
 from ..io import GalacticusHDF5
-from ..constants import Pi,Parsec,massAtomic,massSolar,massFractionHydrogen
+from ..constants import Pi,Parsec,massAtomic,massSolar,massFractionHydrogen,mega
 from ..EmissionLines import getLineNames,GalacticusEmissionLines
 from ..Filters import GalacticusFilters
 
@@ -42,3 +42,23 @@ class DustProperties(object):
         return effectiveWavelength
     
         
+    def computeGasMetallicity(self,gasMass,gasMetalMass):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name            
+        # Create empty array
+        gasMetallicity = np.zeros_like(gasMass)
+        # Mask to avoid divide by zero
+        hasColdGas = gasMass > 0.0
+        # Compute metallicity
+        np.place(gasMetallicity,mask,gasMetalMass[mask]/gasMass[mask])
+        return gasMetallicity
+        
+
+    def computeCentralGasMetalsSurfaceDensity(self,gasMetalMass,scaleLength):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name            
+        # Create empty array
+        gasMetalsSurfaceDensityCentral = np.zeros_like(gasMetalMass)
+        # Masks to avoid divide by zero        
+        nonZeroSize = scaleLength > 0.0
+        # Compute central surface density in M_Solar/pc^2
+        np.place(gasMetalsSurfaceDensityCentral,nonZeroSize,gasMetalMass[nonZeroSize]/(2.0*Pi*(mega*scaleLength[NonZeroSize])**2))
+        return gasMetalsSurfaceDensityCentral

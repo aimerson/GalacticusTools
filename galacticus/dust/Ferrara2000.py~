@@ -98,7 +98,6 @@ class dustAtlas(DustProperties):
         super(dustAtlas, self).__init__()
         # Load dust atlas file
         self.dustFile = pkg_resources.resource_filename(__name__,"../data/dust/Ferrara2000/attenuations_MilkyWay_dustHeightRatio1.0.xml")
-        print self.dustFile
         if not os.path.exists(self.dustFile):
             raise IOError(classname+"(): Cannot find Ferrara et al. (2000) dust atlas file!")
         else:
