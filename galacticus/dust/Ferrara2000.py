@@ -212,7 +212,7 @@ class dustAtlas(DustProperties):
 
 
 
-    def attenuate(self,galHDF5Obj,z,datasetName,overwrite=False,\
+    def attenuate(self,galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True,progressObj=None,\
                       extrapolateInSize=True,extrapolateInTau=True):        
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         # Get nearest redshift output
@@ -298,5 +298,10 @@ class dustAtlas(DustProperties):
         # Apply attenuations and return/store result        
         result = np.array(out["nodeData/"+luminosityDataset])*attenuations
         galHDF5Obj.addDataset(out.name+"/nodeData/",datasetName,result)
-        return result
+        if progressObj is not None:
+            progressObj.increment()
+            progressObj.print_status_line()
+        if returnDataset:
+            return result
+        return
         

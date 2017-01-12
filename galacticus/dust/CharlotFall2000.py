@@ -30,7 +30,7 @@ class CharlotFall2000(DustProperties):
         return
 
 
-    def attenuate(self,galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True,progressObj=None)):
+    def attenuate(self,galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True,progressObj=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         # Get nearest redshift output
         out = galHDF5Obj.selectOutput(z)
