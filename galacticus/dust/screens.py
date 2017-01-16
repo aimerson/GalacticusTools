@@ -10,10 +10,10 @@ from scipy.interpolate import interp1d
 from ..constants import angstrom,micron
 
 ########################################################################
-# CLASSES FOR DUST SLAB MODELS
+# CLASSES FOR DUST SCREEN MODELS
 ########################################################################
 
-class SLAB(object):
+class SCREEN(object):
 
     def __init__(self,Rv=None,dustTable=None):
         self.Rv = Rv
@@ -26,7 +26,7 @@ class SLAB(object):
 
 
 
-class Allen(SLAB):
+class Allen(SCREEN):
     
     def __init__(self,Rv=3.1):
         classname = self.__class__.__name__
@@ -44,13 +44,13 @@ class Allen(SLAB):
         del wavelengths        
         dustTable.klambda = np.copy(klambda)
         del klambda
-        # Initalise SLAB class
+        # Initalise SCREEN class
         super(Allen,self).__init__(Rv=Rv,dustTable=dustTable)        
         self.reference = "Allen (1976) [MW]"
         return
 
     
-class Calzetti(SLAB):
+class Calzetti(SCREEN):
     
     def __init__(self,Rv=4.05):
         classname = self.__class__.__name__
@@ -75,14 +75,14 @@ class Calzetti(SLAB):
         dustTable.klambda = lowRange(dustTable.wavelength) + Rv
         np.place(dustTable.klambda,mask,uppRange(dustTable.wavelength)[mask]+Rv)                
         dustTable.klambda /= Rv
-        # Initalise SLAB class
+        # Initalise SCREEN class
         super(Calzetti,self).__init__(Rv=Rv,dustTable=dustTable)        
         self.reference = "Calzetti et al. (2000) [SB]"
         return
 
 
 
-class Fitzpatrick(SLAB):
+class Fitzpatrick(SCREEN):
     def __init__(self,galaxy="MW",Rv=None):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
@@ -138,13 +138,13 @@ class Fitzpatrick(SLAB):
         dustTable.klambda = np.append(np.copy(klambda),np.copy(klambdaAllen))
         dustTable.klambda /= Rv
         del wavelengths,klambda
-        # Initalise SLAB class
+        # Initalise SCREEN class
         super(Fitzpatrick,self).__init__(Rv=Rv,dustTable=dustTable)        
         return
     
     
 
-class Prevot(SLAB):
+class Prevot(SCREEN):
     
     def __init__(self,Rv=None):
         classname = self.__class__.__name__
@@ -165,14 +165,14 @@ class Prevot(SLAB):
         dustTable.klambda = np.copy(klambda) + Rv
         dustTable.klambda /= Rv
         del klambda
-        # Initalise SLAB class
+        # Initalise SCREEN class
         super(Prevot,self).__init__(Rv=Rv,dustTable=dustTable)        
         self.reference = "Prevot et al. (1984) [SMC]"             
         return
 
 
 
-def slabModel(model,Rv=None):
+def screenModel(model,Rv=None):
     
     if fnmatch.fnmatch(model.lower(),"cal*"):
         DUST = Calzetti(Rv=Rv)
