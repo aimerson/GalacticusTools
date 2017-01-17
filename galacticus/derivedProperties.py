@@ -7,6 +7,7 @@ from .utils.progress import Progress
 
 from .Stars import getStellarMass,getStarFormationRate
 from .ColdGas import getColdGasMass
+from .Inclination import getInclination
 from .EmissionLines import GalacticusEmissionLines
 from .dust.utils import getDustFreeName
 from .dust.Ferrara2000 import dustAtlas
@@ -65,6 +66,9 @@ class derivedProperties(object):
         # Cold gas
         if fnmatch.fnmatch(datasetName,"*MassGas") or fnmatch.fnmatch(datasetName,"*MassColdGas"):
             getColdGasMass(self.galHDF5Obj,z,datasetName,overwrite=overwrite,returnDataset=False)
+        # Inclination
+        if fnmatch.fnmatch(datasetName,"inclination"):
+            getInclination(self.galHDF5Obj,z,overwrite=overwrite,returnDataset=False)
         # Stellar luminosity
         if fnmatch.fname(datasetName,"*LuminositiesStellar:*"):
             getLuminosity(self.galHDF5Obj,z,getDustFreeName(datasetName),overwrite=overwrite,returnDataset=False)        
