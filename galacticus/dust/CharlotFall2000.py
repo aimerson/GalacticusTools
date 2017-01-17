@@ -5,6 +5,7 @@ import sys,os,re,fnmatch
 import numpy as np
 from ..config import *
 from ..GalacticusErrors import ParseError
+from ..constants import luminosityAB,luminositySolar
 from ..utils.progress import Progress
 from .utils import DustProperties
 
@@ -137,6 +138,13 @@ class CharlotFall2000(DustProperties):
         # Write property to file and return result
         out = galHDF5Obj.selectOutput(z)
         galHDF5Obj.addDataset(out.name+"/nodeData/",datasetName,result)
+        attr = None
+        if fnmatch.fnmatch(datasetName,"*LuminositiesStellar*"):
+            attr = {"unitsInSI":luminosityAB}
+        if fnmatch.fnmatch(datasetName,"*LineLuminosity*"):
+            attr = {"unitsInSI":luminositySolar}
+        if attr is not None:
+            galHDF5Obj.addAttributes(out.name+"/nodeData/"+datasetName,attr)
         if progressObj is not None:
             progressObj.increment()
             progressObj.print_status_line()

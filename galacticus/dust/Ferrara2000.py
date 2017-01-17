@@ -14,6 +14,7 @@ from ..GalacticusErrors import ParseError
 from ..Filters import GalacticusFilters
 from ..config import *
 from ..utils.progress import Progress
+from ..constants import luminosityAB,luminositySolar
 from ..constants import Pi,Parsec,massAtomic,massSolar,massFractionHydrogen
 
 
@@ -321,6 +322,13 @@ class dustAtlas(DustProperties):
         # Write property to file and return result
         out = galHDF5Obj.selectOutput(z)
         galHDF5Obj.addDataset(out.name+"/nodeData/",datasetName,result)
+        attr = None
+        if fnmatch.fnmatch(datasetName,"*LuminositiesStellar*"):
+            attr = {"unitsInSI":luminosityAB}
+        if fnmatch.fnmatch(datasetName,"*LineLuminosity*"):
+            attr = {"unitsInSI":luminositySolar}
+        if attr is not None:
+            galHDF5Obj.addAttributes(out.name+"/nodeData/"+datasetName,attr)
         if progressObj is not None:
             progressObj.increment()
             progressObj.print_status_line()
