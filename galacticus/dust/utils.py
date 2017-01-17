@@ -43,7 +43,7 @@ class DustProperties(object):
         else:
             # Photometric band
             effectiveWavelength = self.filtersDatabase.getEffectiveWavelength(name,verbose=verbose)
-            if redshift is None:
+            if redshift is not None:
                 effectiveWavelength /= (1.0+float(redshift))
             if verbose:
                 infoLine = "filter={0:s}  effectiveWavelength={1:s}".format(name,effectiveWavelength)

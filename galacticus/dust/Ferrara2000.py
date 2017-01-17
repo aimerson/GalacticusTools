@@ -264,7 +264,7 @@ class dustAtlas(DustProperties):
         if faceOn:
             inclinations = np.zeros_like(np.array(out["nodeData/diskRadius"]))
         else:
-            inclinations = getInclination(galHDF5Obj,z,overwrite=overwrite,returnDataset=True)
+            inclinations = getInclination(galHDF5Obj,z,overwrite=False,returnDataset=True)
         # Get bulge sizes
         sizes = self.getBulgeSizes(galHDF5Obj,z,component)
         # Compute gas metallicity and central surface density in M_Solar/pc^2
@@ -289,10 +289,9 @@ class dustAtlas(DustProperties):
         # Interpolate dustAtlas table to get attenuations
         wavelengths = effectiveWavelength*np.ones_like(inclinations)
         attenuations = self.InterpolateDustTable(component,wavelengths,inclinations,opticalDepthCentral,bulgeSize=sizes)
-        np.place(attenuations,np.isnan(sizes),1.0)
-        if any(attenuations>1.0):
+        if any(attenuations>1.0) and self._verbose:
             print("WARNING! "+funcname+"(): Some attenuations greater than unity! This is not physical!")
-        if any(attenuations<0.0):
+        if any(attenuations<0.0) and self._verbose:
             print("WARNING! "+funcname+"(): Some attenuations less than zero! This is not physical!")            
         # Apply attenuations and return result        
         result = np.array(out["nodeData/"+luminosityDataset])*attenuations

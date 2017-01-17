@@ -46,7 +46,7 @@ class VegaOffset(object):
     
     def __init__(self,VbandFilterFile=None):
         if VbandFilterFile is None:
-            VbandFilterFile = galacticusPath+"/data/filters/Buser_V.xml"
+            VbandFilterFile = pkg_resources.resource_filename(__name__,"data/filters/Buser_V.xml")
         self.transmissionV = getFilterTransmission(VbandFilterFile)
         self.vegaSpectrum = getVegaSpectrum()
         self.fluxVegaV = None
@@ -107,7 +107,7 @@ def getFilterTransmission(filterFile):
     return transmission.view(np.recarray)
         
 class Filter(object):    
-    def __init__(self,filterFile,verbose=False,VegaObj=None,VbandFilterFile=None,kRomberg=100,**kwargs):
+    def __init__(self,filterFile,verbose=False,VegaObj=None,VbandFilterFile=None,kRomberg=8,**kwargs):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         self.file = filterFile        
@@ -225,16 +225,16 @@ def getTopHatLimits(wavelengthCentral,resolution,verbose=False):
 
 class TopHat(object):
     
-    def __init__(self,filterName,VegaObj=None,VbandFilterFile=None,kRomberg=100,\
+    def __init__(self,filterName,VegaObj=None,VbandFilterFile=None,kRomberg=8,\
                      transmissionArraySize=1000,verbose=False,**kwargs):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         self.name = filterName
-        filterInfo = self.filterName.split("_")
-        if fnmatch.fnmatch(self.filterName,"topHat*"):
+        filterInfo = self.name.split("_")
+        if fnmatch.fnmatch(self.name,"topHat*"):
             self.centralWavelength = float(filterInfo[1])
             self.resolution = float(filterInfo[2])
-        elif fnmatch.fnmatch(self.filterName,"emissionLineContinuum*"):
+        elif fnmatch.fnmatch(self.name,"emissionLineContinuum*"):
             if len(filterInfo) == 4:
                 self.centralWavelength = float(filterInfo[2])
                 self.resolution = float(filterInfo[3])
@@ -244,11 +244,11 @@ class TopHat(object):
                 del CLOUDY
                 self.resolution = float(filterInfo[2])
         else:
-            raise ParseError(funcname+"(): filter '"+self.filterName+"' not a top hat filter!")
+            raise ParseError(funcname+"(): filter '"+self.name+"' not a top hat filter!")
         # Compute transmission curve
         limits = getTopHatLimits(self.centralWavelength,self.resolution)
         offset = np.fabs(limits[1] - limits[0])*0.01
-        self.transmission = np.zeros(len(transmissionArraySize),dtype=[("wavelength",float),("transmission",float)])
+        self.transmission = np.zeros(transmissionArraySize,dtype=[("wavelength",float),("transmission",float)])
         self.transmission = self.transmission.view(np.recarray)
         self.transmission.wavelength = np.linspace(limits[0]-offset,limits[1]+offset,transmissionArraySize)
         inside = np.logical_and(self.transmission.wavelength>=limits[0],self.transmission.wavelength<=limits[1])
@@ -305,7 +305,7 @@ class GalacticusFilters(object):
                 if not os.path.exists(path):
                     error = funcname+"(): Path to filter '"+filterName+"' does not exist!\n  Specified path = "+path
                     raise IOError(error)
-                FILTER = Filter(path,verbose=verbose)
+                FILTER = Filter(path,**kwargs)
             self.effectiveWavelengths[filterName] = FILTER.effectiveWavelength
             self.vegaOffset[filterName] = FILTER.vegaOffset
             if store:
