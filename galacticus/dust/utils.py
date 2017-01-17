@@ -8,6 +8,15 @@ from ..EmissionLines import getLineNames,GalacticusEmissionLines
 from ..Filters import GalacticusFilters
 
 
+def getDustFreeName(datasetName):
+    if ":dust" in datasetName:
+        dustOption = fnmatch.filter(datasetName.split(":"),"dust*")[0]
+        dustFreeName = datasetName.replace(":"+dustOption,"")
+    else:
+        dustFreeName = datasetName
+    return dustFreeName
+
+
 class DustProperties(object):
     
     def __init__(self):

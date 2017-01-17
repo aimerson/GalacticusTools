@@ -30,13 +30,10 @@ class CharlotFall2000(DustProperties):
         return
 
 
-    def attenuate(self,galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True,progressObj=None):
+    def computeAttenuation(self,galHDF5Obj,z,datasetName):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         # Get nearest redshift output
         out = galHDF5Obj.selectOutput(z)
-        # Check if dust attenuated luminosity already calculated
-        if datasetName in galHDF5Obj.availableDatasets(z) and not overwrite:
-            return np.array(out["nodeData/"+datasetName])        
         # Check is a luminosity for attenuation
         MATCH = re.search(r"^(disk|spheroid)([^:]+):([^:]+):([^:]+):z([\d\.]+):dustCharlotFall2000([^:]+)?",datasetName)
         if not MATCH:
@@ -113,8 +110,32 @@ class CharlotFall2000(DustProperties):
                 result = np.copy(opticalDepthISM)
             elif fnmatch.fnmatch(luminosityOrOpticalDepth,"CentralOpticalDepthClouds"):
                 result = np.copy(opticalDepthClouds)
-        ####################################################################
+        # Return resulting attenuated dataset
+        return result
+
+
+    def attenuate(self,galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True,progressObj=None):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        # Check if dust attenuated luminosity already calculated
+        if datasetName in galHDF5Obj.availableDatasets(z) and not overwrite:
+            if progressObj is not None:
+                progressObj.increment()
+                progressObj.print_status_line()
+            if returnDataset:
+                out = galHDF5Obj.selectOutput(z)
+                return np.array(out["nodeData/"+datasetName])
+            else:
+                return
+        # Check if a total luminosity or disk/spheroid luminosity
+        if datasetName.startswith("total"):
+            diskResult = self.attenuate(galHDF5Obj,z,datasetName.replace("total","disk"),overwrite=False,returnDataset=True)
+            spheroidResult = self.attenuate(galHDF5Obj,z,datasetName.replace("total","spheroid"),overwrite=False,returnDataset=True)
+            result = np.copy(diskResult) + np.copy(spheroidResult)
+            del diskResult,spheroidResult
+        else:
+            result = self.computeAttenuation(galHDF5Obj,z,datasetName)
         # Write property to file and return result
+        out = galHDF5Obj.selectOutput(z)
         galHDF5Obj.addDataset(out.name+"/nodeData/",datasetName,result)
         if progressObj is not None:
             progressObj.increment()
@@ -122,6 +143,9 @@ class CharlotFall2000(DustProperties):
         if returnDataset:
             return result
         return
+
+
+
 
 
 
