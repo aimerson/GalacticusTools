@@ -12,7 +12,12 @@ class derivedProperties(object):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         self.galHDF5Obj = galHDF5Obj
+        # Emission lines class
         self.EmissionLines = None
+        # Dust classes
+        self.dustFerrara2000 = None
+        self.dustCharlotFall2000 = None
+
         self._verbose = verbose
         return
 
@@ -87,5 +92,29 @@ class derivedProperties(object):
             dummy = [getColdGasMass(self.galHDF5Obj,z,name,overwrite=overwrite,\
                                         returnDataset=False,progressObj=PROG) for name in datasets]
             del dummy
+
+            
+        # Dust options        
+        datasets = fnmatch.filter(derivedDatasets,"*:dustAtlas*")
+        if len(datasets)>0:
+            from .dust.Ferrara2000 import dustAtlas
+            if self.dustFerrara2000 is None:
+                self.dustFerrara2000 = dustAtlas()
+            dummy = [self.dustFerrara2000.attenuate(self.galHDF5Obj,z,name,overwrite=False,returnDataset=False,progressObj=PROG,\
+                                                        extrapolateInSize=True,extrapolateInTau=True) for name in datasets]
+            del dummy
+        datasets = fnmatch.filter(derivedDatasets,"*:dustCharlotFall*")
+        if len(datasets)>0:
+            from .dust.CharlotFall2000 import CharlotFall2000
+            if self.dustCharlotFall2000 is None:
+                self.dustCharlotFall2000 = CharlotFall2000()
+            dummy = [self.dustCharlotFall2000.attenuate(self.galHDF5Obj,z,name,overwrite=False,returnDataset=False,progressObj=PROG)\
+                         for name in datasets]
+            del dummy        
+            
+
+
+
+
 
         return

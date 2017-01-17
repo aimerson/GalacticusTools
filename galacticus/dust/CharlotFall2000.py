@@ -54,7 +54,7 @@ class CharlotFall2000(DustProperties):
         if self._verbose:
             infoLine = "filter={0:s}  frame={1:s}  redshift={2:s}".format(filter,frame,redshift)
             print(funcname+"(): Filter information:\n        "+infoLine)
-        dustExtension = ":dustCharlotFall"
+        dustExtension = ":dustCharlotFall2000"
         dustOption = MATCH.group(6)
         faceOn = False
         includeClouds = True
@@ -72,8 +72,8 @@ class CharlotFall2000(DustProperties):
                 faceOn = False
         # Get name for luminosity from recent star formation
         luminosityDataset = datasetName.replace(dustExtension,"")
-        recentLuminosityDataset = luminosityDataset+":recent"
-        if not recentLuminosityDataset in out["nodeData"].keys():
+        recentLuminosityDataset = luminosityDataset+":recent"    
+        if not recentLuminosityDataset in list(map(str,out["nodeData"].keys())):
             raise IOError(funcname+"(): Missing luminosity for recent star formation for filter '"+luminosityDataset+"'!")
         # Construct filter label
         filterLabel = filter+":"+frame+":z"+redshift
@@ -96,22 +96,22 @@ class CharlotFall2000(DustProperties):
         opticalDepthClouds = self.opticalDepthCloudsFactor*np.copy(gasMetallicity)/self.localISMMetallicity/wavelengthFactor
         del gasMetalsSurfaceDensityCentral,gasMetallicity
         # Compute the attenutations of ISM and clouds
-        attenuationsISM = np.exp(-opticalDepthISM)
-        attenuationsClouds = np.exp(-opticalDepthClouds)
+        attenuationISM = np.exp(-opticalDepthISM)
+        attenuationClouds = np.exp(-opticalDepthClouds)
         # Apply attenuations to dataset or return optical depths
-        if fnmatch.fnmatch(opticalDepthOrLuminosity,"LuminositiesStellar"):
+        if fnmatch.fnmatch(luminosityOrOpticalDepth,"LuminositiesStellar"):
             # i) stellar luminosities
-            result = np.array(out["nodeData/"+luminosityDataSet]) - np.array(out["nodeData/"+recentLuminosityDataSet]) 
-            result += np.array(out["nodeData/"+recentLuminosityDataSet])*attenuationClouds
+            result = np.array(out["nodeData/"+luminosityDataset]) - np.array(out["nodeData/"+recentLuminosityDataset]) 
+            result += np.array(out["nodeData/"+recentLuminosityDataset])*attenuationClouds
             result *= attenuationISM
-        elif fnmatch.fnmatch(opticalDepthOrLuminosity,"LineLuminosity"):
+        elif fnmatch.fnmatch(luminosityOrOpticalDepth,"LineLuminosity"):
             # ii) emission lines
-            result = np.array(out["nodeData/"+luminosityDataSet])*attenuationClouds*attenuationISM
+            result = np.array(out["nodeData/"+luminosityDataset])*attenuationClouds*attenuationISM
         else:
             # iii) return appropriate optical depth
-            if fnmatch.fnmatch(opticalDepthOrLuminosity,"CentralOpticalDepthISM"):
+            if fnmatch.fnmatch(luminosityOrOpticalDepth,"CentralOpticalDepthISM"):
                 result = np.copy(opticalDepthISM)
-            elif fnmatch.fnmatch(opticalDepthOrLuminosity,"CentralOpticalDepthClouds"):
+            elif fnmatch.fnmatch(luminosityOrOpticalDepth,"CentralOpticalDepthClouds"):
                 result = np.copy(opticalDepthClouds)
         ####################################################################
         # Write property to file and return result
