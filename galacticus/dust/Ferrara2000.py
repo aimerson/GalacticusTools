@@ -89,7 +89,8 @@ def loadSpheroidAttenuation(component,verbose=False):
 
 class dustAtlas(DustProperties):
     
-    def __init__(self,verbose=False,interpolateBoundsError=False,interpolateFillValue=None):        
+    def __init__(self,verbose=False,interpolateBoundsError=False,interpolateFillValue=None,\
+                     extrapolateInSize=True,extrapolateInTau=True):        
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Set verbosity
@@ -132,6 +133,9 @@ class dustAtlas(DustProperties):
                 self.diskInterpolator = RegularGridInterpolator(axes,self.diskAttenuation["attenuation"],\
                                                                     bounds_error=interpolateBoundsError,\
                                                                     fill_value=interpolateFillValue)                                                                
+        # Set options whether to extrapolate for various properties
+        self.extrapolateInSize = extrapolateInSize
+        self.extrapolateInTau = extrapolateInTau
         # Initialise classes for emission lines and filters
         self.emissionLinesClass = GalacticusEmissionLines()
         self.filtersDatabase = GalacticusFilters()
@@ -201,7 +205,7 @@ class dustAtlas(DustProperties):
             else:
                 raise ValueError(funcname+"(): Value for parameter 'spheroidMassDistribution' must be either 'hernquist' or 'sersic'!")
             np.place(sizes,np.isnan(sizes),1.0)
-            if not extrapolateInSize:
+            if not self.extrapolateInSize:
                 sizeMinimum = self.spheroidAttenuation["size"].min()
                 sizeMaximum = self.spheroidAttenuation["size"].max()
                 np.place(sizes,sizes<sizeMinimum,sizeMinimum)
@@ -211,15 +215,10 @@ class dustAtlas(DustProperties):
         return sizes
 
 
-
-    def attenuate(self,galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True,progressObj=None,\
-                      extrapolateInSize=True,extrapolateInTau=True):        
+    def computeAttenuation(self,galHDF5Obj,z,datasetName):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         # Get nearest redshift output
         out = galHDF5Obj.selectOutput(z)
-        # Check if dust attenuated luminosity already calculated
-        if datasetName in galHDF5Obj.availableDatasets(z) and not overwrite:
-            return np.array(out["nodeData/"+datasetName])        
         # Compute attenuation
         if self._verbose:
             print(funcname+"(): Processing dataset '"+datasetName+"'")            
@@ -276,7 +275,7 @@ class dustAtlas(DustProperties):
         # Compute central optical depths
         opticalDepthCentral = self.opticalDepthNormalization*np.copy(gasMetalsSurfaceDensityCentral)        
         del gasMetalsSurfaceDensityCentral
-        if not extrapolateInTau:
+        if not self.extrapolateInTau:
             if fnmatch.fnmatch(component,"spheroid"):
                 tauMinimum = self.spheroidAttenuation["opticalDepth"].min()
                 tauMaximum = self.spheroidAttenuation["opticalDepth"].max()
@@ -295,8 +294,33 @@ class dustAtlas(DustProperties):
             print("WARNING! "+funcname+"(): Some attenuations greater than unity! This is not physical!")
         if any(attenuations<0.0):
             print("WARNING! "+funcname+"(): Some attenuations less than zero! This is not physical!")            
-        # Apply attenuations and return/store result        
+        # Apply attenuations and return result        
         result = np.array(out["nodeData/"+luminosityDataset])*attenuations
+        return result
+
+
+    def attenuate(self,galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True,progressObj=None):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Check if dust attenuated luminosity already calculated
+        if datasetName in galHDF5Obj.availableDatasets(z) and not overwrite:
+            if progressObj is not None:
+                progressObj.increment()
+                progressObj.print_status_line()
+            if returnDataset:
+                out = galHDF5Obj.selectOutput(z)
+                return np.array(out["nodeData/"+datasetName])
+            else:
+                return
+        # Check if a total luminosity or disk/spheroid luminosity
+        if datasetName.startswith("total"):
+            diskResult = self.attenuate(galHDF5Obj,z,datasetName.replace("total","disk"),overwrite=False,returnDataset=True)
+            spheroidResult = self.attenuate(galHDF5Obj,z,datasetName.replace("total","spheroid"),overwrite=False,returnDataset=True)
+            result = np.copy(diskResult) + np.copy(spheroidResult)
+            del diskResult,spheroidResult
+        else:
+            result = self.computeAttenuation(galHDF5Obj,z,datasetName)
+        # Write property to file and return result
+        out = galHDF5Obj.selectOutput(z)
         galHDF5Obj.addDataset(out.name+"/nodeData/",datasetName,result)
         if progressObj is not None:
             progressObj.increment()
@@ -304,4 +328,3 @@ class dustAtlas(DustProperties):
         if returnDataset:
             return result
         return
-        
