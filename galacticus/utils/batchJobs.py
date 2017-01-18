@@ -81,7 +81,7 @@ class SLURMjob(object):
 
 
 
-def submitSLURM(script,args=None,PARTITION=None,QOS=None,WALLTIME=None,JOBNAME=None,LOGDIR=None,RUNS=None,\
+def submitSLURM(script,args=None,PARTITION=None,QOS=None,WALLTIME=None,JOBNAME=None,LOGDIR=None,RUNS=None,NODETYPE=None,\
                     NODES=1,TASKS=None,CPUS=None,ACCOUNT=None,WORKDIR=None,LICENSE=None,mergeOE=False,verbose=False,submit=True):
     import sys,os,getpass,fnmatch,subprocess,glob
     sjob = "sbatch "
@@ -119,6 +119,8 @@ def submitSLURM(script,args=None,PARTITION=None,QOS=None,WALLTIME=None,JOBNAME=N
     if NODES is None:
         NODES = 1
     sjob = sjob + " -N " + str(NODES)
+    if NODETYPE is not None:
+        sjob = sjob + " -C "+NODETYPE
     if TASKS is not None:
         sjob = sjob + " --ntasks-per-node="+str(TASKS)
     if CPUS is not None:
