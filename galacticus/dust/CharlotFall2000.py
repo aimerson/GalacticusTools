@@ -36,7 +36,7 @@ class CharlotFall2000(DustProperties):
         # Get nearest redshift output
         out = galHDF5Obj.selectOutput(z)
         # Check is a luminosity for attenuation
-        MATCH = re.search(r"^(disk|spheroid)([^:]+):([^:]+):([^:]+):z([\d\.]+):dustCharlotFall2000([^:]+)?",datasetName)
+        MATCH = re.search(r"^(disk|spheroid)([^:]+):([^:]+):([^:]+):z([\d\.]+)(:contam_[^:]+)?:dustCharlotFall2000([^:]+)?",datasetName)
         if not MATCH:
             raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
         # Extract dataset information
@@ -52,8 +52,11 @@ class CharlotFall2000(DustProperties):
         if self._verbose:
             infoLine = "filter={0:s}  frame={1:s}  redshift={2:s}".format(filter,frame,redshift)
             print(funcname+"(): Filter information:\n        "+infoLine)
+        contamination = MATCH.group(6)
+        if contamination is None:
+            contamination = ""
         dustExtension = ":dustCharlotFall2000"
-        dustOption = MATCH.group(6)
+        dustOption = MATCH.group(7)
         faceOn = False
         includeClouds = True
         if dustOption is not None:
@@ -74,7 +77,7 @@ class CharlotFall2000(DustProperties):
         if not recentLuminosityDataset in list(map(str,out["nodeData"].keys())):
             raise IOError(funcname+"(): Missing luminosity for recent star formation for filter '"+luminosityDataset+"'!")
         # Construct filter label
-        filterLabel = filter+":"+frame+":z"+redshift
+        filterLabel = filter+":"+frame+":z"+redshift+contamination
         # Compute effective wavelength for filter/line
         if frame == "observed":
             effectiveWavelength = self.effectiveWavelength(filter,redshift=float(redshift),verbose=self._verbose)

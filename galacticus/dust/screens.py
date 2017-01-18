@@ -103,7 +103,7 @@ class dustScreen(DustProperties):
         if self._verbose:
             print(funcname+"(): Processing dataset '"+datasetName+"'")
         # Check is a luminosity for attenuation
-        MATCH = re.search(r"^(disk|spheroid)(LuminositiesStellar|LineLuminosity):([^:]+):([^:]+):z([\d\.]+):dustScreen_([^:]+)",datasetName)
+        MATCH = re.search(r"^(disk|spheroid)(LuminositiesStellar|LineLuminosity):([^:]+):([^:]+):z([\d\.]+)(:contam_[^:]+)?:dustScreen_([^:]+)",datasetName)
         if not MATCH:
             raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
        # Extract dataset information                                                                                                                                     
@@ -117,7 +117,10 @@ class dustScreen(DustProperties):
         if self._verbose:
             infoLine = "filter={0:s}  frame={1:s}  redshift={2:s}".format(filter,frame,redshift)
             print(funcname+"(): Filter information:\n        "+infoLine)
-        screenOptions = MATCH.group(6)
+        contamination = MATCH.group(6)
+        if contamination is None:
+            contamination = ""
+        screenOptions = MATCH.group(7)
         dustExtension = ":dustScreen_"+screenOptions
         # Check dust screen information is as expected
         OPTIONS = re.search(r"^([^_]+)(_age[\d\.]+)?_Av([\d\.]+)",screenOptions)
@@ -133,7 +136,7 @@ class dustScreen(DustProperties):
         # Get name of unattenuated dataset
         luminosityDataset = datasetName.replace(dustExtension,"")
         # Construct filter label
-        filterLabel = filter+":"+frame+":z"+redshift
+        filterLabel = filter+":"+frame+":z"+redshift+contamination
         # Compute effective wavelength for filter/line
         if frame == "observed":
             effectiveWavelength = self.effectiveWavelength(filter,redshift=float(redshift),verbose=self._verbose)
