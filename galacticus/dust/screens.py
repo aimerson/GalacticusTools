@@ -26,6 +26,122 @@ class SCREEN(object):
 
 
 
+class dustScreen(object):
+    
+    def __init__(self):
+        classname = self.__class__.__name__
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        self.screenObjs = {}
+        return
+
+    def attenuate(self,galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True,progressObj=None):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Check if dust attenuated luminosity already calculated
+        if datasetName in galHDF5Obj.availableDatasets(z) and not overwrite:
+            if progressObj is not None:
+                progressObj.increment()
+                progressObj.print_status_line()
+            if returnDataset:
+                out = galHDF5Obj.selectOutput(z)
+                return np.array(out["nodeData/"+datasetName])
+            else:
+                return
+       # Check if a total luminosity or disk/spheroid luminosity                                                                                                         
+        if datasetName.startswith("total"):
+            diskResult = self.attenuate(galHDF5Obj,z,datasetName.replace("total","disk"),overwrite=False,returnDataset=True)
+            spheroidResult = self.attenuate(galHDF5Obj,z,datasetName.replace("total","spheroid"),overwrite=False,returnDataset=True)
+            result = np.copy(diskResult) + np.copy(spheroidResult)
+            del diskResult,spheroidResult
+        else:
+            result = self.computeAttenuation(galHDF5Obj,z,datasetName)
+        # Write property to file and return result
+        out = galHDF5Obj.selectOutput(z)
+        galHDF5Obj.addDataset(out.name+"/nodeData/",datasetName,result)
+        attr = None
+        if fnmatch.fnmatch(datasetName,"*LuminositiesStellar*"):
+            attr = {"unitsInSI":luminosityAB}
+        if fnmatch.fnmatch(datasetName,"*LineLuminosity*"):
+            attr = {"unitsInSI":luminositySolar}
+        if attr is not None:
+            galHDF5Obj.addAttributes(out.name+"/nodeData/"+datasetName,attr)
+        if progressObj is not None:
+            progressObj.increment()
+            progressObj.print_status_line()
+        if returnDataset:
+            return result
+        return
+
+    
+    def selectScreen(self,screenName,Av,age=None,Rv=None):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        # Store and return appropriate screen class
+        if screenName not in self.screenObjs.keys():
+            if fnmatch.fnmatch(screenName,"calzetti*"):                
+                self.screenObjs[screeName] = Calzetti(Rv=Rv)
+            if fnmatch.fnmatch(screenName,"allen*"):                
+                self.screenObjs[screeName] = Allen(Rv=Rv)
+            if fnmatch.fnmatch(screenName,"fitzpatrick*"):                
+                self.screenObjs[screeName] = Fitzpatrick(Rv=Rv,galaxy="LMC")
+            if fnmatch.fnmatch(screenName,"seaton*"):                
+                self.screenObjs[screeName] = Fitzpatrick(Rv=Rv,galaxy="MW")
+            if fnmatch.fnmatch(screenName,"prevot*"):                
+                self.screenObjs[screeName] = Prevot(Rv=Rv)
+        return self.screenObjs[screenName]
+    
+
+    def computeAttenuation(self,galHDF5Obj,z,datasetName):        
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Get nearest redshift output
+        out = galHDF5Obj.selectOutput(z)
+        # Compute attenuation
+        if self._verbose:
+            print(funcname+"(): Processing dataset '"+datasetName+"'")
+        # Check is a luminosity for attenuation
+        MATCH = re.search(r"^(disk|spheroid)(LuminositiesStellar|LineLuminosity):([^:]+):([^:]+):z([\d\.]+):dustScreen_([^:]+)",datasetName)
+        if not MATCH:
+            raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
+       # Extract dataset information                                                                                                                                     
+        component = MATCH.group(1)
+        if component not in ["disk","spheroid"]:
+            raise ParseError(funcname+"(): Cannot identify if '"+datasetName+"' corresponds to disk or spheroid!")
+        luminosityType = MATCH.group(2)
+        filter = MATCH.group(3)
+        frame = MATCH.group(4)
+        redshift = MATCH.group(5)
+        if self._verbose:
+            infoLine = "filter={0:s}  frame={1:s}  redshift={2:s}".format(filter,frame,redshift)
+            print(funcname+"(): Filter information:\n        "+infoLine)
+        screenOptions = MATCH.group(6)
+        dustExtension = ":dustScreen_"+screenOptions
+        # Check dust screen information is as expected
+        OPTIONS = re.search(r"^([^_]+)(_age[\d\.]+)?_Av([\d\.]+)",screenOptions)
+        if not OPTIONS:
+            raise ParseError(funcname+"(): Dust screen options '"+screenOptions+"' not understood!")
+        screenName = OPTIONS.group(1).lower()
+        age = OPTIONS.group(2).replace("_age","")        
+        if age == "":
+            age = None
+        else:
+            age = float(age)
+        Av = float(OPTIONS.group(3))
+        # Get name of unattenuated dataset
+        luminosityDataset = datasetName.replace(dustExtension,"")
+        # Construct filter label
+        filterLabel = filter+":"+frame+":z"+redshift
+        # Compute effective wavelength for filter/line
+        if frame == "observed":
+            effectiveWavelength = self.effectiveWavelength(filter,redshift=float(redshift),verbose=self._verbose)
+        else:
+            effectiveWavelength = self.effectiveWavelength(filter,redshift=None,verbose=self._verbose)
+        # Select class for dust screen and compute attenuation
+        screenClass = self.selectScreen(screenName,Av,age=age,Rv=None)
+        attenuation = screenClass.attenuation(effectiveWavelength,Av)
+        # Apply attenuation and return result                                                                                                                            
+        result = np.array(out["nodeData/"+luminosityDataset])*attenuation
+        return result
+
+
+
 class Allen(SCREEN):
     
     def __init__(self,Rv=3.1):
@@ -186,3 +302,7 @@ def screenModel(model,Rv=None):
         DUST = Prevot(Rv=Rv)
     return DUST
     
+
+
+
+
