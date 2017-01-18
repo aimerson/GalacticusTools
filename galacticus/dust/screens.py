@@ -2,12 +2,13 @@
 
 # Values/fits from: http://webast.ast.obs-mip.fr/hyperz/hyperz_manual1/node10.html
 
-import sys
+import sys,re
 import numpy as np
 import copy
 import fnmatch
 from scipy.interpolate import interp1d
-from ..constants import angstrom,micron
+from .utils import DustProperties
+from ..constants import angstrom,micron,luminosityAB,luminositySolar
 
 ########################################################################
 # CLASSES FOR DUST SCREEN MODELS
@@ -26,11 +27,16 @@ class SCREEN(object):
 
 
 
-class dustScreen(object):
+class dustScreen(DustProperties):
     
-    def __init__(self):
+    def __init__(self,verbose=False):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        # Set verbosity
+        self._verbose = verbose
+        # Initialise DustProperties class
+        super(dustScreen, self).__init__()
+        # Dictionary to store classes for different screens
         self.screenObjs = {}
         return
 
@@ -77,15 +83,15 @@ class dustScreen(object):
         # Store and return appropriate screen class
         if screenName not in self.screenObjs.keys():
             if fnmatch.fnmatch(screenName,"calzetti*"):                
-                self.screenObjs[screeName] = Calzetti(Rv=Rv)
+                self.screenObjs[screenName] = Calzetti(Rv=Rv)
             if fnmatch.fnmatch(screenName,"allen*"):                
-                self.screenObjs[screeName] = Allen(Rv=Rv)
+                self.screenObjs[screenName] = Allen(Rv=Rv)
             if fnmatch.fnmatch(screenName,"fitzpatrick*"):                
-                self.screenObjs[screeName] = Fitzpatrick(Rv=Rv,galaxy="LMC")
+                self.screenObjs[screenName] = Fitzpatrick(Rv=Rv,galaxy="LMC")
             if fnmatch.fnmatch(screenName,"seaton*"):                
-                self.screenObjs[screeName] = Fitzpatrick(Rv=Rv,galaxy="MW")
+                self.screenObjs[screenName] = Fitzpatrick(Rv=Rv,galaxy="MW")
             if fnmatch.fnmatch(screenName,"prevot*"):                
-                self.screenObjs[screeName] = Prevot(Rv=Rv)
+                self.screenObjs[screenName] = Prevot(Rv=Rv)
         return self.screenObjs[screenName]
     
 
