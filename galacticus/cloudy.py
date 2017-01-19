@@ -41,8 +41,7 @@ class cloudyTable(HDF5):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         if lineName not in self.lines:
             raise IndexError(funcname+"(): Line '"+lineName+"' not found!")
-        index = self.lines.index(lineName)
-        return self.wavelengths[index]
+        return self.wavelengths[lineName]
 
     def interpolate(self,lineName,metallicity,densityHydrogen,ionizingFluxHydrogen,\
                         ionizingFluxHeliumToHydrogen,ionizingFluxOxygenToHydrogen,**kwargs):
