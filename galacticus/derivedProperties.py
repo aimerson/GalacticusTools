@@ -8,6 +8,7 @@ from .utils.progress import Progress
 from .Stars import getStellarMass,getStarFormationRate
 from .ColdGas import getColdGasMass
 from .Inclination import getInclination
+from .Luminosities import getLuminosity
 from .EmissionLines import GalacticusEmissionLines
 from .dust.utils import getDustFreeName
 from .dust.Ferrara2000 import dustAtlas
@@ -18,7 +19,7 @@ from .dust.CharlotFall2000 import CharlotFall2000
 
 class derivedProperties(object):
     
-    def __init__(self,galHDF5Obj,dustFerrara200=None,dustCharlotFall2000=None,verbose=True):        
+    def __init__(self,galHDF5Obj,dustFerrara2000=None,dustCharlotFall2000=None,verbose=True):        
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         self.galHDF5Obj = galHDF5Obj
@@ -33,23 +34,12 @@ class derivedProperties(object):
 
     def addDatasets(self,z,derivedDatasets,overwrite=False):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        PROG = len(derivedDatasets)
+        PROG = Progress(len(derivedDatasets))
         if self._verbose:
             print(funcname+"(): processing derived datasets:")       
         dummy = [self.addDataset(datasetName,z,overwrite=overwrite,progObj=PROG) \
                      for datasetName in derivedDatasets]
-
-        # Emission line equivalent widths
-        datasets = fnmatch.filter(derivedDatasets,"*EquivalentWidth:*")
-        if len(datasets)>0:         
-            if self.EmissionLines is None:
-                self.EmissionLines = GalacticusEmissionLines()
-            if self._verbose:
-                print("    emission line equivalent widths...")
-                PROG = Progress(len(datasets))
-            dummy = [self.EmissionLines.getEquivalentWidth(self.galHDF5Obj,z,name,overwrite=overwrite,\
-                                                               returnDataset=False,progressObj=PROG) for name in datasets]
-            del dummy
+        del dummy
         return
 
 
@@ -70,7 +60,7 @@ class derivedProperties(object):
         if fnmatch.fnmatch(datasetName,"inclination"):
             getInclination(self.galHDF5Obj,z,overwrite=overwrite,returnDataset=False)
         # Stellar luminosity
-        if fnmatch.fname(datasetName,"*LuminositiesStellar:*"):
+        if fnmatch.fnmatch(datasetName,"*LuminositiesStellar:*"):
             getLuminosity(self.galHDF5Obj,z,getDustFreeName(datasetName),overwrite=overwrite,returnDataset=False)        
         # Emission line luminosities
         if fnmatch.fnmatch(datasetName,"*LineLuminosity:*"):

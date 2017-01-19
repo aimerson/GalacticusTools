@@ -116,6 +116,33 @@ class GalacticusEmissionLines(object):
         return luminosityMultiplier
 
 
+    def computeHydrogenDensity(self,gasMass,radius):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        densityHydrogen = np.zeros_like(gasMass)
+        hasGas = gasMass > 0.0
+        hasSize = radius > 0.0
+        mask = np.logical_and(hasGas,hasSize)
+        tmp = gasMass[mask]*massSolar/(radius[mask]*megaParsec/centi)**3
+        tmp = np.log10(tmp/(4.0*Pi*massAtomic*atomicMassHydrogen*massFractionHydrogen))
+        np.place(densityHydrogen,mask,np.copy(tmp))
+        del mask,tmp
+        return densityHydrogen
+
+    def computeLymanContinuumLuminosity(self,LyContinuum):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        ionizingFluxHydrogen = np.zeros_like(LyContinuum)
+        hasFlux = LyContinuum > 0.0
+        np.place(ionizingFluxHydrogen,hasFlux,np.log10(LyContinuum[hasFlux])+50.0)
+        return ionizingFluxHydrogen
+
+    def computeHydrogenLuminosityRatio(self,LyContinuum,XContinuum):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name                
+        ionizingFluxXToHydrogen = np.zeros_like(LyContinuum)
+        hasFlux = np.logical_and(LyContinuum>0.0,XContinuum>0.0)
+        np.place(ionizingFluxXToHydrogen,hasFlux,np.log10(XContinuum[hasFlux]/LyContinuum[hasFlux]))
+        return ionizingFluxXToHydrogen
+
+
     def calculateLineLuminosity(self,galHDF5Obj,z,datasetName,overwrite=False,\
                                     massHIIRegion=7.5e3,lifetimeHIIRegion=1.0e-3,\
                                     **kwargs):
@@ -163,48 +190,30 @@ class GalacticusEmissionLines(object):
         metallicity = np.zeros_like(gasMass)
         np.place(metallicity,hasGas,np.log10(abundanceGasMetals[hasGas]/gasMass[hasGas]))
         # ii) compute hydrogen density
-        densityHydrogen = np.zeros_like(gasMass)
-        mask = np.logical_and(hasGas,hasSize)
-        tmp = gasMass[mask]*massSolar/(radius[mask]*megaParsec/centi)**3
-        tmp = np.log10(tmp/(4.0*Pi*massAtomic*atomicMassHydrogen*massFractionHydrogen))
-        np.place(densityHydrogen,mask,np.copy(tmp))
-        del tmp
-        # iii) compute Lyman continuum luminosity
-        ionizingFluxHydrogen = np.zeros_like(gasMass)
-        tmp = np.log10(LyContinuum[hasFlux]) + 50.0
-        np.place(ionizingFluxHydrogen,hasFlux,np.copy(tmp))
-        del tmp
+        densityHydrogen = self.computeHydrogenDensity(gasMass,radius)
+        # iii) compute Lyman continuum luminosity        
+        ionizingFluxHydrogen = self.computeLymanContinuumLuminosity(LyContinuum)
         # iv) compute luminosity ratios He/H and Ox/H
-        ionizingFluxHeliumToHydrogen = np.zeros_like(gasMass)
-        tmp = np.log10(HeContinuum[hasFlux]/LyContinuum[hasFlux])
-        np.place(ionizingFluxHeliumToHydrogen,hasFlux,np.copy(tmp))
-        del tmp
-        ionizingFluxOxygenToHydrogen = np.zeros_like(gasMass)
-        tmp = np.log10(OxContinuum[hasFlux]/LyContinuum[hasFlux])
-        np.place(ionizingFluxOxygenToHydrogen,hasFlux,np.copy(tmp))
-        del tmp
+        ionizingFluxHeliumToHydrogen = self.computeHydrogenLuminosityRatio(LyContinuum,HeContinuum)
+        ionizingFluxOxygenToHydrogen = self.computeHydrogenLuminosityRatio(LyContinuum,OxContinuum)
         # Check if returning raw line luminosity or luminosity under filter
         if filterName is not None:
             luminosityMultiplier = self.getLuminosityMultiplier(datasetName)
         else:
             luminosityMultiplier = 1.0
         # Find number of HII regions        
+        starFormationRate = np.maximum(starFormationRate,1.0e-20)
         numberHIIRegion = starFormationRate*lifetimeHIIRegion/massHIIRegion
         # Convert the hydrogen ionizing luminosity to be per HII region
-        #np.place(numberHIIRegion,numberHIIRegion==0.0,1.0)
         ionizingFluxHydrogen -= np.log10(numberHIIRegion)
-        np.place(ionizingFluxHydrogen,np.isinf(ionizingFluxHydrogen),0.0)               
         # Interpolate over Cloudy tables to get luminosity per HII region
         lineLuminosity = self.CLOUDY.interpolate(lineName,metallicity,\
                                                      densityHydrogen,ionizingFluxHydrogen,\
                                                      ionizingFluxHeliumToHydrogen,\
                                                      ionizingFluxOxygenToHydrogen,**kwargs)
-        # Convert to line luminosity in Solar luminosities (or AB maggies if a filter was specified)
+        # Convert to line luminosity in Solar luminosities (or AB maggies if a filter was specified)        
         lineLuminosity *= luminosityMultiplier*numberHIIRegion*erg/luminositySolar
-        np.place(lineLuminosity,OR(np.invert(hasGas),np.invert(hasSize),np.invert(hasFlux),np.invert(formingStars)),0.0)
-        np.place(lineLuminosity,lineLuminosity<0.0,-999.9)
-        np.place(lineLuminosity,np.isnan(lineLuminosity),-999.9)
-        np.place(lineLuminosity,np.isinf(lineLuminosity),-999.9)
+        lineLuminosity = np.maximum(lineLuminosity,0.0)
         # Add luminosity to file and return values
         galHDF5Obj.addDataset(out.name+"/nodeData/",datasetName,np.copy(lineLuminosity))
         # Add appropriate attributes to new dataset
