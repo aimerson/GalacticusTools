@@ -153,6 +153,7 @@ class dustAtlas(DustProperties):
             attenuation = self.spheroidInterpolator(zip(bulgeSize,inclination,opticalDepth,wavelength))
         else:
             raise ValueError(funcname+"(): Value for 'component' not recognised! Must be either 'spheroid' or 'disk'!")
+        
         #np.place(attenuation,attenuation>1.0,1.0)
         #np.place(attenuation,attenuation<0.0,0.0)
         return attenuation
@@ -199,13 +200,15 @@ class dustAtlas(DustProperties):
         # Get bulge sizes
         if fnmatch.fnmatch(component,"spheroid"):
             spheroidMassDistribution = galHDF5Obj.parameters["spheroidMassDistribution"].lower()
+            spheroidRadius = np.array(out["nodeData/spheroidRadius"])
+            diskRadius = np.array(out["nodeData/diskRadius"])
+            np.place(diskRadius,diskRadius<=0.0,1.0)
             if fnmatch.fnmatch(spheroidMassDistribution,"hernquist"):
-                sizes = (1.0+np.sqrt(2.0))*np.array(out["nodeData/spheroidRadius"])/np.array(out["nodeData/diskRadius"])
+                sizes = (1.0+np.sqrt(2.0))*spheroidRadius/diskRadius
             elif fnmatch.fnmatch(spheroidMassDistribution,"sersic"):
-                sizes = np.array(out["nodeData/spheroidRadius"])/np.array(out["nodeData/diskRadius"])
+                sizes = spheroidRadius/diskRadius
             else:
                 raise ValueError(funcname+"(): Value for parameter 'spheroidMassDistribution' must be either 'hernquist' or 'sersic'!")
-            np.place(sizes,np.isnan(sizes),1.0)
             if not self.extrapolateInSize:
                 sizeMinimum = self.spheroidAttenuation["size"].min()
                 sizeMaximum = self.spheroidAttenuation["size"].max()
@@ -293,12 +296,18 @@ class dustAtlas(DustProperties):
         # Interpolate dustAtlas table to get attenuations
         wavelengths = effectiveWavelength*np.ones_like(inclinations)
         attenuations = self.InterpolateDustTable(component,wavelengths,inclinations,opticalDepthCentral,bulgeSize=sizes)
+        # Set attenuation to unity for galaxies with no disk
+        diskRadius = np.array(out["nodeData/diskRadius"])
+        np.place(attenuations,diskRadius<=0.0,1.0)       
+        # Print warnings for any un-physical attenuations
         if any(attenuations>1.0) and self._verbose:
             print("WARNING! "+funcname+"(): Some attenuations greater than unity! This is not physical!")
+        attenuations = np.minimum(attenuations,1.0)
         if any(attenuations<0.0) and self._verbose:
             print("WARNING! "+funcname+"(): Some attenuations less than zero! This is not physical!")            
+        attenuations = np.maximum(attenuations,0.0)
         # Apply attenuations and return result        
-        result = np.array(out["nodeData/"+luminosityDataset])*attenuations
+        result = np.array(out["nodeData/"+luminosityDataset])*attenuations    
         return result
 
 
