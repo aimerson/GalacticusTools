@@ -48,6 +48,9 @@ class GalacticusEmissionLines(object):
             raise IndexError(funcname+"(): Line '"+lineName+"' not found!")
         return float(self.CLOUDY.wavelengths[lineName])*(1.0+redshift)
                 
+    #####################################################################################
+    # LINE LUMINOSITIES
+    #####################################################################################
     
     def parseLuminosityDataset(self,datasetName):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
@@ -275,6 +278,10 @@ class GalacticusEmissionLines(object):
         del lineLuminosity
         return
 
+    #####################################################################################
+    # EQUIVALENT WIDTHS
+    #####################################################################################
+
     
     def getTopHatWavelength(self,datasetName,lineWavelength,frame,z):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name                
@@ -325,7 +332,7 @@ class GalacticusEmissionLines(object):
     def getEquivalentWidth(self,galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True,progressObj=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         # Check property corresponds to equivalent width        
-        MATCH = re.search("^(disk|spheroid|total)EquivalentWidth:([^:]+):([^:]+)_([\d\.]+):([^:]+):z([\d\.]+)(:dust[^:]+)?(:[^:]+)?$",datasetName)        
+        MATCH = re.search("^(disk|spheroid|total)EquivalentWidth:([^:]+):([^:]+)_([\d\.]+):([^:]+):z([\d\.]+)(:dust[^:]+)?(:contam_[^:]+)?$",datasetName)        
         if not MATCH:
             raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
         # Extract dataset information
@@ -338,9 +345,9 @@ class GalacticusEmissionLines(object):
         dust = MATCH.group(7)
         if dust is None:
             dust = ""
-        recent = MATCH.group(8)
-        if recent is None:
-            recent = ""
+        contam = MATCH.group(8)
+        if contam is None:
+            contam = ""
         # Get emission line wavelength
         lineWavelength = self.getWavelength(lineName)
         if frame == "observed":
@@ -348,7 +355,7 @@ class GalacticusEmissionLines(object):
         # Get nearest redshift output
         out = galHDF5Obj.selectOutput(z)                        
         # Extract emission line luminosity
-        lineDatasetName = component+"LineLuminosity:"+lineName+":"+frame+":z"+redshift+dust+recent        
+        lineDatasetName = component+"LineLuminosity:"+lineName+":"+frame+":z"+redshift+dust+contam
         if lineDatasetName not in out["nodeData"].keys():
             raise KeyError(funcname+"(): emission line luminosity '"+lineDatasetName+"' cannot be found!") 
         lineLuminosity = np.array(out["nodeData/"+lineDatasetName])
