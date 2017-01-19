@@ -16,6 +16,7 @@ from .constants import megaParsec,centi,Pi,erg,angstrom,speedOfLight
 from .constants import massAtomic,atomicMassHydrogen,massFractionHydrogen
 from .utils.sorting import natural_sort_key
 from .utils.logicFunctions import OR
+from .utils.misc import TemporaryClass
 from .config import *
 from .cosmology import Cosmology
 from .cloudy import cloudyTable
@@ -27,11 +28,15 @@ from .cloudy import cloudyTable
 
 class GalacticusEmissionLines(object):
     
-    def __init__(self):
+    def __init__(self,massHIIRegion=7.5e3,lifetimeHIIRegion=1.0e-3):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        # Create classes for CLOUDY and filter information
         self.CLOUDY = cloudyTable()
         self.FILTERS = GalacticusFilters()
+        # Set properties for HII regions
+        self.massHIIRegion = massHIIRegion
+        self.lifetimeHIIRegion = lifetimeHIIRegion
         return
 
     def getLineNames(self):
@@ -44,9 +49,9 @@ class GalacticusEmissionLines(object):
         return float(self.CLOUDY.wavelengths[lineName])*(1.0+redshift)
                 
     
-    def parseDatasetName(self,datasetName):
+    def parseLuminosityDataset(self,datasetName):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        MATCH = re.search("^(disk|spheroid|total)LineLuminosity:([^:]+)(:[^:]+)??(:[^:]+)??:z([\d\.]+)(:recent)?$",datasetName)
+        MATCH = re.search("^(disk|spheroid)LineLuminosity:([^:]+)(:[^:]+)??(:[^:]+)??:z([\d\.]+)(:recent)?(:contam_[^:]+)?$",datasetName)
         if not MATCH:
             raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
         return MATCH
@@ -55,7 +60,7 @@ class GalacticusEmissionLines(object):
     def getLuminosityMultiplier(self,datasetName,**kwargs):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Extract information from dataset name
-        MATCH = self.parseDatasetName(datasetName)
+        MATCH = self.parseLuminosityDataset(datasetName)
         component = MATCH.group(1).lower()
         lineName = MATCH.group(2)
         filterName = MATCH.group(3)
@@ -143,15 +148,10 @@ class GalacticusEmissionLines(object):
         return ionizingFluxXToHydrogen
 
 
-    def calculateLineLuminosity(self,galHDF5Obj,z,datasetName,overwrite=False,\
-                                    massHIIRegion=7.5e3,lifetimeHIIRegion=1.0e-3,\
-                                    **kwargs):
+    def calculateLineLuminosity(self,galHDF5Obj,z,datasetName,**kwargs):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         # Check dataset name corresponds to a luminosity
-        MATCH = self.parseDatasetName(datasetName)
-        if MATCH.group(1).lower() == "total":
-            raise ParseError(funcname+"(): Cannot process total luminosities! Use "+\
-                                 classname+".getLineLuminosity().")
+        MATCH = self.parseLuminosityDataset(datasetName)
         # Extract dataset components
         component = MATCH.group(1).lower()
         lineName = MATCH.group(2)
@@ -160,20 +160,17 @@ class GalacticusEmissionLines(object):
             filterName = filterName.replace(":","")
         frame = MATCH.group(4).replace(":","")
         redshift = MATCH.group(5)
-        option = MATCH.group(6)
-        if option is None:
-            option = ""        
+        recent = MATCH.group(6)
+        if recent is None:
+            recent = ""        
         # Get nearest redshift output
         out = galHDF5Obj.selectOutput(z)
-        # Check if luminosity already calculated
-        if datasetName in galHDF5Obj.availableDatasets(z) and not overwrite:
-            return np.array(out["nodeData/"+datasetName])
         # Extract various properties for interpolation over Cloudy tables
         gasMass = np.copy(out["nodeData/"+component+"MassGas"])
         radius = np.copy(out["nodeData/"+component+"Radius"])
         starFormationRate = np.copy(out["nodeData/"+component+"StarFormationRate"])
         abundanceGasMetals = np.copy(out["nodeData/"+component+"AbundancesGasMetals"])        
-        suffix = ":"+frame+":z"+redshift+option
+        suffix = ":"+frame+":z"+redshift+recent
         LyDatasetName = fnmatch.filter(out["nodeData"].keys(),component+"LuminositiesStellar:Lyc"+suffix) + \
             fnmatch.filter(out["nodeData"].keys(),component+"LuminositiesStellar:LymanContinuum"+suffix)
         LyDatasetName = LyDatasetName[0]            
@@ -203,7 +200,7 @@ class GalacticusEmissionLines(object):
             luminosityMultiplier = 1.0
         # Find number of HII regions        
         starFormationRate = np.maximum(starFormationRate,1.0e-20)
-        numberHIIRegion = starFormationRate*lifetimeHIIRegion/massHIIRegion
+        numberHIIRegion = starFormationRate*self.lifetimeHIIRegion/self.massHIIRegion
         # Convert the hydrogen ionizing luminosity to be per HII region
         ionizingFluxHydrogen -= np.log10(numberHIIRegion)
         # Interpolate over Cloudy tables to get luminosity per HII region
@@ -214,48 +211,60 @@ class GalacticusEmissionLines(object):
         # Convert to line luminosity in Solar luminosities (or AB maggies if a filter was specified)        
         lineLuminosity *= luminosityMultiplier*numberHIIRegion*erg/luminositySolar
         lineLuminosity = np.maximum(lineLuminosity,0.0)
-        # Add luminosity to file and return values
-        galHDF5Obj.addDataset(out.name+"/nodeData/",datasetName,np.copy(lineLuminosity))
-        # Add appropriate attributes to new dataset
-        attr = {"unitsInSI":luminositySolar}
-        galHDF5Obj.addAttributes(out.name+"/nodeData/"+datasetName,attr)        
         return lineLuminosity
 
 
     def getLineLuminosity(self,galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True,progressObj=None,\
-                              massHIIRegion=7.5e3,lifetimeHIIRegion=1.0e-3,**kwargs):
+                              **kwargs):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
-        # Check dataset name corresponds to a luminosity
-        MATCH = self.parseDatasetName(datasetName)
-        # Extract component and decide how to proceed based on componet value
-        component = MATCH.group(1).lower()
-        if component in ["disk","spheroid"]:
-            lineLuminosity = self.calculateLineLuminosity(galHDF5Obj,z,datasetName,overwrite=overwrite,\
-                                                          massHIIRegion=massHIIRegion,\
-                                                          lifetimeHIIRegion=lifetimeHIIRegion,\
-                                                          **kwargs)
+        # Get nearest redshift output
+        out = galHDF5Obj.selectOutput(z)
+        # Check if luminosity already calculated
+        if datasetName in galHDF5Obj.availableDatasets(z) and not overwrite:
+            if progressObj is not None:
+                progressObj.increment()
+                progressObj.print_status_line()
+            if returnDataset:
+                return np.array(out["nodeData/"+datasetName])
+            else:
+                return
+        # Check if requesting pure or contaminated luminosity
+        if fnmatch.fnmatch(datasetName,"*:contam_*"):
+            contaminants = fnmatch.filter(datasetName.split(":"),"contam_*")[0]
+            pureDatasetName = datasetName.replace(":"+contaminants,"")
+        else:
+            pureDatasetName = datasetName
+            contaminants = None
+        # Check whether computing disk/spheroid/total luminosity
+        if pureDatasetName.startswith("disk") or pureDatasetName.startswith("spheroid"):
+            lineLuminosity = self.calculateLineLuminosity(galHDF5Obj,z,pureDatasetName,**kwargs)
         else:
             # Compute total luminosity by summing disk and spheroid luminosities
-            diskName = datasetName.replace("totalLineLuminosity","diskLineLuminosity")
-            diskLuminosity = self.calculateLineLuminosity(galHDF5Obj,z,diskName,overwrite=overwrite,\
-                                                          massHIIRegion=massHIIRegion,\
-                                                          lifetimeHIIRegion=lifetimeHIIRegion,\
-                                                          **kwargs)
-            spheroidName = datasetName.replace("totalLineLuminosity","spheroidLineLuminosity")
-            spheroidLuminosity = self.calculateLineLuminosity(galHDF5Obj,z,spheroidName,overwrite=overwrite,\
-                                                                  massHIIRegion=massHIIRegion,\
-                                                                  lifetimeHIIRegion=lifetimeHIIRegion,\
-                                                                  **kwargs)
+            diskName = pureDatasetName.replace("totalLineLuminosity","diskLineLuminosity")
+            diskLuminosity = self.getLineLuminosity(galHDF5Obj,z,diskName,overwrite=False,returnDataset=True,\
+                                                        **kwargs)
+            spheroidName = pureDatasetName.replace("totalLineLuminosity","spheroidLineLuminosity")
+            spheroidLuminosity = self.getLineLuminosity(galHDF5Obj,z,spheroidName,overwrite=False,returnDataset=True,\
+                                                        **kwargs)
             lineLuminosity = np.copy(diskLuminosity+spheroidLuminosity)
             del diskLuminosity
             del spheroidLuminosity
-            # Get nearest redshift output
-            out = galHDF5Obj.selectOutput(z)
-            # Add luminosity to file
-            galHDF5Obj.addDataset(out.name+"/nodeData/",datasetName,np.copy(lineLuminosity))
-            # Add appropriate attributes to new dataset
-            attr = {"unitsInSI":luminositySolar}
-            galHDF5Obj.addAttributes(out.name+"/nodeData/"+datasetName,attr)
+        # Apply contamination if requested            
+        if contaminants is not None:
+            contaminants = contaminants.replace("contam_","").split("_")
+            lineName = pureDatasetName.split(":")[1]
+            TEMP = TemporaryClass(lineLuminosity)
+            dummy = [TEMP.updateArray(self.getLineLuminosity(galHDF5Obj,z,pureDatasetName.replace(lineName,contam),\
+                                                                 overwrite=False,returnDataset=True,progressObj=None,**kwargs),np.add)\
+                         for contam in contaminants]
+            del dummy
+            lineLuminosity = np.copy(TEMP.array)
+            del TEMP
+        # Add luminosity to file
+        galHDF5Obj.addDataset(out.name+"/nodeData/",datasetName,np.copy(lineLuminosity))
+        # Add appropriate attributes to new dataset
+        attr = {"unitsInSI":luminositySolar}
+        galHDF5Obj.addAttributes(out.name+"/nodeData/"+datasetName,attr)
         # Print progress if requested
         if progressObj is not None:
             progressObj.increment()
@@ -329,9 +338,9 @@ class GalacticusEmissionLines(object):
         dust = MATCH.group(7)
         if dust is None:
             dust = ""
-        option = MATCH.group(8)
-        if option is None:
-            option = ""
+        recent = MATCH.group(8)
+        if recent is None:
+            recent = ""
         # Get emission line wavelength
         lineWavelength = self.getWavelength(lineName)
         if frame == "observed":
@@ -339,7 +348,7 @@ class GalacticusEmissionLines(object):
         # Get nearest redshift output
         out = galHDF5Obj.selectOutput(z)                        
         # Extract emission line luminosity
-        lineDatasetName = component+"LineLuminosity:"+lineName+":"+frame+":z"+redshift+dust+option        
+        lineDatasetName = component+"LineLuminosity:"+lineName+":"+frame+":z"+redshift+dust+recent        
         if lineDatasetName not in out["nodeData"].keys():
             raise KeyError(funcname+"(): emission line luminosity '"+lineDatasetName+"' cannot be found!") 
         lineLuminosity = np.array(out["nodeData/"+lineDatasetName])
@@ -347,10 +356,10 @@ class GalacticusEmissionLines(object):
         # Compute continuum luminosity
         if calculationMethod.lower() in ["pair","offset"]:
             searchPattern = component+"LuminositiesStellar:emissionLineContinuumOffset_"+lineName+"_*_"+\
-                resolution+":"+frame+":z"+redshift+dust+option
+                resolution+":"+frame+":z"+redshift+dust+recent
         elif calculationMethod.lower() in ["central"]:
             searchPattern = component+"LuminositiesStellar:emissionLineContinuumCentral_"+lineName+"_"+\
-                resolution+":"+frame+":z"+redshift+dust+option
+                resolution+":"+frame+":z"+redshift+dust+recent
         else:
             raise ValueError(funcname+"(): calculation method not recognised! Should be 'Central' or 'Offset',")
         continuumLuminosity = self.computeContinuumLuminosity(galHDF5Obj,float(redshift),frame,searchPattern,lineName)
