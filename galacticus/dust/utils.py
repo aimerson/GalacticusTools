@@ -58,7 +58,8 @@ class DustProperties(object):
         # Mask to avoid divide by zero
         hasColdGas = gasMass > 0.0
         # Compute metallicity
-        np.place(gasMetallicity,hasColdGas,gasMetalMass[hasColdGas]/gasMass[hasColdGas])
+        np.place(gasMetallicity,hasColdGas,gasMetalMass[hasColdGas]/gasMass[hasColdGas])        
+        gasMetallicity = np.maximum(gasMetallicity,0.0)
         return gasMetallicity
         
 
@@ -70,4 +71,5 @@ class DustProperties(object):
         nonZeroSize = scaleLength > 0.0
         # Compute central surface density in M_Solar/pc^2
         np.place(gasMetalsSurfaceDensityCentral,nonZeroSize,gasMetalMass[nonZeroSize]/(2.0*Pi*(mega*scaleLength[nonZeroSize])**2))
+        gasMetalsSurfaceDensityCentral = np.maximum(gasMetalsSurfaceDensityCentral,0.0)
         return gasMetalsSurfaceDensityCentral
