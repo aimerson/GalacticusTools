@@ -305,6 +305,13 @@ class GalacticusEmissionLines(object):
         if frame == "observed":
             lineWavelength *= (1.0+float(z))
         # Extract filters
+        if searchPattern.startswith("total"):
+            if len(fnmatch.filter(galHDF5Obj.availableDatasets(z),searchPattern))==0:
+                diskPattern = searchPattern.replace("total","disk")
+                topHatDatasetNames = fnmatch.filter(galHDF5Obj.availableDatasets(z),diskPattern)
+                dummy = [getLuminosity(galHDF5Obj,z,datasetName.replace("disk","total"),overwrite=False,returnDataset=False,progressObj=None)\
+                             for datasetName in topHatDatasetNames]
+                del dummy
         topHatDatasetNames = fnmatch.filter(galHDF5Obj.availableDatasets(z),searchPattern)        
         # Extract wavelengths
         topHatWavelengths = np.array([float(self.getTopHatWavelength(topHatName,lineWavelength,frame,z)) for topHatName in topHatDatasetNames])
@@ -332,7 +339,7 @@ class GalacticusEmissionLines(object):
     def getEquivalentWidth(self,galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True,progressObj=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         # Check property corresponds to equivalent width        
-        MATCH = re.search("^(disk|spheroid|total)EquivalentWidth:([^:]+):([^:]+)_([\d\.]+):([^:]+):z([\d\.]+)(:dust[^:]+)?(:contam_[^:]+)?$",datasetName)        
+        MATCH = re.search("^(disk|spheroid|total)EquivalentWidth:([^:]+):([^:]+)_([\d\.]+):([^:]+):z([\d\.]+)(:contam_[^:]+)?(:dust[^:]+)?$",datasetName)        
         if not MATCH:
             raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
         # Extract dataset information
@@ -347,7 +354,7 @@ class GalacticusEmissionLines(object):
             dust = ""
         contam = MATCH.group(8)
         if contam is None:
-            contam = ""
+            contam = ""            
         # Get emission line wavelength
         lineWavelength = self.getWavelength(lineName)
         if frame == "observed":
@@ -355,20 +362,22 @@ class GalacticusEmissionLines(object):
         # Get nearest redshift output
         out = galHDF5Obj.selectOutput(z)                        
         # Extract emission line luminosity
-        lineDatasetName = component+"LineLuminosity:"+lineName+":"+frame+":z"+redshift+dust+contam
+        lineDatasetName = component+"LineLuminosity:"+lineName+":"+frame+":z"+redshift+contam+dust
+        if lineDatasetName.startswith("total"):
+            self.getLineLuminosity(galHDF5Obj,z,lineDatasetName,overwrite=False,returnDataset=False)
         if lineDatasetName not in out["nodeData"].keys():
             raise KeyError(funcname+"(): emission line luminosity '"+lineDatasetName+"' cannot be found!") 
-        lineLuminosity = np.array(out["nodeData/"+lineDatasetName])
+        lineLuminosity = self.getLineLuminosity(galHDF5Obj,z,lineDatasetName,overwrite=False,returnDataset=True)
         lineLuminosity *= luminositySolar
         # Compute continuum luminosity
         if calculationMethod.lower() in ["pair","offset"]:
             searchPattern = component+"LuminositiesStellar:emissionLineContinuumOffset_"+lineName+"_*_"+\
-                resolution+":"+frame+":z"+redshift+dust+recent
+                resolution+":"+frame+":z"+redshift+dust
         elif calculationMethod.lower() in ["central"]:
             searchPattern = component+"LuminositiesStellar:emissionLineContinuumCentral_"+lineName+"_"+\
-                resolution+":"+frame+":z"+redshift+dust+recent
+                resolution+":"+frame+":z"+redshift+dust
         else:
-            raise ValueError(funcname+"(): calculation method not recognised! Should be 'Central' or 'Offset',")
+            raise ValueError(funcname+"(): calculation method not recognised! Should be 'Central' or 'Offset'.")
         continuumLuminosity = self.computeContinuumLuminosity(galHDF5Obj,float(redshift),frame,searchPattern,lineName)
         # Compute equivalent width        
         nonZeroContinuum = continuumLuminosity>0.0    
