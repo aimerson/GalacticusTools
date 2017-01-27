@@ -73,9 +73,12 @@ class CharlotFall2000(DustProperties):
                 faceOn = False
         # Get name for luminosity from recent star formation
         luminosityDataset = datasetName.replace(dustExtension,"")
-        recentLuminosityDataset = luminosityDataset+":recent"    
-        if not recentLuminosityDataset in list(map(str,out["nodeData"].keys())):
-            raise IOError(funcname+"(): Missing luminosity for recent star formation for filter '"+luminosityDataset+"'!")
+        if fnmatch.fnmatch(luminosityOrOpticalDepth,"LineLuminosity"):
+            recentLuminosityDataset = luminosityDataset    
+        else:
+            recentLuminosityDataset = luminosityDataset+":recent"    
+            if not recentLuminosityDataset in list(map(str,out["nodeData"].keys())):
+                raise IOError(funcname+"(): Missing luminosity for recent star formation for filter '"+luminosityDataset+"'!")
         # Construct filter label
         filterLabel = filter+":"+frame+":z"+redshift+contamination
         # Compute effective wavelength for filter/line
