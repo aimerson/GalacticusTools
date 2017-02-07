@@ -142,9 +142,13 @@ class dustScreen(DustProperties):
             effectiveWavelength = self.effectiveWavelength(filter,redshift=float(redshift),verbose=self._verbose)
         else:
             effectiveWavelength = self.effectiveWavelength(filter,redshift=None,verbose=self._verbose)
-        # Select class for dust screen and compute attenuation
+        # Select class for dust screen and compute attenuation in magnitudes
         screenClass = self.selectScreen(screenName,Av,age=age,Rv=None)
         attenuation = screenClass.attenuation(effectiveWavelength,Av)
+        # Convert to optical depth
+        e = np.exp(1.0)
+        opticalDepth = np.copy(attenuation)/(2.5*np.log10(e))
+        attenuation = np.exp(-opticalDepth)
         # Apply attenuation and return result                                                                                                                            
         result = np.array(out["nodeData/"+luminosityDataset])*attenuation
         return result
