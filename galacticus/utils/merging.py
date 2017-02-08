@@ -4,6 +4,7 @@ import sys,os,glob,fnmatch
 import numpy as np
 from ..io import GalacticusHDF5
 from ..hdf5 import HDF5
+from copy import copy
 from ..parameters import compareParameterSets
 
 
@@ -21,22 +22,29 @@ def copyHDF5File(ifile,ofile,overwrite=False):
 
 class mergeHDF5Outputs(HDF5):
 
-    def __init__(self,outfile,zMin=None,zMax=None,expansionFactorTolerance=1.0e-6):
+    def __init__(self,outfile,zMin=None,zMax=None,expansionFactorTolerance=1.0e-6,checkParameters=True):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Initalise HDF5 class
-        super(mergeHDF5Outputs, self).__init__(outfile,"a")        
+        super(mergeHDF5Outputs, self).__init__(outfile,"w")        
         # Store redshift range to merge
         self.zMin = None
         self.zMax = None
-        # Set tolerances for consistency checking
+        # Set variables and tolerances for consistency checking
+        self.checkParameters = checkParameters
         self.expansionFactorTolerance = expansionFactorTolerance
+        # Variable to store parameter information
+        self.parameters = None
         return
     
     def updateUUID(self,galHDF5Obj):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         uuid = self.readAttributes("/",required=["UUID"])
-        uuid = uuid + ":" + galHDF5Obj.readAttributes("/",required=["UUID"])
+        if "UUID" in uuid.keys():
+            uuid = uuid["UUID"] + ":"
+        else:
+            uuid = ""
+        uuid = uuid + galHDF5Obj.readAttributes("/",required=["UUID"])["UUID"]
         self.addAttributes("/",{"UUID":uuid},overwrite=True)
         return
 
@@ -64,20 +72,22 @@ class mergeHDF5Outputs(HDF5):
         self.cpGroup(galHDF5Obj.filename,"Parameters")
         attrib = {"treeEvolveWorkerNumber":1,"treeEvolveWorkerCount":1}
         self.addAttributes("Parameters",attrib,overwrite=True)
+        self.parameters = copy(galHDF5Obj.parameters)
         return 
     
-    def checkParametersConsistent(self,galHDF5Obj):
+    def checkParametersConsistent(self,galHDF5Obj,ignoreParameters=[]):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Check if parameters information written -- if not write and exit
-        if "Parameters" not in self.fileObj.keys():
+        if "Parameters" not in list(map(str,self.fileObj.keys())):
             self.addParametersInformation(galHDF5Obj)
             return 
         # Parameters already written -- check parameters are consistent
-        if not compareParameterSets(GAL.parameters,self.parameters,ignore=ignoreParameters):            
-            self.fileObj.close()
-            err = funcname+"(): cannot merge files -- parameter sets not consistent!" + \
-                "\n"+" "*len(funcname)+"   Input file: "+galHDF5Obj.filename            
-            raise ValueError(err)
+        if self.checkParameters:
+            if not compareParameterSets(galHDF5Obj.parameters,self.parameters,ignore=ignoreParameters):            
+                self.fileObj.close()
+                err = funcname+"(): cannot merge files -- parameter sets not consistent!" + \
+                    "\n"+" "*len(funcname)+"   Input file: "+galHDF5Obj.filename            
+                raise ValueError(err)
         return
     
     
@@ -141,8 +151,8 @@ class mergeHDF5Outputs(HDF5):
 
     def expansionFactorConsistent(self,galHDF5Obj,outputName):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        a = float(self.readAttributes("Outputs/"+outputName,required=["outputExpansionFactor"])))
-        aNew = float(galHDF5Obj.readAttributes("Outputs/"+outputName,required=["outputExpansionFactor"])))
+        a = float(self.readAttributes("Outputs/"+outputName,required=["outputExpansionFactor"])["outputExpansionFactor"])
+        aNew = float(galHDF5Obj.readAttributes("Outputs/"+outputName,required=["outputExpansionFactor"])["outputExpansionFactor"])
         if not np.fabs(a-aNew)<=self.expansionFactorTolerance:
             self.fileObj.close()
             err = funcname+"(): cannot merge output "+outputname+" -- expansion factors not consistent!" + \
@@ -211,12 +221,13 @@ class mergeHDF5Outputs(HDF5):
 
     def mergeOutput(self,galHDF5Obj,outputName):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        print galHDF5Obj.filename,outputName
         # Check Outputs group exists
-        if "Outputs" not in self.fileObjs.keys():
+        if "Outputs" not in self.fileObj.keys():
             self.mkGroup("Outputs")
         # If specified output does not exist, simply copy and exit
-        if outputName not in self.fileObjs["Outputs"].keys():
-            self.cpGroup(galHDF5Obj.filename,"Outputs/"+outputName)
+        if outputName not in self.fileObj["Outputs/"].keys():
+            self.cpGroup(galHDF5Obj.filename,"/Outputs/"+outputName+"/")
             return
         # Check expansion factors of outputs are consistent
         self.expansionFactorConsistent(galHDF5Obj,outputName)

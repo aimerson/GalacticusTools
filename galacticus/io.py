@@ -55,7 +55,7 @@ class GalacticusHDF5(HDF5):
             isort = np.argsort(np.array([ int(key.replace("Output","")) for key in Outputs.keys()]))
             self.outputs = np.zeros(nout,dtype=[("iout",int),("a",float),("z",float),("name","|S10")])
             for i,out in enumerate(np.array(Outputs.keys())[isort]):
-                self.outputs["name"]i] = out
+                self.outputs["name"][i] = out
                 self.outputs["iout"][i] = int(out.replace("\n","").replace("Output",""))
                 a = float(Outputs[out].attrs["outputExpansionFactor"])
                 self.outputs["a"][i] = a
