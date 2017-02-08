@@ -28,8 +28,8 @@ class mergeHDF5Outputs(HDF5):
         # Initalise HDF5 class
         super(mergeHDF5Outputs, self).__init__(outfile,"w")        
         # Store redshift range to merge
-        self.zMin = None
-        self.zMax = None
+        self.zMin = zMin
+        self.zMax = zMax
         # Set variables and tolerances for consistency checking
         self.checkParameters = checkParameters
         self.expansionFactorTolerance = expansionFactorTolerance
@@ -130,13 +130,15 @@ class mergeHDF5Outputs(HDF5):
 
     def getOutputsToMerge(self,galHDF5Obj):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        print self.zMin,self.zMax
+        print galHDF5Obj.outputs.z
         # If no redshift limits specified simply return list of outputs
         if self.zMin is None and self.zMax is None:
             return galHDF5Obj.outputs.name
         # Check if outputs contain lightcone redshifts
         lightcone = "lightconeRedshift" in galHDF5Obj.fileObj["Outputs/Output1"].keys()
         # Apply redshift mask
-        zMask = maskRedshifts(galHDF5Obj.outputs.z)
+        zmask = self.maskRedshifts(galHDF5Obj.outputs.z)
         if lightcone and not all(zmask):
             minTrue = np.where(zmask)[0].min()
             if minTrue > 0:
@@ -146,6 +148,7 @@ class mergeHDF5Outputs(HDF5):
             if maxTrue < len(zmask)-1:
                 maxTrue =+ 1
                 zmask[maxTrue] = True
+        print galHDF5Obj.outputs.name[zmask]
         return galHDF5Obj.outputs.name[zmask]
         
 
