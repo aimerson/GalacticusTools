@@ -255,7 +255,8 @@ class mergeHDF5Outputs(HDF5):
         self.addVersionInformation(galHDF5Obj)
         self.addBuildInformation(galHDF5Obj)
         # Update global history information
-        self.updateGlobalHistory(galHDF5Obj)
+        if "globalHistory" in galHDF5Obj.fileObj.keys():
+            self.updateGlobalHistory(galHDF5Obj)
         # Get outputs to merge
         outputsToMerge = self.getOutputsToMerge(galHDF5Obj)
         # Merge outputs
