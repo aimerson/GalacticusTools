@@ -187,14 +187,15 @@ class mergeHDF5Outputs(HDF5):
         return 
     
 
-    def checkForMissingDatasets(self,datasets,newDatasets,fileName=None):
+    def checkForMissingDatasets(self,datasets,newDatasets,fileName=None,printMissing=False):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         missingDatasets = list(set(datasets).difference(newDatasets))
         if len(missingDatasets)>0:
             err = funcname+"(): some datasets are missing!"
             if fileName is not None:
                 err = err + "\n"+" "*len(funcname)+"   Input file: "+fileName
-            err = err + "\n\n    MISSING DATASETS:\n    "+"\n    ".join(missingDatasets)
+            if printMissing:
+                err = err + "\n\n    MISSING DATASETS:\n    "+"\n    ".join(missingDatasets)
             raise KeyError(str(err))
         return
 
@@ -207,8 +208,8 @@ class mergeHDF5Outputs(HDF5):
 
     def nodeDataDatasetsConsistent(self,galHDF5Obj,outputName):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        nodeDataDatasets = self.fileObj["Outputs/"+outputName+"/nodeData"].keys()
-        newNodeDataDatasets = galHDF5Obj.fileObj["Outputs/"+outputName+"/nodeData"].keys()
+        nodeDataDatasets = self.lsDatasets("Outputs/"+outputName+"/nodeData/")
+        newNodeDataDatasets = galHDF5Obj.lsDatasets("Outputs/"+outputName+"/nodeData/")        
         self.checkForMissingDatasets(nodeDataDatasets,newNodeDataDatasets,fileName=galHDF5Obj.filename)
         return
     
@@ -249,6 +250,8 @@ class mergeHDF5Outputs(HDF5):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Check this output contains galaxy data
         if "nodeData" not in galHDF5Obj.lsGroups("/Outputs/"+outputName+"/"):
+            return
+        if len(galHDF5Obj.lsDatasets("/Outputs/"+outputName+"/nodeData/"))==0:
             return
         # Check Outputs group exists
         if "Outputs" not in self.fileObj.keys():
@@ -292,7 +295,7 @@ class mergeHDF5Outputs(HDF5):
         # Update progress and return
         if progressOBJ is not None:
             progressOBJ.increment()
-            progressOBJ.print_status_line(task=galHDF5Obj.filename)
+            progressOBJ.print_status_line(task=galHDF5Obj.filename.split("/")[-1])
         galHDF5Obj.close()
         return
 
