@@ -134,7 +134,7 @@ class mergeHDF5Outputs(HDF5):
         ngals = 0
         if outputName in outputs:
             if "nodeData" in galHDF5Obj.lsGroups("Outputs/"+outputName+"/"):
-                datasets = galHDF5Obj.lsDatasets("Outputs/"+outputName+"/nodeData/"):
+                datasets = galHDF5Obj.lsDatasets("Outputs/"+outputName+"/nodeData/")
                 if len(datasets) > 0:
                     path = "Outputs/"+outputName+"/nodeData/"+datasets[0]
                     ngals = len(np.array(galHDF5Obj.fileObj[path]))
