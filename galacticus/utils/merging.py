@@ -128,10 +128,34 @@ class mergeHDF5Outputs(HDF5):
         return np.logical_and(zLow,zUpp)
 
 
+    def countGalaxiesInOutput(self,galHDF5Obj,outputName):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        outputs = self.lsGroups("Outputs")
+        ngals = 0
+        if outputName in outputs:
+            if "nodeData" in galHDF5Obj.lsGroups("Outputs/"+outputName+"/"):
+                datasets = galHDF5Obj.lsDatasets("Outputs/"+outputName+"/nodeData/"):
+                if len(datasets) > 0:
+                    path = "Outputs/"+outputName+"/nodeData/"+datasets[0]
+                    ngals = len(np.array(galHDF5Obj.fileObj[path]))
+        return ngals
+                    
+
+    def countGalaxies(self,galHDF5Obj,outputName=None):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        outputs = self.lsGroups("Outputs")
+        if outputName is not None:
+            if outputName not in outputs:
+                raise KeyError(funcname+"(): output "+outputName+" cannot be found in file "+\
+                                   galHDF5Obj.filename+"!")
+            outputs = [outputName]
+        galaxies = np.array([self.countGalaxiesInOutput(galHDF5Obj,name) for name in outputs])
+        return np.sum(galaxies)
+
+
+
     def getOutputsToMerge(self,galHDF5Obj):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        print self.zMin,self.zMax
-        print galHDF5Obj.outputs.z
         # If no redshift limits specified simply return list of outputs
         if self.zMin is None and self.zMax is None:
             return galHDF5Obj.outputs.name
@@ -148,7 +172,6 @@ class mergeHDF5Outputs(HDF5):
             if maxTrue < len(zmask)-1:
                 maxTrue =+ 1
                 zmask[maxTrue] = True
-        print galHDF5Obj.outputs.name[zmask]
         return galHDF5Obj.outputs.name[zmask]
         
 
@@ -160,7 +183,7 @@ class mergeHDF5Outputs(HDF5):
             self.fileObj.close()
             err = funcname+"(): cannot merge output "+outputname+" -- expansion factors not consistent!" + \
                 "\n"+" "*len(funcname)+"   Input file: "+galHDF5Obj.filename
-            raise ValueError(err)
+            raise ValueError(str(err))
         return 
     
 
@@ -171,8 +194,8 @@ class mergeHDF5Outputs(HDF5):
             err = funcname+"(): some datasets are missing!"
             if fileName is not None:
                 err = err + "\n"+" "*len(funcname)+"   Input file: "+fileName
-            err = err + "\n\n    MISSING DATASETS:\n    "+"\n    ".join(missingProps)
-            raise KeyError(err)
+            err = err + "\n\n    MISSING DATASETS:\n    "+"\n    ".join(missingDatasets)
+            raise KeyError(str(err))
         return
 
     def mergerTreeDatasetsConsistent(self,galHDF5Obj,outputName):
@@ -224,14 +247,16 @@ class mergeHDF5Outputs(HDF5):
 
     def mergeOutput(self,galHDF5Obj,outputName):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        print galHDF5Obj.filename,outputName
+        # Check this output contains galaxy data
+        if "nodeData" not in galHDF5Obj.lsGroups("/Outputs/"+outputName+"/"):
+            return
         # Check Outputs group exists
         if "Outputs" not in self.fileObj.keys():
             self.mkGroup("Outputs")
         # If specified output does not exist, simply copy and exit
         if outputName not in self.fileObj["Outputs/"].keys():
             self.cpGroup(galHDF5Obj.filename,"/Outputs/"+outputName+"/")
-            return
+            return        
         # Check expansion factors of outputs are consistent
         self.expansionFactorConsistent(galHDF5Obj,outputName)
         # Check datasets in this output are consistent
@@ -248,7 +273,7 @@ class mergeHDF5Outputs(HDF5):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Open file
         galHDF5Obj = GalacticusHDF5(ifile,'r')
-        # Check files are consistent:
+        # Check files are consistent
         self.checkParametersConsistent(galHDF5Obj)
         # Update information
         self.updateUUID(galHDF5Obj)
@@ -257,12 +282,13 @@ class mergeHDF5Outputs(HDF5):
         # Update global history information
         if "globalHistory" in galHDF5Obj.fileObj.keys():
             self.updateGlobalHistory(galHDF5Obj)
-        # Get outputs to merge
-        outputsToMerge = self.getOutputsToMerge(galHDF5Obj)
-        # Merge outputs
-        dummy = [self.mergeOutput(galHDF5Obj,outputName) \
-                     for outputName in outputsToMerge]        
-        del dummy
+        if "Outputs" in galHDF5Obj.fileObj.keys():
+            # Get outputs to merge
+            outputsToMerge = self.getOutputsToMerge(galHDF5Obj)
+            # Merge outputs
+            dummy = [self.mergeOutput(galHDF5Obj,outputName) \
+                         for outputName in outputsToMerge]        
+            del dummy
         # Update progress and return
         if progressOBJ is not None:
             progressOBJ.increment()

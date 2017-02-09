@@ -117,6 +117,26 @@ class GalacticusHDF5(HDF5):
         out = self.selectOutput(z)
         return map(str,out["nodeData"].keys())
 
+
+    def countGalaxiesAtRedshift(self,z):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        OUT = self.selectOutput(z)
+        ngals = 0
+        if "nodeData" in OUT.keys():
+            dataset = self.availableDatasets(z)[0]
+            ngals = len(np.array(OUT["nodeData/"+dataset]))
+        return ngals
+
+    def countGalaxies(self,z=None):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        if z is None:
+            redshifts = self.outputs.z
+        else:
+            redshifts = [z]
+        galaxies = np.array([self.countGalaxiesAtRedshift(redshift) for redshift in redshifts])
+        return np.sum(galaxies)
+
+
     def readGalaxies(self,z,props=None,SIunits=False):                
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Select epoch closest to specified redshift
