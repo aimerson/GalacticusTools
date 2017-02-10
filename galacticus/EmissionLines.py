@@ -189,7 +189,7 @@ class GalacticusEmissionLines(object):
         # i) compute metallicity
         metallicity = np.zeros_like(gasMass)
         np.place(metallicity,hasGas,np.log10(abundanceGasMetals[hasGas]/gasMass[hasGas]))
-        metallicity /= metallicitySolar
+        metallicity -= np.log10(metallicitySolar)
         # ii) compute hydrogen density
         densityHydrogen = self.computeHydrogenDensity(gasMass,radius)
         # iii) compute Lyman continuum luminosity        
