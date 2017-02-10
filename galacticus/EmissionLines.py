@@ -11,7 +11,7 @@ from .io import GalacticusHDF5
 from .GalacticusErrors import ParseError
 from .Filters import GalacticusFilters
 from .Luminosities import getLuminosity
-from .constants import massSolar,luminositySolar,luminosityAB
+from .constants import massSolar,luminositySolar,luminosityAB,metallicitySolar
 from .constants import megaParsec,centi,Pi,erg,angstrom,speedOfLight
 from .constants import massAtomic,atomicMassHydrogen,massFractionHydrogen
 from .utils.sorting import natural_sort_key
@@ -189,6 +189,7 @@ class GalacticusEmissionLines(object):
         # i) compute metallicity
         metallicity = np.zeros_like(gasMass)
         np.place(metallicity,hasGas,np.log10(abundanceGasMetals[hasGas]/gasMass[hasGas]))
+        metallicity /= metallicitySolar
         # ii) compute hydrogen density
         densityHydrogen = self.computeHydrogenDensity(gasMass,radius)
         # iii) compute Lyman continuum luminosity        
