@@ -37,7 +37,6 @@ megaParsec = 3.0856775800000000e+22 # m
 massAtomic = 1.6605389200000000e-27 # kg
 massHydrogen = 1.67262158000e-27 # kg
 atomicMassHydrogen = 1.0079400000000000e+00 # amu
-massFractionHydrogen = 0.7070000000000000e+00 # Solar composition
 hydrogenByMassPrimordial = 0.76000000000e+00 # Primordial fraction
 
 #####################################################################
@@ -56,6 +55,7 @@ oxygenTwoIonizationEnergy   = 35.1180000000000000e+00 # eV
 #####################################################################
 # SOLAR VALUES
 ##################################################################### 
+massFractionHydrogen = 0.7070000000000000e+00 # Solar composition
 massSolar        = 1.9891000000000000e+30 # kg
 metallicitySolar = 0.01880000000000000000
 luminositySolar  = 3.8390000000000000e+26 # W

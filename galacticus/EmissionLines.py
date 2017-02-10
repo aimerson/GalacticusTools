@@ -131,7 +131,8 @@ class GalacticusEmissionLines(object):
         hasSize = radius > 0.0
         mask = np.logical_and(hasGas,hasSize)
         tmp = gasMass[mask]*massSolar/(radius[mask]*megaParsec/centi)**3
-        tmp = np.log10(tmp/(4.0*Pi*massAtomic*atomicMassHydrogen*massFractionHydrogen))
+        tmp *= massFractionHydrogen/(4.0*Pi*massAtomic*atomicMassHydrogen)
+        tmp = np.log10(tmp)
         np.place(densityHydrogen,mask,np.copy(tmp))
         del mask,tmp
         return densityHydrogen
