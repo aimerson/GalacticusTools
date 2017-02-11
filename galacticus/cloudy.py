@@ -38,6 +38,13 @@ class cloudyTable(HDF5):
             self.interpolants = self.interpolants + (values,)
         return
 
+    def getInterpolantValues(self,interpolantName):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        if interpolantName not in self.interpolantNames:
+            raise ValueError(funcname+"(): interpolant '"+interpolantName+"'not recognised! Options are: "+\
+                                 ",".join(self.interpolantNames))
+        return np.log10(self.readDatasets('/',required=[interpolantName])[interpolantName])        
+
     def getWavelength(self,lineName):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         if lineName not in self.lines:
