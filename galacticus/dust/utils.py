@@ -66,10 +66,11 @@ class DustProperties(object):
     def computeCentralGasMetalsSurfaceDensity(self,gasMetalMass,scaleLength):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name            
         # Create empty array
-        gasMetalsSurfaceDensityCentral = np.zeros_like(gasMetalMass)
+        gasMetalsSurfaceDensityCentral = np.zeros_like(gasMetalMass,dtype=gasMetalMass.dtype)
         # Masks to avoid divide by zero        
         nonZeroSize = scaleLength > 0.0
         # Compute central surface density in M_Solar/pc^2
-        np.place(gasMetalsSurfaceDensityCentral,nonZeroSize,gasMetalMass[nonZeroSize]/(2.0*Pi*(mega*scaleLength[nonZeroSize])**2))
-        gasMetalsSurfaceDensityCentral = np.maximum(gasMetalsSurfaceDensityCentral,0.0)
+        np.place(gasMetalsSurfaceDensityCentral,nonZeroSize,gasMetalMass[nonZeroSize]/(2.0*Pi*(mega*scaleLength[nonZeroSize])**2))        
+        zeros = np.zeros_like(gasMetalsSurfaceDensityCentral,dtype=gasMetalMass.dtype)
+        gasMetalsSurfaceDensityCentral = np.maximum(gasMetalsSurfaceDensityCentral,zeros)
         return gasMetalsSurfaceDensityCentral
