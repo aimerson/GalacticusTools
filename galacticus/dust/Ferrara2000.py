@@ -165,7 +165,7 @@ class dustAtlas(DustProperties):
         out = galHDF5Obj.selectOutput(z)
         # Get metal mass
         gasMetalMass = np.array(out["nodeData/"+component+"AbundancesGasMetals"])
-        gasMass = np.array(out["nodeData/"+component+"massStellar"])
+        gasMass = np.array(out["nodeData/"+component+"MassGas"])
         metallicity = gasMetalMass/gasMass
         # Compute surface density
         mega = 1.0e6

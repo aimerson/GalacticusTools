@@ -176,7 +176,7 @@ class dustHybrid(DustProperties):
         out = galHDF5Obj.selectOutput(z)
         # Get metal mass
         gasMetalMass = np.array(out["nodeData/"+component+"AbundancesGasMetals"])
-        gasMass = np.array(out["nodeData/"+component+"massStellar"])
+        gasMass = np.array(out["nodeData/"+component+"MassGas"])
         metallicity = gasMetalMass/gasMass
         # Compute surface density
         mega = 1.0e6
@@ -252,7 +252,7 @@ class dustHybrid(DustProperties):
         contamination = MATCH.group(6)
         if contamination is None:
             contamination = ""
-        dustExtension = ":dustAtlas"
+        dustExtension = ":dustHybrid"
         dustOption = MATCH.group(7)
         faceOn = False
         includeClouds = True
@@ -290,6 +290,7 @@ class dustHybrid(DustProperties):
         # Get bulge sizes
         sizes = self.getBulgeSizes(galHDF5Obj,z,component)
         # Compute gas metallicity and central surface density in M_Solar/pc^2
+        gasMass = np.array(out["nodeData/"+component+"MassGas"])
         gasMetalMass = np.array(out["nodeData/"+component+"AbundancesGasMetals"])
         scaleLength = np.array(out["nodeData/"+component+"Radius"])
         gasMetalsSurfaceDensityCentral = self.computeCentralGasMetalsSurfaceDensity(np.copy(gasMetalMass),np.copy(scaleLength))
@@ -319,13 +320,14 @@ class dustHybrid(DustProperties):
         if any(attenuationISM>1.0) and self._verbose:
             print("WARNING! "+funcname+"(): Some attenuations greater than unity! This is not physical!")
         attenuationISM = np.minimum(attenuationISM,1.0)
-        if any(attenuations<0.0) and self._verbose:
+        if any(attenuationISM<0.0) and self._verbose:
             print("WARNING! "+funcname+"(): Some attenuations less than zero! This is not physical!")            
         attenuationISM = np.maximum(attenuationISM,0.0)
         attenuationISM *= self.opticalDepthISMFactor
         # Compute Charlot & Fall attenuation for clouds
         wavelengthFactor = (effectiveWavelength/self.wavelengthZeroPoint)**self.wavelengthExponent
         opticalDepthClouds = self.opticalDepthCloudsFactor*np.copy(gasMetallicity)/self.localISMMetallicity/wavelengthFactor
+        attenuationClouds = np.exp(-opticalDepthClouds)
         # Apply attenuations and return result 
         if fnmatch.fnmatch(luminosityType,"LuminositiesStellar"):
             # i) stellar luminosities
