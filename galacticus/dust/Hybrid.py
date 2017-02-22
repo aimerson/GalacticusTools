@@ -147,7 +147,7 @@ class dustHybrid(DustProperties):
         # -- "opticalDepthCloudsFactor" is set to unity, such that in gas with Solar metallicity the cloud optical depth will be 1.
         # -- "opticalDepthISMFactor" is set to 1.0 such that we reproduce the standard (Bohlin et al 1978) relation between visual
         #     extinction and column density in the local ISM (essentially solar metallicity).
-        self.opticalDepthISMFactor = 1.0
+        self.opticalDepthISMFactor = opticalDepthCloudsFactor
         self.opticalDepthCloudsFactor = opticalDepthCloudsFactor
         self.wavelengthZeroPoint = wavelengthZeroPoint
         self.wavelengthExponent = wavelengthExponent
