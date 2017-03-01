@@ -104,7 +104,7 @@ class galacticusOS(object):
         print(funcname+"(): Running "+EXE+"...")
         SW = STOPWATCH()
         sys.stdout.flush()
-        cmd = EXE + " " + paramfile 
+        cmd = "./"+EXE + " " + paramfile 
         if logfile is not None:
             cmd = cmd + " &> "+logfile
         os.system(cmd)
@@ -113,9 +113,9 @@ class galacticusOS(object):
         if logfile is None and os.path.exists(logfile):
             pattern = "*MM: <- Finished task set*"
             failed = len(fnmatch.filter(open(logfile,'r').readlines(),pattern))==0
-            if exitOnFail:
+            if exitOnFail and failed:
                 raise RuntimeError(funcname+"(): Galacticus run FAILED!")            
-        print("Galacticus finished processing")
+        print(funcname+"():Galacticus finished processing")
         SW.stop()
         sys.stdout.flush()
         return
