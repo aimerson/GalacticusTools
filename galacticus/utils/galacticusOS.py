@@ -96,7 +96,7 @@ class galacticusOS(object):
             paramfileName = paramfile.split("/")[-1]
             os.rename(paramfile,rundir+paramfileName)
             if not os.path.exists(rundir+EXE):
-                shutil.copyfile(self.GALACTICUS_ROOT+"/"+EXE,rundir+EXE)
+                shutil.copy2(self.GALACTICUS_ROOT+"/"+EXE,rundir+EXE)
         # Run Galacticus            
         os.chdir(rundir)
         print(funcname+"(): Running Galacticus...")        
