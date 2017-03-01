@@ -92,7 +92,7 @@ class dustHybrid(DustProperties):
     
     def __init__(self,verbose=False,interpolateBoundsError=False,interpolateFillValue=None,\
                      extrapolateInSize=True,extrapolateInTau=True,\
-                     opticalDepthISMFactor=1.0,opticalDepthCloudsFactor=1.0,\
+                     opticalDepthISMFactor=0.0,opticalDepthCloudsFactor=1.0,\
                      wavelengthZeroPoint=5500,wavelengthExponent=0.7):        
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
@@ -147,7 +147,7 @@ class dustHybrid(DustProperties):
         # -- "opticalDepthCloudsFactor" is set to unity, such that in gas with Solar metallicity the cloud optical depth will be 1.
         # -- "opticalDepthISMFactor" is set to 1.0 such that we reproduce the standard (Bohlin et al 1978) relation between visual
         #     extinction and column density in the local ISM (essentially solar metallicity).
-        self.opticalDepthISMFactor = 1.0
+        self.opticalDepthISMFactor = opticalDepthCloudsFactor
         self.opticalDepthCloudsFactor = opticalDepthCloudsFactor
         self.wavelengthZeroPoint = wavelengthZeroPoint
         self.wavelengthExponent = wavelengthExponent
@@ -323,7 +323,7 @@ class dustHybrid(DustProperties):
         if any(attenuationISM<0.0) and self._verbose:
             print("WARNING! "+funcname+"(): Some attenuations less than zero! This is not physical!")            
         attenuationISM = np.maximum(attenuationISM,0.0)
-        attenuationISM *= self.opticalDepthISMFactor
+        attenuationISM *= np.exp(-self.opticalDepthISMFactor)
         # Compute Charlot & Fall attenuation for clouds
         wavelengthFactor = (effectiveWavelength/self.wavelengthZeroPoint)**self.wavelengthExponent
         opticalDepthClouds = self.opticalDepthCloudsFactor*np.copy(gasMetallicity)/self.localISMMetallicity/wavelengthFactor
