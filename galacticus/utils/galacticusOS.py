@@ -3,6 +3,25 @@
 import os,sys,subprocess,fnmatch,glob
 import shutil
 from .timing import STOPWATCH
+import numpy as np
+
+
+def getSubvolumes(ivols):
+    """
+    e.g. 1,2,3,4,5:60:3,100,102:105,500
+    """
+    def constructRange(value):
+        elems =list(map(int,value.split(":")))
+        if len(elems) == 2:
+            elems = (elems[0],elems[1],1)
+        return ",".join(list(map(str,range(elems[0],elems[1],elems[2]))))
+    ivols = ivols.split(",")
+    ranges = fnmatch.filter(ivols,"*:*")
+    ivols = list(set(ivols).difference(ranges))
+    ivols = ivols + [ constructRange(elem) for elem in ranges]
+    ivols = list(map(int,",".join(ivols).split(",")))
+    return list(np.sort(np.unique(ivols)))
+
 
 
 class galacticusOS(object):
