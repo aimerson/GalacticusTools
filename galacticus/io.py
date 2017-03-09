@@ -49,7 +49,7 @@ class GalacticusHDF5(HDF5):
         
         # Store output epochs
         self.outputs = None
-        if "Outputs" in self.fileObj:
+        if "Outputs" in self.fileObj.keys():
             Outputs = self.fileObj["Outputs"]
             nout = len(Outputs.keys())
             isort = np.argsort(np.array([ int(key.replace("Output","")) for key in Outputs.keys()]))
@@ -94,6 +94,8 @@ class GalacticusHDF5(HDF5):
 
     def nearestRedshift(self,z):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        if self.outputs is None:
+            return None
         # Select epoch closest to specified redshift
         iselect = np.argmin(np.fabs(self.outputs.z-z))
         return self.outputs.z[iselect]
@@ -101,7 +103,9 @@ class GalacticusHDF5(HDF5):
 
     def selectOutput(self,z):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        # Select epoch closest to specified redshift
+        if self.outputs is None:
+            return None
+        # Select epoch closest to specified redshift        
         iselect = np.argmin(np.fabs(self.outputs.z-z))
         outstr = "Output"+str(self.outputs["iout"][iselect])
         if self._verbose:
@@ -113,22 +117,29 @@ class GalacticusHDF5(HDF5):
         return fnmatch.filter(fnmatch.filter(self.availableDatasets(z),"*z[0-9].[0-9]*")[0].split(":"),"z*")[0]
         
     def availableDatasets(self,z):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         out = self.selectOutput(z)
+        if out is None:
+            return []
         return map(str,out["nodeData"].keys())
 
 
     def countGalaxiesAtRedshift(self,z):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        OUT = self.selectOutput(z)
         ngals = 0
-        if "nodeData" in OUT.keys():
-            dataset = self.availableDatasets(z)[0]
-            ngals = len(np.array(OUT["nodeData/"+dataset]))
+        OUT = self.selectOutput(z)
+        if OUT is None:
+            return ngals
+        if "nodeData" in OUT.keys():            
+            if len(self.availableDatasets(z)) > 0:
+                dataset = self.availableDatasets(z)[0]            
+                ngals = len(np.array(OUT["nodeData/"+dataset]))
         return ngals
 
     def countGalaxies(self,z=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        if self.outputs is None:
+            return 0
         if z is None:
             redshifts = self.outputs.z
         else:
