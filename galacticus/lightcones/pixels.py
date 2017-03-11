@@ -32,6 +32,17 @@ def estimateNSIDE(files,totalArea,galaxiesPerPixel=10000):
     return nsides[iside]
 
 
+
+def getPixelNumbers(NSIDE,ra,dec,nest=False):
+    pixels = hp.ang2pix(NSIDE,dec,ra,nest=nest,lonlat=True)
+    return pixels
+
+def pixelNumberValid(NSIDE,pixelNumber):
+    return pixelNumber>=0 and pixelNumber<hp.nside2npix(NSIDE)
+
+
+
+
 class Pixels(object):
     
     def __init__(self,NSIDE,nest=False):
@@ -41,8 +52,8 @@ class Pixels(object):
         return
 
     def getGalaxyPixelNumbers(self,ra,dec):
-        pixels = hp.ang2pix(self.NSIDE,dec,ra,nest=self.nest,lonlat=True)
-        return pixels
+        return getPixelNumbers(self.NSIDE,ra,dec,nest=self.nest)
+
 
     def selectGalaxiesInPixel(self,ra,dec,pixelNumber):        
         pixels = self.getGalaxyPixelNumbers(ra,dec)

@@ -61,9 +61,50 @@ class GalacticusHDF5(HDF5):
                 self.outputs["a"][i] = a
                 self.outputs["z"][i] = (1.0/a) - 1.0
             self.outputs = self.outputs.view(np.recarray)
-
         return
+
+    def availableDatasets(self,z):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        out = self.selectOutput(z)
+        if out is None:
+            return []
+        return map(str,out["nodeData"].keys())
+
+    def countGalaxies(self,z=None):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        if self.outputs is None:
+            return 0
+        if z is None:
+            redshifts = self.outputs.z
+        else:
+            redshifts = [z]
+        galaxies = np.array([self.countGalaxiesAtRedshift(redshift) for redshift in redshifts])
+        return np.sum(galaxies)
+
+    def countGalaxiesAtRedshift(self,z):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        ngals = 0
+        OUT = self.selectOutput(z)
+        if OUT is None:
+            return ngals
+        if "nodeData" in OUT.keys():            
+            if len(self.availableDatasets(z)) > 0:
+                dataset = self.availableDatasets(z)[0]            
+                ngals = len(np.array(OUT["nodeData/"+dataset]))
+        return ngals
+
+    def getRedshiftString(self,z):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        return fnmatch.filter(fnmatch.filter(self.availableDatasets(z),"*z[0-9].[0-9]*")[0].split(":"),"z*")[0]
     
+    def getUUID(self):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        keys = list(map(str,self.fileObj["/"].attrs.keys()))
+        uuid = None
+        if "UUID" in keys:            
+            uuid = str(self.fileObj["/"].attrs["UUID"])
+        return uuid
+
     def globalHistory(self,props=None,si=False):        
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         globalHistory = self.fileObj["globalHistory"]
@@ -91,7 +132,6 @@ class GalacticusHDF5(HDF5):
                         history[p] = history[p]*unit
         return history.view(np.recarray)
 
-
     def nearestRedshift(self,z):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         if self.outputs is None:
@@ -99,54 +139,6 @@ class GalacticusHDF5(HDF5):
         # Select epoch closest to specified redshift
         iselect = np.argmin(np.fabs(self.outputs.z-z))
         return self.outputs.z[iselect]
-
-
-    def selectOutput(self,z):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        if self.outputs is None:
-            return None
-        # Select epoch closest to specified redshift        
-        iselect = np.argmin(np.fabs(self.outputs.z-z))
-        outstr = "Output"+str(self.outputs["iout"][iselect])
-        if self._verbose:
-            print(funcname+"(): Nearest output is "+outstr+" (redshift = "+str(self.outputs.z[iselect])+")")
-        return self.fileObj["Outputs/"+outstr]
-
-    def getRedshiftString(self,z):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        return fnmatch.filter(fnmatch.filter(self.availableDatasets(z),"*z[0-9].[0-9]*")[0].split(":"),"z*")[0]
-        
-    def availableDatasets(self,z):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
-        out = self.selectOutput(z)
-        if out is None:
-            return []
-        return map(str,out["nodeData"].keys())
-
-
-    def countGalaxiesAtRedshift(self,z):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        ngals = 0
-        OUT = self.selectOutput(z)
-        if OUT is None:
-            return ngals
-        if "nodeData" in OUT.keys():            
-            if len(self.availableDatasets(z)) > 0:
-                dataset = self.availableDatasets(z)[0]            
-                ngals = len(np.array(OUT["nodeData/"+dataset]))
-        return ngals
-
-    def countGalaxies(self,z=None):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        if self.outputs is None:
-            return 0
-        if z is None:
-            redshifts = self.outputs.z
-        else:
-            redshifts = [z]
-        galaxies = np.array([self.countGalaxiesAtRedshift(redshift) for redshift in redshifts])
-        return np.sum(galaxies)
-
 
     def readGalaxies(self,z,props=None,SIunits=False):                
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
@@ -189,6 +181,20 @@ class GalacticusHDF5(HDF5):
                     galaxies[p.lower()] = np.copy(np.repeat(wgt,cts))
                     del cts,wgt            
         return galaxies
+
+    def selectOutput(self,z):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        if self.outputs is None:
+            return None
+        # Select epoch closest to specified redshift        
+        iselect = np.argmin(np.fabs(self.outputs.z-z))
+        outstr = "Output"+str(self.outputs["iout"][iselect])
+        if self._verbose:
+            print(funcname+"(): Nearest output is "+outstr+" (redshift = "+str(self.outputs.z[iselect])+")")
+        return self.fileObj["Outputs/"+outstr]
+
+
+
 
         
     def calculateProperties(self,galaxyProperties,z,overwrite=False):        

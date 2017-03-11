@@ -2,9 +2,11 @@
 
 import sys,os,fnmatch
 import numpy as np
-from galacticus.io import GalacticusHDF5
-from galacticus.xmlTree import xmlTree
-from galacticus.hdf5 import HDF5
+from ..io import GalacticusHDF5
+from ..xmlTree import xmlTree
+from ..hdf5 import HDF5
+from .utils import getRaDec
+from ..utils.progress import Progress
 
 
 class LightconeHDF5(HDF5):
@@ -79,5 +81,155 @@ class LightconeHDF5(HDF5):
         dummy = [self.addGalaxyProperty(name,galaxies[name]) for name in galaxies.dtype.names]
         del dummy
         return
+
+
+
+
+
+class writeGalacticusLightcone(HDF5):
+    
+    def __init__(self,fileName,format="galacticus",NSIDE=None,nest=False):
+        classname = self.__class__.__name__
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Initalise HDF5 class
+        super(writeGalacticusLightcone, self).__init__(fileName,"a")
+        # Store HealPix parameters (if specified)        
+        self.NSIDE = NSIDE
+        self.nest = nest
+        # Store format for file        
+        if format.lower() not in ["galacticus","lightcone"]:
+            raise ValueError(classname+"(): format must be 'galacticus' or 'lightcone'!")
+        self.format = format.lower()
+        # Create outputs directory
+        self.mkGroup("Outputs")
+        if fnmatch.fnmatch(self.format,"lightcone"):
+            self.mkGroup("Outputs/nodeData")
+        return
+
+
+    def buildOutputsDirectory(self,galHDF5Obj):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Make group to store outputs
+        self.mkGroup("Outputs")
+        outputNames = self.selectOutputsToProcess(galHDF5Obj)
+        for outputName in outputNames:
+            self.mkGroup("Outputs/"+outputName)
+            attrib = galHDF5Obj.readAttributes("Outputs/"+outputName)
+            self.addAttributes("Outputs/"+outputName,attrib)
+        return
+
+
+    
+
+
+    def createOutputDirectory(self,galHDF5Obj,outputName):        
+        if outputName not in self.fileObj["Outputs"].keys():
+            self.mkGroup("Outputs/"+outputName)
+            attrib = galHDF5Obj.readAttributes("Outputs/"+outputName)
+            self.addAttributes("Outputs/"+outputName,attrib)
+            self.mkGroup("Outputs/"+outputName+"/nodeData")
+        return
+
+
+
+    def getRedshiftMask(self,z,redshiftRange=None):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        mask = np.ones(len(z),dtype=bool)
+        if redshiftRange is not None:
+            mask = np.logical_and(z>=redshiftRange[0],z<=redshiftRange[1])
+        return mask
+
+
+    def getPixelMask(self,X,Y,Z,pixelNumber=None):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        mask = np.ones(len(X),dtype=bool)
+        if pixelNumber is not None:
+            if self.NSIDE is None:
+                raise ValueError(funcname+"(): Class value for NSIDE was not specified!")            
+            from .pixels import pixelNumberValid,getPixelNumbers
+            if not pixelNumberValid(self.NSIDE,pixelNumber):
+                raise ValueError(funcname+"(): pixel number outside range of allowed pixels for NSIDE = "+str(NSIDE))            
+            ra,dec = getRaDec(X,Y,Z,degrees=True)
+            mask = getPixelNumbers(self.NSIDE,ra,dec,nest=self.nest)==pixelNumber
+        return mask
+            
+
+    def addGalaxyDataset(self,datasetName,zGalHDF5Obj,path,mask=None):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        if not path.endswith("/"):
+            path = path + "/"
+        data = np.array(zGalHDF5Obj["nodeData/"+datasetName])
+        if mask is not None:
+            data = data[mask]
+        if datasetName not in self.lsDatasets(path):
+            attrib = dict(zGalHDF5Obj["nodeData/"+datasetName].attrs)
+            append = False
+        else:
+            attrib = None
+            append = True
+        self.addDataset(path,datasetName,data,append=append,overwrite=False,\
+                        maxshape=tuple([None]),chunks=True,compression="gzip",\
+                        compression_opts=6)
+        if attrib is not None:
+            self.addAttributes(path+datasetName,attrib)
+        return
+            
+
+    def addGalaxiesFromOutput(self,galHDF5Obj,outputName,props=None,pixelNumber=None,redshiftRange=None,progressObj=None):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Check output contains galaxies
+        if "nodeData" not in galHDF5Obj.lsGroups("Outputs/"+outputName):            
+            return
+        if len(galHDF5Obj.lsDatasets("Outputs/"+outputName+"/nodeData"))==0:
+            return
+        # Create directories if necessary
+        if fnmatch.fnmatch(self.format,"galacticus"):
+            self.createOutputDirectory(galHDF5Obj,outputName)
+            path = "Outputs/"+outputName+"/nodeData/"
+        else:
+            if "nodeData" not in self.fileObj["Outputs"].keys():
+                self.mkGroup("Outputs/nodeData")
+            path = "Outputs/nodeData/"
+        # Construct mask to select galaxies
+        z = np.array(galHDF5Obj.fileObj["Outputs/"+outputName+"/nodeData/lightconeRedshift"])
+        zmask = self.getRedshiftMask(z,redshiftRange=redshiftRange)
+        if pixelNumber is not None:
+            X = np.array(galHDF5Obj.fileObj["Outputs/"+outputName+"/nodeData/lightconePositionX"])
+            Y = np.array(galHDF5Obj.fileObj["Outputs/"+outputName+"/nodeData/lightconePositionY"])
+            Z = np.array(galHDF5Obj.fileObj["Outputs/"+outputName+"/nodeData/lightconePositionZ"])
+            pmask = self.getPixelMask(X,Y,Z,pixelNumber=pixelNumber)
+        else:
+            pmask = np.ones(len(zmask),bool=True)
+        mask = np.logical_and(zmask,pmask)
+        if any(mask):
+            # Select properties to add
+            if props is None:
+                props = galHDF5Obj.lsDatasets("Outputs/"+outputName+"/nodeData")
+            # Add galaxy properties
+            OUT = galHDF5Obj.fileObj["Outputs/"+outputName]
+            dummy = [self.addGalaxyDataset(datasetName,OUT,path,mask=mask) for datasetName in props]
+        if progressObj is not None:
+            progressObj.increment()
+            progressObj.print_status_line()
+        return
+
+
+    def addGalaxies(self,galHDF5Obj,props=None,pixelNumber=None,redshiftRange=None):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Skip if file does not contain any galaxies
+        if galHDF5Obj.outputs is None:
+            return
+        # Loop over outputs adding galaxies where necessary        
+        PROG = Progress(len(galHDF5Obj.outputs.name))
+        dummy = [self.addGalaxiesFromOutput(galHDF5Obj,outName,props=props,pixelNumber=pixelNumber,redshiftRange=redshiftRange,progressObj=PROG)\
+                     for outName in galHDF5Obj.outputs.name]
+        return
+
+
+    
+
+
+
+
 
 
