@@ -175,6 +175,61 @@ class writeGalacticusLightcone(HDF5):
         return
             
 
+    def maskMergerTrees(self,mask,index,count,weight,startIndex):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        dataIndex = np.copy(np.repeat(index,count))        
+        uniq,uniqCount = np.unique(dataIndex[mask],return_counts=True)
+        indexMask = np.array([ind in uniq for ind in index])
+        newIndex = index[indexMask]
+        newCount = np.array([uniqCount[np.argwhere(uniq==ind)[0][0]] for ind in newIndex])
+        newWeight = np.array([weight[np.argwhere(index==ind)[0][0]] for ind in newIndex])
+        newStartIndex = np.array([startIndex[np.argwhere(index==ind)[0][0]] for ind in newIndex])
+        return newIndex,newCount,newWeight,newStartIndex
+
+    def addMergerTreeFromOutput(self,galHDF5Obj,outputName,mask=None):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Check output contains galaxies
+        if "nodeData" not in galHDF5Obj.lsGroups("Outputs/"+outputName):            
+            return
+        if len(galHDF5Obj.lsDatasets("Outputs/"+outputName+"/nodeData"))==0:
+            return
+        # Create directories if necessary
+        if fnmatch.fnmatch(self.format,"galacticus"):
+            self.createOutputDirectory(galHDF5Obj,outputName)
+            path = "Outputs/"+outputName+"/"
+        else:
+            if "nodeData" not in self.fileObj["Outputs"].keys():
+                self.mkGroup("Outputs/nodeData")
+            path = "Outputs/"
+        # Extract merger tree information
+        OUT = galHDF5Obj.fileObj['Outputs/'+outputName]
+        count = np.array(OUT["mergerTreeCount"])
+        weight = np.array(OUT["mergerTreeWeight"])
+        index = np.array(OUT["mergerTreeIndex"])
+        startIndex = np.array(OUT["mergerTreeStartIndex"])
+        # Apply mask if necessary
+        if mask is not None:
+            if not all(mask):
+                index,count,weight,startIndex = self.maskMergerTrees(mask,index,count,weight,startIndex)
+        # Write to file
+        append = False
+        if "mergerTreeIndex" in self.lsDatasets(path):
+            append = True
+        self.addDataset(path,"mergerTreeCount",count,append=append,overwrite=False,\
+                            maxshape=tuple([None]),chunks=True,compression="gzip",\
+                            compression_opts=6)
+        self.addDataset(path,"mergerTreeIndex",index,append=append,overwrite=False,\
+                            maxshape=tuple([None]),chunks=True,compression="gzip",\
+                            compression_opts=6)
+        self.addDataset(path,"mergerTreeStartIndex",startIndex,append=append,overwrite=False,\
+                            maxshape=tuple([None]),chunks=True,compression="gzip",\
+                            compression_opts=6)
+        self.addDataset(path,"mergerTreeWeight",weight,append=append,overwrite=False,\
+                            maxshape=tuple([None]),chunks=True,compression="gzip",\
+                            compression_opts=6)
+        return
+
+    
     def addGalaxiesFromOutput(self,galHDF5Obj,outputName,props=None,pixelNumber=None,redshiftRange=None,progressObj=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Check output contains galaxies
@@ -202,6 +257,9 @@ class writeGalacticusLightcone(HDF5):
             pmask = np.ones(len(zmask),bool=True)
         mask = np.logical_and(zmask,pmask)
         if any(mask):
+            # Update merger tree information
+            if fnmatch.fnmatch(self.format,"galacticus"):
+                self.addMergerTreeFromOutput(galHDF5Obj,outputName,mask=mask)
             # Select properties to add
             if props is None:
                 props = galHDF5Obj.lsDatasets("Outputs/"+outputName+"/nodeData")
@@ -214,21 +272,45 @@ class writeGalacticusLightcone(HDF5):
         return
 
 
-    def addGalaxies(self,galHDF5Obj,props=None,pixelNumber=None,redshiftRange=None):
+    def addGalaxies(self,galHDF5Obj,props=None,pixelNumber=None,redshiftRange=None,progressObj=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Skip if file does not contain any galaxies
         if galHDF5Obj.outputs is None:
             return
+        # Copy all directories apart from galaxy outputs                                                                                                                                                                
+        self.addBuildInformation(galHDF5Obj)
+        self.addVersionInformation(galHDF5Obj)
+        self.addParametersInformation(galHDF5Obj)
         # Loop over outputs adding galaxies where necessary        
-        PROG = Progress(len(galHDF5Obj.outputs.name))
+        if progressObj is None:
+            PROG = Progress(len(galHDF5Obj.outputs.name))
+        else:
+            PROG = None
         dummy = [self.addGalaxiesFromOutput(galHDF5Obj,outName,props=props,pixelNumber=pixelNumber,redshiftRange=redshiftRange,progressObj=PROG)\
                      for outName in galHDF5Obj.outputs.name]
+        if progressObj is not None:
+            progressObj.increment()
+            progressObj.print_status_line()
         return
 
 
-    
+    def addBuildInformation(self,galHDF5Obj):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        if "Build" not in self.lsGroups("/"):
+            self.cpGroup(str(galHDF5Obj.fileObj.filename),"Build")
+        return
 
+    def addVersionInformation(self,galHDF5Obj):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        if "Version" not in self.lsGroups("/"):
+            self.cpGroup(galHDF5Obj.fileObj.filename,"Version")
+        return
 
+    def addParametersInformation(self,galHDF5Obj):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        if "Parameters" not in self.lsGroups("/"):
+            self.cpGroup(galHDF5Obj.fileObj.filename,"Parameters")
+        return
 
 
 
