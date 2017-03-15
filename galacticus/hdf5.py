@@ -110,7 +110,7 @@ class HDF5(object):
             thisdir.visititems(_append_item)
         else:
             ls = thisdir.keys()
-        return ls
+        return list(map(str,ls))
 
     ##############################################################################
     # DATASETS
@@ -175,7 +175,7 @@ class HDF5(object):
         dsets = []
         def _is_dataset(obj):
             return isinstance(self.fileObj[hdfdir+"/"+obj],h5py.Dataset)        
-        return filter(_is_dataset,objs)
+        return list(map(str,filter(_is_dataset,objs)))
 
 
     def readDatasets(self,hdfdir,recursive=False,required=None,exit_if_missing=True):

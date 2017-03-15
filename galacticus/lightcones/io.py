@@ -119,9 +119,6 @@ class writeGalacticusLightcone(HDF5):
         return
 
 
-    
-
-
     def createOutputDirectory(self,galHDF5Obj,outputName):        
         if outputName not in self.fileObj["Outputs"].keys():
             self.mkGroup("Outputs/"+outputName)
@@ -174,7 +171,6 @@ class writeGalacticusLightcone(HDF5):
             self.addAttributes(path+datasetName,attrib)
         return
             
-
     def maskMergerTrees(self,mask,index,count,weight,startIndex):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         dataIndex = np.copy(np.repeat(index,count))        
@@ -183,7 +179,7 @@ class writeGalacticusLightcone(HDF5):
         newIndex = index[indexMask]
         newCount = np.array([uniqCount[np.argwhere(uniq==ind)[0][0]] for ind in newIndex])
         newWeight = np.array([weight[np.argwhere(index==ind)[0][0]] for ind in newIndex])
-        newStartIndex = np.array([startIndex[np.argwhere(index==ind)[0][0]] for ind in newIndex])
+        newStartIndex = np.copy(np.cumsum(newCount)-newCount)
         return newIndex,newCount,newWeight,newStartIndex
 
     def addMergerTreeFromOutput(self,galHDF5Obj,outputName,mask=None):
@@ -221,17 +217,19 @@ class writeGalacticusLightcone(HDF5):
         self.addDataset(path,"mergerTreeIndex",index,append=append,overwrite=False,\
                             maxshape=tuple([None]),chunks=True,compression="gzip",\
                             compression_opts=6)
-        self.addDataset(path,"mergerTreeStartIndex",startIndex,append=append,overwrite=False,\
+        self.addDataset(path,"mergerTreeWeight",weight,append=append,overwrite=False,\
                             maxshape=tuple([None]),chunks=True,compression="gzip",\
                             compression_opts=6)
-        self.addDataset(path,"mergerTreeWeight",weight,append=append,overwrite=False,\
+        count = np.array(OUT["mergerTreeCount"])
+        startIndex = np.cumsum(count) - count
+        self.addDataset(path,"mergerTreeStartIndex",startIndex,append=False,overwrite=True,\
                             maxshape=tuple([None]),chunks=True,compression="gzip",\
                             compression_opts=6)
         return
 
     
     def addGalaxiesFromOutput(self,galHDF5Obj,outputName,props=None,pixelNumber=None,redshiftRange=None,progressObj=None):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         # Check output contains galaxies
         if "nodeData" not in galHDF5Obj.lsGroups("Outputs/"+outputName):            
             return
