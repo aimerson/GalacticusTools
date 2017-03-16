@@ -155,7 +155,7 @@ class writeGalacticusLightcone(HDF5):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         if not path.endswith("/"):
             path = path + "/"
-        data = np.array(zGalHDF5Obj["nodeData/"+datasetName])
+        data = np.copy(np.array(zGalHDF5Obj["nodeData/"+datasetName]))
         if mask is not None:
             data = data[mask]
         if datasetName not in self.lsDatasets(path):
@@ -170,7 +170,23 @@ class writeGalacticusLightcone(HDF5):
         if attrib is not None:
             self.addAttributes(path+datasetName,attrib)
         return
-            
+
+
+
+    def _getMaskedCount(self,i,startIndex,count,mask):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        if count[i] == 0:
+            return 0
+        istart = startIndex[i]
+        if i == len(startIndex) - 1:
+            iend = len(startIndex)
+        else:
+            iend = startIndex[i+1]    
+        mask = mask.astype(int)
+        newCount = np.sum(mask[istart:iend])
+        return newCount
+    
+   
     def maskMergerTrees(self,mask,index,count,weight,startIndex):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         dataIndex = np.copy(np.repeat(index,count))        
@@ -181,6 +197,15 @@ class writeGalacticusLightcone(HDF5):
         newWeight = np.array([weight[np.argwhere(index==ind)[0][0]] for ind in newIndex])
         newStartIndex = np.copy(np.cumsum(newCount)-newCount)
         return newIndex,newCount,newWeight,newStartIndex
+
+
+    def _maskMergerTrees(self,mask,index,count,weight,startIndex):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        newCount = np.array([self._getMaskedCount(i,startIndex,count,mask) for i in range(len(index))])
+        newStartIndex = np.copy(np.cumsum(newCount)-newCount)        
+        return index,newCount,weight,newStartIndex
+
+
 
     def addMergerTreeFromOutput(self,galHDF5Obj,outputName,mask=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
@@ -201,12 +226,12 @@ class writeGalacticusLightcone(HDF5):
         OUT = galHDF5Obj.fileObj['Outputs/'+outputName]
         count = np.array(OUT["mergerTreeCount"])
         weight = np.array(OUT["mergerTreeWeight"])
-        index = np.array(OUT["mergerTreeIndex"])
+        index = np.array(OUT["mergerTreeIndex"])    
         startIndex = np.array(OUT["mergerTreeStartIndex"])
         # Apply mask if necessary
         if mask is not None:
             if not all(mask):
-                index,count,weight,startIndex = self.maskMergerTrees(mask,index,count,weight,startIndex)
+                index,count,weight,startIndex = self._maskMergerTrees(mask,index,count,weight,startIndex)
         # Write to file
         append = False
         if "mergerTreeIndex" in self.lsDatasets(path):
@@ -220,7 +245,7 @@ class writeGalacticusLightcone(HDF5):
         self.addDataset(path,"mergerTreeWeight",weight,append=append,overwrite=False,\
                             maxshape=tuple([None]),chunks=True,compression="gzip",\
                             compression_opts=6)
-        count = np.array(OUT["mergerTreeCount"])
+        count = np.array(self.fileObj['Outputs/'+outputName+"/mergerTreeCount"])
         startIndex = np.cumsum(count) - count
         self.addDataset(path,"mergerTreeStartIndex",startIndex,append=False,overwrite=True,\
                             maxshape=tuple([None]),chunks=True,compression="gzip",\
@@ -235,14 +260,6 @@ class writeGalacticusLightcone(HDF5):
             return
         if len(galHDF5Obj.lsDatasets("Outputs/"+outputName+"/nodeData"))==0:
             return
-        # Create directories if necessary
-        if fnmatch.fnmatch(self.format,"galacticus"):
-            self.createOutputDirectory(galHDF5Obj,outputName)
-            path = "Outputs/"+outputName+"/nodeData/"
-        else:
-            if "nodeData" not in self.fileObj["Outputs"].keys():
-                self.mkGroup("Outputs/nodeData")
-            path = "Outputs/nodeData/"
         # Construct mask to select galaxies
         z = np.array(galHDF5Obj.fileObj["Outputs/"+outputName+"/nodeData/lightconeRedshift"])
         zmask = self.getRedshiftMask(z,redshiftRange=redshiftRange)
@@ -255,6 +272,14 @@ class writeGalacticusLightcone(HDF5):
             pmask = np.ones(len(zmask),bool=True)
         mask = np.logical_and(zmask,pmask)
         if any(mask):
+            # Create directories if necessary
+            if fnmatch.fnmatch(self.format,"galacticus"):
+                self.createOutputDirectory(galHDF5Obj,outputName)
+                path = "Outputs/"+outputName+"/nodeData/"
+            else:
+                if "nodeData" not in self.fileObj["Outputs"].keys():
+                    self.mkGroup("Outputs/nodeData")
+                path = "Outputs/nodeData/"
             # Update merger tree information
             if fnmatch.fnmatch(self.format,"galacticus"):
                 self.addMergerTreeFromOutput(galHDF5Obj,outputName,mask=mask)
