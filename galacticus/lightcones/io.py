@@ -146,7 +146,8 @@ class writeGalacticusLightcone(HDF5):
             if not pixelNumberValid(self.NSIDE,pixelNumber):
                 raise ValueError(funcname+"(): pixel number outside range of allowed pixels for NSIDE = "+str(self.NSIDE))            
             ra,dec = getRaDec(X,Y,Z,degrees=True)
-            mask = getPixelNumbers(self.NSIDE,ra,dec,nest=self.nest)==pixelNumber
+            pixels = getPixelNumbers(self.NSIDE,ra,dec,nest=self.nest)
+            mask = pixels==int(pixelNumber)
         return mask
             
 
