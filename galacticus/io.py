@@ -4,6 +4,7 @@ import os,sys,fnmatch
 import numpy as np
 from .hdf5 import HDF5
 from .utils.datatypes import getDataType
+from .utils.progress import Progress
 from .cosmology import Cosmology
 
 
@@ -148,7 +149,7 @@ class GalacticusHDF5(HDF5):
         return self.outputs.z[iselect]
 
 
-    def readGalaxies(self,z,props=None,SIunits=False):                
+    def readGalaxiesOLD(self,z,props=None,SIunits=False):                
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Select epoch closest to specified redshift
         out = self.selectOutput(z)
@@ -192,7 +193,7 @@ class GalacticusHDF5(HDF5):
 
 
 
-    def readGalaxiesNEW(self,z,props=None,SIunits=False,removeRedshiftString=False):                
+    def readGalaxies(self,z,props=None,SIunits=False,removeRedshiftString=False):                
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Create array to store galaxy data
         self.galaxies = None
@@ -204,23 +205,28 @@ class GalacticusHDF5(HDF5):
             self.readGalaxiesAtRedshift(z,props=props,SIunits=SIunits,removeRedshiftString=removeRedshiftString)
         else:
             zout = np.unique([self.outputs.z[np.argmin(np.fabs(self.outputs.z-iz))] for iz in z])
-            dummy = [self.readGalaxiesAtRedshift(iz,props=props,SIunits=SIunits,removeRedshiftString=True) for iz in zout]
+            PROG = Progress(len(zout))
+            dummy = [self.readGalaxiesAtRedshift(iz,props=props,SIunits=SIunits,removeRedshiftString=True,progressObj=PROG) for iz in zout]
         return self.galaxies
 
     
-    def readGalaxiesAtRedshift(self,z,props=None,SIunits=False,removeRedshiftString=False):                
+    def readGalaxiesAtRedshift(self,z,props=None,SIunits=False,removeRedshiftString=False,progressObj=None):                
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         # Initiate class for snapshot output
         OUTPUT = SnapshotOutput(z,self)
         # Read galaxies from snapshot
         OUTPUT.readGalaxies(props=props,SIunits=SIunits,removeRedshiftString=removeRedshiftString)
         # Add to galaxies data array
-        if self.galxies is None:
+        if self.galaxies is None:
             self.galaxies = np.copy(OUTPUT.galaxies)
         else:
             self.galaxies = np.append(self.galaxies,np.copy(OUTPUT.galaxies))
         # Delete output class
         del OUTPUT
+        # Report progress
+        if progressObj is not None:
+            progressObj.increment()
+            progressObj.print_status_line(task="Redshift = "+str(z))
         return 
     
     def selectOutput(self,z):
@@ -289,7 +295,7 @@ class SnapshotOutput(object):
         if dataTypeName is None:
             dataTypeName = datasetName
         # Store galaxy data
-        if datasetname in self.galHDF5Obj.availableDatasets(self.redshift):
+        if datasetName in self.galHDF5Obj.availableDatasets(self.redshift):
             self.galaxies[dataTypeName] = np.copy(np.array(self.out["nodeData/"+datasetName]))
             if SIunits:
                 if "unitsInSI" in out["nodeData/"+p].attrs.keys():
@@ -308,7 +314,7 @@ class SnapshotOutput(object):
     def _getDataTypeNames(self,prop):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         allpropsZ = self.galHDF5Obj.availableDatasets(self.redshift)
-        allprops = [prop.replace(":"+self.redshiftString,"") for prop in allpropsZ]
+        allprops = [p.replace(":"+self.redshiftString,"") for p in allpropsZ]
         matches = fnmatch.filter(allprops,prop) + fnmatch.filter(allprops,prop) + fnmatch.filter(special_cases,prop)
         matches = [m.replace(":"+self.redshiftString,"") for m in matches]
         matches = list(np.unique(matches))
@@ -321,8 +327,8 @@ class SnapshotOutput(object):
             self._datasetNames.append(prop)
             return        
         allpropsZ = self.galHDF5Obj.availableDatasets(self.redshift)
-        allprops = [prop.replace(":"+self.redshiftString,"") for prop in allpropsZ]      
-        index = np.where(allprops==prop)[0][0]
+        allprops = [p.replace(":"+self.redshiftString,"") for p in allpropsZ]              
+        index = np.where(np.array(allprops)==prop)[0][0]
         self._datasetNames.append(allpropsZ[index])
         return
     
@@ -331,7 +337,7 @@ class SnapshotOutput(object):
         if datasetName not in self.galHDF5Obj.availableDatasets(self.redshift):
             raise KeyError(funcname+"(): dataset '"+datasetName+"' not found in file '"+self.galHDF5Obj.fileObj.filename+"'!")
         # Get datatype
-        dtype = getDataType(self.out["nodeData/"+datasetName]))
+        dtype = getDataType(self.out["nodeData/"+datasetName])
         # Select name to use in datatype
         if dataTypeName is None:
             dataTypeName = datasetName
@@ -350,19 +356,19 @@ class SnapshotOutput(object):
         # Get list of datasets and corresponding names in file
         self._dataTypeNames = []
         dummy = [self._getDataTypeNames(prop) for prop in props]
-        self._datasetnames = []
-        dummy = [self._findDatasetName(prop) for prop in props]
+        self._datasetNames = []
+        dummy = [self._findDatasetName(prop) for prop in self._dataTypeNames]
         if not removeRedshiftString:
-            self._dataTypeNames = self._datasetnames
+            self._dataTypeNames = self._datasetNames
         # Build galaxies array
         self._dtype = []
-        dummy = [self._buildDataType(self._datasetnames[i],dataTypeName=self._dataTypeNames[i])\
+        dummy = [self._buildDataType(self._datasetNames[i],dataTypeName=self._dataTypeNames[i])\
                      for i in range(len(self._dataTypeNames))]
         self.galaxies = np.zeros(self.numberGalaxies,dtype=self._dtype)
         # Read properties        
         dummy = [self.getGalaxyDataset(self._datasetNames[i],SIunits=False,dataTypeName=self._dataTypeNames[i])\
                      for i in range(len(self._datasetNames))]
-        del self._datasetnames,self._dataTypeNames,self._dtype
+        del self._datasetNames,self._dataTypeNames,self._dtype
         return
         
 
