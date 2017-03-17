@@ -9,7 +9,7 @@ from .cosmology import Cosmology
 
 
 # Special cases for dataset names
-special_cases = ["weight","mergerTreeWeight"]
+special_cases = ["weight","mergerTreeWeight","snapshotRedshift"]
 
 
 ######################################################################################
@@ -308,6 +308,8 @@ class SnapshotOutput(object):
                 wgt = np.array(self.out["mergerTreeWeight"])
                 self.galaxies[dataTypeName] = np.copy(np.repeat(wgt,cts))
                 del cts,wgt
+            if datasetName == "snapshotRedshift":
+                self.galaxies[dataTypeName] = np.ones_like(self.galaxies[dataTypeName])*self.redshift
         return
 
 
