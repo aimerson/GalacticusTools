@@ -7,3 +7,5 @@ def getDataType(arr):
     dtype = dtype.replace("float32","float64")
     return dtype
 
+
+    

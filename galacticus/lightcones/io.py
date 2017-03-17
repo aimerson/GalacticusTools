@@ -128,7 +128,6 @@ class writeGalacticusLightcone(HDF5):
         return
 
 
-
     def getRedshiftMask(self,z,redshiftRange=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         mask = np.ones(len(z),dtype=bool)
@@ -145,7 +144,7 @@ class writeGalacticusLightcone(HDF5):
                 raise ValueError(funcname+"(): Class value for NSIDE was not specified!")            
             from .pixels import pixelNumberValid,getPixelNumbers
             if not pixelNumberValid(self.NSIDE,pixelNumber):
-                raise ValueError(funcname+"(): pixel number outside range of allowed pixels for NSIDE = "+str(NSIDE))            
+                raise ValueError(funcname+"(): pixel number outside range of allowed pixels for NSIDE = "+str(self.NSIDE))            
             ra,dec = getRaDec(X,Y,Z,degrees=True)
             mask = getPixelNumbers(self.NSIDE,ra,dec,nest=self.nest)==pixelNumber
         return mask

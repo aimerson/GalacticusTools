@@ -38,7 +38,7 @@ def getPixelNumbers(NSIDE,ra,dec,nest=False):
     return pixels
 
 def pixelNumberValid(NSIDE,pixelNumber):
-    return pixelNumber>=0 and pixelNumber<hp.nside2npix(NSIDE)
+    return int(pixelNumber)>=0 and int(pixelNumber)<hp.nside2npix(NSIDE)
 
 
 
