@@ -88,7 +88,7 @@ def loadSpheroidAttenuation(component,verbose=False):
 
 
 
-class dustHybrid(DustProperties):
+class dustAtlasClouds(DustProperties):
     
     def __init__(self,verbose=False,interpolateBoundsError=False,interpolateFillValue=None,\
                      extrapolateInSize=True,extrapolateInTau=True,\
@@ -99,7 +99,7 @@ class dustHybrid(DustProperties):
         # Set verbosity
         self._verbose = verbose        
         # Initialise DustProperties class
-        super(dustHybrid, self).__init__()
+        super(dustAtlasClouds, self).__init__()
         # Load dust atlas file
         self.dustFile = pkg_resources.resource_filename(__name__,"../data/dust/Ferrara2000/attenuations_MilkyWay_dustHeightRatio1.0.xml")
         if not os.path.exists(self.dustFile):
@@ -235,7 +235,7 @@ class dustHybrid(DustProperties):
         if self._verbose:
             print(funcname+"(): Processing dataset '"+datasetName+"'")            
         # Check is a luminosity for attenuation
-        MATCH = re.search(r"^(disk|spheroid)(LuminositiesStellar|LineLuminosity):([^:]+):([^:]+):z([\d\.]+)(:contam_[^:]+)?:dustHybrid([^:]+)?",datasetName)
+        MATCH = re.search(r"^(disk|spheroid)(LuminositiesStellar|LineLuminosity):([^:]+):([^:]+):z([\d\.]+)(:contam_[^:]+)?:dustAtlasClouds([^:]+)?",datasetName)
         if not MATCH:
             raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
         # Extract dataset information
@@ -252,7 +252,7 @@ class dustHybrid(DustProperties):
         contamination = MATCH.group(6)
         if contamination is None:
             contamination = ""
-        dustExtension = ":dustHybrid"
+        dustExtension = ":dustAtlasClouds"
         dustOption = MATCH.group(7)
         faceOn = False
         includeClouds = True
