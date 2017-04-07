@@ -82,7 +82,7 @@ class GalacticusSED(object):
     def getSED(self,datasetName,selectionMask=None,ignoreResolution=False,resampleLimit=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Check dataset name correspnds to an SED
-        MATCH = re.search(r"^(disk|spheroid|total)SED:([^:]+):([^:]+)(:[^:]+)?(:snr[\d\.]+)?:z([\d\.]+)(:dust[^:]+)?(:recent)?",datasetName)
+        MATCH = re.search(r"^(disk|spheroid|total)SED:([^:]+):([^:]+)?(:[^:]+)??(:snr[\d\.]+)?:z([\d\.]+)(:dust[^:]+)?(:recent)?",datasetName)
         if not MATCH:
             raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
         # Extract necessary information
