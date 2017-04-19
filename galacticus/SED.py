@@ -31,6 +31,16 @@ def sedStatistic(seds,axis=0,statistic="mean"):
     return stat
 
 
+def normaliseSED(wavelength,sed,normWavelength,**kwargs):    
+    funcname = sys._getframe().f_code.co_name
+    if normWavelength < wavelength.min() or normWavelength > wavelength.max():
+        raise ValueError(funcname+"(): normalisation point outside wavelength range, ("+\
+                             str(wavelength.min())+","+str(wavelength.max())+")")
+    f = interp1d(wavelength,sed,**kwargs)
+    norm = f(normWavelength)
+    return sed/norm
+
+
 
 class GalacticusSED(object):
     
