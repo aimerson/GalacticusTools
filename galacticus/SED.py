@@ -13,6 +13,23 @@ from .constants import plancksConstant
 from .Inclination import getInclination
 from .GalacticusErrors import ParseError
 
+
+
+def sedStatistic(seds,axis=0,statistic="mean"):
+    if statistic.lower() == "mean": 
+        stat = np.mean(np.log10(seds),axis=axis)
+        stat = 10.0**stat
+    elif fnmatch.fnmatch(statistic.lower(),"std*"):
+        stat = np.std(np.log10(seds),axis=axis)
+        stat = 10.0**stat
+    elif fnmatch.fnmatch(statistic.lower(),"med*"):
+        stat = np.median(seds,axis=axis)
+    else:
+        stat = None
+    return stat
+
+
+
 class GalacticusSED(object):
     
     def __init__(self,galObj,verbose=False):
@@ -78,8 +95,9 @@ class GalacticusSED(object):
         luminosity = 10.0**luminosity
         return luminosity
 
+
         
-    def getSED(self,datasetName,selectionMask=None,ignoreResolution=False,resampleLimit=None):
+    def getSED(self,datasetName,selectionMask=None,ignoreResolution=False,resampleLimit=None,statistic=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Check dataset name correspnds to an SED
         MATCH = re.search(r"^(disk|spheroid|total)SED:([^:]+):([^:]+)?(:[^:]+)??(:snr[\d\.]+)?:z([\d\.]+)(:dust[^:]+)?(:recent)?",datasetName)
@@ -145,6 +163,9 @@ class GalacticusSED(object):
         sed /= 4.0*Pi*comDistance**2
         sed /= jansky
         sed *= 1.0e6
+        # Compute a statistic if specified
+        if statistic is not None:
+            sed = sedStatistic(sed,axis=0,statistic=statistic)
         return wavelengths,sed
         
         
