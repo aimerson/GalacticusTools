@@ -12,7 +12,7 @@ from .constants import angstrom,megaParsec,Pi,speedOfLight,centi
 from .constants import plancksConstant
 from .Inclination import getInclination
 from .GalacticusErrors import ParseError
-
+from .statistics.utils import mad
 
 
 def sedStatistic(seds,axis=0,statistic="mean"):
@@ -24,6 +24,8 @@ def sedStatistic(seds,axis=0,statistic="mean"):
         stat = 10.0**stat
     elif fnmatch.fnmatch(statistic.lower(),"med*"):
         stat = np.median(seds,axis=axis)
+    elif statistic.lower() == "mad": 
+        stat = np.mad(seds,axis=axis)
     else:
         stat = None
     return stat
