@@ -4,6 +4,10 @@ import math
 from scipy.stats import *
 import numpy as np
 
+def mad(data,axis=None):
+    return np.median(np.absolute(data-np.median(data,axis)),axis)
+
+
 def binstats(X,Y,Xbins,statistic="median",weights=None,mask=None):
     if weights is None:
         weights = np.ones_like(X)
