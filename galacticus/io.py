@@ -240,9 +240,22 @@ class GalacticusHDF5(HDF5):
             print(funcname+"(): Nearest output is "+outstr+" (redshift = "+str(self.outputs.z[iselect])+")")
         return self.fileObj["Outputs/"+outstr]
 
-
-
-
+    def selectOutputsInRedshiftRange(self,zlow=None,zupp=None,lightconeRedshifts=True):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        z = np.sort(np.copy(self.outputs.z))
+        if zlow is not None:
+            ilow = np.argwhere(z>=zlow)[0][0]
+            if lightconeRedshifts:
+                ilow -= 1
+            ilow = np.maximum(ilow,0)
+            z = z[ilow:]
+        if zupp is not None:
+            iupp = np.argwhere(z<=zupp)[-1][0]
+            if lightconeRedshifts:
+                iupp += 1
+            iupp = np.minimum(iupp,len(z))
+            z = z[:iupp+1]
+        return z
         
     def calculateProperties(self,galaxyProperties,z,overwrite=False):        
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        

@@ -36,9 +36,20 @@ def normaliseSED(wavelength,sed,normWavelength,**kwargs):
     if normWavelength < wavelength.min() or normWavelength > wavelength.max():
         raise ValueError(funcname+"(): normalisation point outside wavelength range, ("+\
                              str(wavelength.min())+","+str(wavelength.max())+")")
+    kwaargs["axis"] = 0
     f = interp1d(wavelength,sed,**kwargs)
     norm = f(normWavelength)
     return sed/norm
+
+
+
+def interpolateSED(wavelengths,seds,newWavelength,**kwargs):
+    funcname = sys._getframe().f_code.co_name
+    kwargs["axis"] = 1
+    f = interp1d(wavelengths,seds,**kwargs)
+    return f(newWavelength)
+
+
 
 
 
