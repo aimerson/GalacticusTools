@@ -5,7 +5,8 @@ from setuptools import setup, find_packages
 
 
 datafiles = ['data/LuminosityFunctions/*.dat','data/Simulations/*.xml','data/stellarAstrophysics/Vega/*.xml',\
-                 'data/stellarAstrophysics/hiiRegions/*.hdf5','data/dust/*/*.xml','data/filters/*.xml']
+                 'data/stellarAstrophysics/hiiRegions/*.hdf5','data/dust/*/*.xml','data/filters/*.xml',\
+                 'data/powerSpectra/*.dat']
 
 
 setup(name='galacticus',
