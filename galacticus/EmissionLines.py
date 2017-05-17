@@ -135,6 +135,7 @@ class GalacticusEmissionLines(object):
         tmp = np.log10(tmp)
         np.place(densityHydrogen,mask,np.copy(tmp))
         del mask,tmp
+        print densityHydrogen
         return densityHydrogen
 
     def computeLymanContinuumLuminosity(self,LyContinuum):
@@ -173,14 +174,19 @@ class GalacticusEmissionLines(object):
         gasMass = np.copy(out["nodeData/"+component+"MassGas"])
         radius = np.copy(out["nodeData/"+component+"Radius"])
         starFormationRate = np.copy(out["nodeData/"+component+"StarFormationRate"])
-        abundanceGasMetals = np.copy(out["nodeData/"+component+"AbundancesGasMetals"])        
+        abundanceGasMetals = np.copy(out["nodeData/"+component+"AbundancesGasMetals"])
         suffix = ":"+frame+":z"+redshift+recent
         LyDatasetName = fnmatch.filter(out["nodeData"].keys(),component+"LuminositiesStellar:Lyc"+suffix) + \
-            fnmatch.filter(out["nodeData"].keys(),component+"LuminositiesStellar:LymanContinuum"+suffix)
-        LyDatasetName = LyDatasetName[0]            
+            fnmatch.filter(out["nodeData"].keys(),component+"LuminositiesStellar:LymanContinuum"+suffix)        
+        LyDatasetName = LyDatasetName[0]                    
+        #LyDatasetName = fnmatch.filter(out["nodeData"].keys(),component+"LymanContinuumLuminosity:z"+redshift)[0]
+        HeDatasetName = fnmatch.filter(out["nodeData"].keys(),component+"LuminositiesStellar:HeliumContinuum"+suffix)[0]
+        #HeDatasetName = fnmatch.filter(out["nodeData"].keys(),component+"HeliumContinuumLuminosity:z"+redshift)[0]
+        OxDatasetName = fnmatch.filter(out["nodeData"].keys(),component+"LuminositiesStellar:OxygenContinuum"+suffix)[0]
+        #OxDatasetName = fnmatch.filter(out["nodeData"].keys(),component+"OxygenContinuumLuminosity:z"+redshift)[0]
         LyContinuum = np.copy(out["nodeData/"+LyDatasetName])
-        HeContinuum = np.copy(out["nodeData/"+component+"LuminositiesStellar:HeliumContinuum"+suffix])
-        OxContinuum = np.copy(out["nodeData/"+component+"LuminositiesStellar:OxygenContinuum"+suffix])
+        HeContinuum = np.copy(out["nodeData/"+HeDatasetName])
+        OxContinuum = np.copy(out["nodeData/"+OxDatasetName])
         # Useful masks to avoid dividing by zero etc.
         #hasGas = gasMass > 0.0
         hasGas = np.logical_and(gasMass>0.0,abundanceGasMetals>0.0)
