@@ -101,6 +101,10 @@ class GalacticusHDF5(HDF5):
                 ngals = len(np.array(OUT["nodeData/"+dataset]))
         return ngals
 
+    def datasetExists(self,datasetName,z):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        return len(fnmatch.filter(self.availableDatasets(z),datasetName))>0
+
     def getRedshiftString(self,z):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         return fnmatch.filter(fnmatch.filter(self.availableDatasets(z),"*z[0-9].[0-9]*")[0].split(":"),"z*")[0]
@@ -328,6 +332,7 @@ class SnapshotOutput(object):
 
     def _getDataTypeNames(self,prop):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        prop = prop.replace(":"+self.redshiftString,"")
         allpropsZ = self.galHDF5Obj.availableDatasets(self.redshift)
         allprops = [p.replace(":"+self.redshiftString,"") for p in allpropsZ]
         matches = fnmatch.filter(allprops,prop) + fnmatch.filter(allprops,prop) + fnmatch.filter(special_cases,prop)
