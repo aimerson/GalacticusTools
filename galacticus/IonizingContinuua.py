@@ -53,7 +53,7 @@ class IonizingContinuua(object):
         continuumName = MATCH.group(2)
         redshift = MATCH.group(3)
         # Get appropriate stellar luminosity
-        if postProcessingInformation is not None:
+        if postProcessingInformation is not None and postProcessingInformation != "":
             if not postProcessingInformation.startswith(":"):
                 postProcessingInformation = ":"+postProcessingInformation
         else:
@@ -74,6 +74,6 @@ class IonizingContinuua(object):
                 raise IndexError(funcname+"(): dataset '"+luminosityName+"' not found!")
             luminosity = np.copy(OUT["nodeData/"+luminosityName])
         conversion = (luminosityAB/plancksConstant/self.continuumUnits)
-        conversion *= np.log10(self.wavelengthRanges[continuumName][1]/self.wavelengthRanges[continuumName][0])
+        conversion *= np.log(self.wavelengthRanges[continuumName][1]/self.wavelengthRanges[continuumName][0])
         return luminosity*conversion
         

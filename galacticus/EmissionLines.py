@@ -9,6 +9,7 @@ from scipy.integrate import romb
 from .hdf5 import HDF5
 from .io import GalacticusHDF5
 from .GalacticusErrors import ParseError
+from .IonizingContinuua import IonizingContinuua
 from .Filters import GalacticusFilters
 from .Luminosities import getLuminosity
 from .constants import massSolar,luminositySolar,luminosityAB,metallicitySolar
@@ -31,9 +32,10 @@ class GalacticusEmissionLines(object):
     def __init__(self,massHIIRegion=7.5e3,lifetimeHIIRegion=1.0e-3):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
-        # Create classes for CLOUDY and filter information
+        # Create classes for CLOUDY, ionization continuua and filter information
         self.CLOUDY = cloudyTable()
         self.FILTERS = GalacticusFilters()
+        self.IONISATION = IonizingContinuua()
         # Set properties for HII regions
         self.massHIIRegion = massHIIRegion
         self.lifetimeHIIRegion = lifetimeHIIRegion
@@ -175,18 +177,12 @@ class GalacticusEmissionLines(object):
         radius = np.copy(out["nodeData/"+component+"Radius"])
         starFormationRate = np.copy(out["nodeData/"+component+"StarFormationRate"])
         abundanceGasMetals = np.copy(out["nodeData/"+component+"AbundancesGasMetals"])
-        suffix = ":"+frame+":z"+redshift+recent
-        LyDatasetName = fnmatch.filter(out["nodeData"].keys(),component+"LuminositiesStellar:Lyc"+suffix) + \
-            fnmatch.filter(out["nodeData"].keys(),component+"LuminositiesStellar:LymanContinuum"+suffix)        
-        LyDatasetName = LyDatasetName[0]                    
-        #LyDatasetName = fnmatch.filter(out["nodeData"].keys(),component+"LymanContinuumLuminosity:z"+redshift)[0]
-        HeDatasetName = fnmatch.filter(out["nodeData"].keys(),component+"LuminositiesStellar:HeliumContinuum"+suffix)[0]
-        #HeDatasetName = fnmatch.filter(out["nodeData"].keys(),component+"HeliumContinuumLuminosity:z"+redshift)[0]
-        OxDatasetName = fnmatch.filter(out["nodeData"].keys(),component+"LuminositiesStellar:OxygenContinuum"+suffix)[0]
-        #OxDatasetName = fnmatch.filter(out["nodeData"].keys(),component+"OxygenContinuumLuminosity:z"+redshift)[0]
-        LyContinuum = np.copy(out["nodeData/"+LyDatasetName])
-        HeContinuum = np.copy(out["nodeData/"+HeDatasetName])
-        OxContinuum = np.copy(out["nodeData/"+OxDatasetName])
+        LyDatasetName = component+"LymanContinuumLuminosity:z"+redshift
+        LyContinuum = self.IONISATION.computeIonizingLuminosity(galHDF5Obj,z,LyDatasetName,postProcessingInformation=recent)
+        HeDatasetName = component+"HeliumContinuumLuminosity:z"+redshift
+        HeContinuum = self.IONISATION.computeIonizingLuminosity(galHDF5Obj,z,HeDatasetName,postProcessingInformation=recent)
+        OxDatasetName = component+"OxygenContinuumLuminosity:z"+redshift
+        OxContinuum = self.IONISATION.computeIonizingLuminosity(galHDF5Obj,z,OxDatasetName,postProcessingInformation=recent)
         # Useful masks to avoid dividing by zero etc.
         #hasGas = gasMass > 0.0
         hasGas = np.logical_and(gasMass>0.0,abundanceGasMetals>0.0)
