@@ -29,11 +29,11 @@ from .cloudy import cloudyTable
 
 class GalacticusEmissionLines(object):
     
-    def __init__(self,massHIIRegion=7.5e3,lifetimeHIIRegion=1.0e-3):
+    def __init__(self,massHIIRegion=7.5e3,lifetimeHIIRegion=1.0e-3,verbose=False):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         # Create classes for CLOUDY, ionization continuua and filter information
-        self.CLOUDY = cloudyTable()
+        self.CLOUDY = cloudyTable(verbose=verbose)
         self.FILTERS = GalacticusFilters()
         self.IONISATION = IonizingContinuua()
         # Set properties for HII regions

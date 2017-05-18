@@ -16,7 +16,7 @@ from .hdf5 import HDF5
 
 class cloudyTable(HDF5):
 
-    def __init__(self):
+    def __init__(self,verbose=False):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         hdf5File = pkg_resources.resource_filename(__name__,"data/stellarAstrophysics/hiiRegions/emissionLines.hdf5")
@@ -36,6 +36,8 @@ class cloudyTable(HDF5):
         for name in self.interpolantNames:
             values = np.log10(self.readDatasets('/',required=[name])[name])
             self.interpolants = self.interpolants + (values,)
+        # Set verbosity
+        self.verbose = verbose
         return
 
     def getInterpolantValues(self,interpolantName):
@@ -51,6 +53,34 @@ class cloudyTable(HDF5):
             raise IndexError(funcname+"(): Line '"+lineName+"' not found!")
         return self.wavelengths[lineName]
 
+
+    def reportLimits(self,metallicity,densityHydrogen,ionizingFluxHydrogen,\
+                        ionizingFluxHeliumToHydrogen,ionizingFluxOxygenToHydrogen):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        print("-"*40)
+        print("CLOUDY Interpolation Report:")
+        print("i )METALLICITY")
+        print("Galacticus Data (min,max,median) = "+str(metallicity.min())+", "+str(metallicity.max())+", "+str(np.median(metallicity)))
+        print("CLOUDY Range (min,max) = "+str(self.interpolants[0].min())+", "+str(self.interpolants[0].max()))
+        print(" ")
+        print("ii) HYDROGEN DENSITY")
+        print("Galacticus Data (min,max,median) = "+str(densityHydrogen.min())+", "+str(densityHydrogen.max())+", "+str(np.median(densityHydrogen)))
+        print("CLOUDY Range (min,max) = "+str(self.interpolants[1].min())+", "+str(self.interpolants[1].max()))
+        print(" ")
+        print("iii) IONIZING HYDROGEN FLUX")
+        print("Galacticus Data (min,max,median) = "+str(ionizingFluxHydrogen.min())+", "+str(ionizingFluxHydrogen.max())+", "+str(np.median(ionizingFluxHydrogen)))
+        print("CLOUDY Range (min,max) = "+str(self.interpolants[2].min())+", "+str(self.interpolants[2].max()))
+        print(" ")
+        print("iv) HELIUM/HYDROGEN RATIO")
+        print("Galacticus Data (min,max,median) = "+str(ionizingFluxHeliumToHydrogen.min())+", "+str(ionizingFluxHeliumToHydrogen.max())+", "+str(np.median(ionizingFluxHeliumToHydrogen)))
+        print("CLOUDY Range (min,max) = "+str(self.interpolants[3].min())+", "+str(self.interpolants[3].max()))
+        print(" ")
+        print("v) OXYGEN/HYDROGEN RATIO")
+        print("Galacticus Data (min,max,median) = "+str(ionizingFluxOxygenToHydrogen.min())+", "+str(ionizingFluxOxygenToHydrogen.max())+", "+str(np.median(ionizingFluxOxygenToHydrogen)))
+        print("CLOUDY Range (min,max) = "+str(self.interpolants[4].min())+", "+str(self.interpolants[4].max()))
+        print("-"*40)
+        return
+
     def interpolate(self,lineName,metallicity,densityHydrogen,ionizingFluxHydrogen,\
                         ionizingFluxHeliumToHydrogen,ionizingFluxOxygenToHydrogen,**kwargs):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
@@ -63,5 +93,8 @@ class cloudyTable(HDF5):
             kwargs["bounds_error"] = False
         if "fill_value" not in kwargs.keys():
             kwargs["fill_value"] = None
+        if self.verbose:
+            self.reportLimits(metallicity,densityHydrogen,ionizingFluxHydrogen,\
+                                  ionizingFluxHeliumToHydrogen,ionizingFluxOxygenToHydrogen)
         luminosities = interpn(self.interpolants,tableLuminosities,galaxyData,**kwargs)
         return luminosities
