@@ -137,7 +137,6 @@ class GalacticusEmissionLines(object):
         tmp = np.log10(tmp)
         np.place(densityHydrogen,mask,np.copy(tmp))
         del mask,tmp
-        print densityHydrogen
         return densityHydrogen
 
     def computeLymanContinuumLuminosity(self,LyContinuum):
