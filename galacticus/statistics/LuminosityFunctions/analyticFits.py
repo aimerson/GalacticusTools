@@ -201,9 +201,9 @@ class EuclidModel1(object):
         lstar = self.Lstar(z)        
         factor1 = (l/lstar)**self.alpha
         factor2 = np.exp(-l/lstar)
-        lf = self.phistar(z)*factor1*factor2
+        lf = self.phistar(z)*factor1*factor2/lstar
         if perDex:
-            lf *= np.log(10.0)*(l/lstar)
+            lf *= np.log(10.0)*l
         return lf
     
 class EuclidModel2(object):
@@ -238,15 +238,15 @@ class EuclidModel2(object):
         factor1 = (l/lstar)**self.alpha
         factor2 = np.exp(-l/lstar)
         phistar = self.phistar(z)
-        lf = phistar*factor1*factor2
+        lf = phistar*factor1*factor2/lstar
         if perDex:
-            lf *= np.log(10.0)*l/lstar
+            lf *= np.log(10.0)*l
         return lf
 
 
 class EuclidModel3(object):
 
-    def __init__(self,alpha=-1.587,beta=1.615,gamma=1.0,delta=2.288,phistar0=10.0**-2.920,lstarinf=10**42.557,\
+    def __init__(self,alpha=-1.587,beta=1.615,gamma=1.0,delta=2.288,phistar0=10.0**-2.920,lstarinf=10**42.956,\
                      lstarhalf=10**41.733,method="broken"):
         self.number = 3
         self.name = "Hirata"        
@@ -281,9 +281,9 @@ class EuclidModel3(object):
         factor1 = (l/Lstar)**self.alpha
         factor2 = np.exp(-(1.0-self.gamma)*l/Lstar)
         factor3 = (1.0 + np.expm1(1.0)*((l/Lstar)**self.delta))**-self.gamma
-        lf = factor1*factor2*factor3*self.phistar(z)
+        lf = factor1*factor2*factor3*self.phistar(z)/Lstar
         if perDex:
-            lf *= np.log(10)*l/Lstar
+            lf *= np.log(10)*l
         return lf
 
 

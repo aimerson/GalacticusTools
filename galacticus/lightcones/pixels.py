@@ -45,7 +45,7 @@ def pixelNumberValid(NSIDE,pixelNumber):
 
 class Pixels(object):
     
-    def __init__(self,NSIDE,nest=False):
+    def __init__(self,NSIDE,nest=True):
         self.NSIDE = NSIDE
         self.nest = nest
         self.galaxyCounts = np.zeros(hp.nside2npix(self.NSIDE))
@@ -58,8 +58,6 @@ class Pixels(object):
     def selectGalaxiesInPixel(self,ra,dec,pixelNumber):        
         pixels = self.getGalaxyPixelNumbers(ra,dec)
         return pixels==pixelNumber
-
-
 
 
     def _addOutputToCounts(self,galHDF5Obj,z):
