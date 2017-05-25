@@ -310,8 +310,8 @@ class EuclidLuminosityFunction(object):
         return self.model.phi(luminosity,z,perDex=perDex)
 
     def integrate(self,llow,lupp,z,**kwargs):
-        kwargs["args"] = (z)
-        integral = integrate.quad(self.phi,llow,lupp,**kwargs)
+        kwargs["args"] = (z,False)
+        integral = quad(self.phi,llow,lupp,**kwargs)
         return integral
 
 
