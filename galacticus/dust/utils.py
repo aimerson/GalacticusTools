@@ -17,6 +17,10 @@ def getDustFreeName(datasetName):
     return dustFreeName
 
 
+def AtoTau(A):
+    return A/(2.5*np.log10(np.exp(1.0)))
+
+
 class DustProperties(object):
     
     def __init__(self):
