@@ -5,7 +5,7 @@ import numpy as np
 import scipy as sp
 from scipy.constants import c,constants
 from scipy.integrate import romberg
-from .constants import Pi,massSolar,Parsec
+from .constants import Pi,massSolar,Parsec,mega
 
 class Cosmology(object):
     """
@@ -482,8 +482,8 @@ def wavelengthToRedshift(obsv,emit):
 def redshiftToWavelength(z,emit):
     return (1.0+z)*emit
     
-
-
+def MpcToCM(r):
+    return r*Parsec*mega*100.0
 
 
 
