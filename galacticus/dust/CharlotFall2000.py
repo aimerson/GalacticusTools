@@ -10,6 +10,8 @@ from ..utils.progress import Progress
 from .utils import DustProperties
 
 
+
+
 class CharlotFall2000(DustProperties):
     
     def __init__(self,opticalDepthISMFactor=1.0,opticalDepthCloudsFactor=1.0,\
@@ -29,6 +31,33 @@ class CharlotFall2000(DustProperties):
         self.wavelengthZeroPoint = wavelengthZeroPoint
         self.wavelengthExponent = wavelengthExponent
         return
+
+
+    def computeOpticalDepthISM(self,gasMetalMass,scaleLength,effectiveWavelength):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        # Compute gas metals central surface density in M_Solar/pc^2
+        gasMetalsSurfaceDensityCentral = self.computeCentralGasMetalsSurfaceDensity(np.copy(gasMetalMass),np.copy(scaleLength))
+        # Compute central optical depth
+        wavelengthFactor = (effectiveWavelength/self.wavelengthZeroPoint)**self.wavelengthExponent
+        opticalDepth = self.opticalDepthNormalization*np.copy(gasMetalsSurfaceDensityCentral)/wavelengthFactor
+        opticalDepthISM = self.opticalDepthISMFactor*opticalDepth
+        return opticalDepthISM
+                           
+    def computeOpticalDepthClouds(self,gasMass,gasMetalMass):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        # Compute gas metallicity
+        gasMetallicity = self.computeGasMetallicity(np.copy(gasMass),np.copy(gasMetalMass))
+        # Compute central optical depth
+        wavelengthFactor = (effectiveWavelength/self.wavelengthZeroPoint)**self.wavelengthExponent
+        opticalDepthClouds = self.opticalDepthCloudsFactor*np.copy(gasMetallicity)/self.localISMMetallicity/wavelengthFactor
+        return opticalDepthClouds
+    
+    def applyAttenuation(self,luminosity,recentLuminosity,opticalDepthISM,opticalDepthClouds):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        attenuationISM = np.exp(-opticalDepthISM)
+        attenuationClouds = np.exp(-opticalDepthClouds)
+        result = ((luminosity-recentLuminosity) + recentLuminosity*attenuationClouds)*attenuationISM
+        return result
 
 
     def computeAttenuation(self,galHDF5Obj,z,datasetName):
@@ -86,31 +115,30 @@ class CharlotFall2000(DustProperties):
             effectiveWavelength = self.effectiveWavelength(filter,redshift=float(redshift),verbose=self._verbose)
         else:
             effectiveWavelength = self.effectiveWavelength(filter,redshift=None,verbose=self._verbose)
-        # Compute gas metallicity and central surface density in M_Solar/pc^2
+        # Load required galaxy properties
         gasMass = np.array(out["nodeData/"+component+"MassGas"])
         gasMetalMass = np.array(out["nodeData/"+component+"AbundancesGasMetals"])
-        gasMetallicity = self.computeGasMetallicity(np.copy(gasMass),np.copy(gasMetalMass))
         scaleLength = np.array(out["nodeData/"+component+"Radius"])
-        gasMetalsSurfaceDensityCentral = self.computeCentralGasMetalsSurfaceDensity(np.copy(gasMetalMass),np.copy(scaleLength))
-        del gasMass,gasMetalMass,scaleLength
         # Compute central optical depths
-        wavelengthFactor = (effectiveWavelength/self.wavelengthZeroPoint)**self.wavelengthExponent
-        opticalDepth = self.opticalDepthNormalization*np.copy(gasMetalsSurfaceDensityCentral)/wavelengthFactor
-        opticalDepthISM = self.opticalDepthISMFactor*opticalDepth
-        opticalDepthClouds = self.opticalDepthCloudsFactor*np.copy(gasMetallicity)/self.localISMMetallicity/wavelengthFactor
-        del gasMetalsSurfaceDensityCentral,gasMetallicity
+        opticalDepthISM = np.copy(self.computeOpticalDepthISM(gasMetalMass,scaleLength,effectiveWavelength))
+        opticalDepthClouds = np.copy(self.computeOpticalDepthClouds(gasMass,gasMetalMass))
+        del gasMass,gasMetalMass,scaleLength        
         # Compute the attenutations of ISM and clouds
         attenuationISM = np.exp(-opticalDepthISM)
         attenuationClouds = np.exp(-opticalDepthClouds)
         # Apply attenuations to dataset or return optical depths
         if fnmatch.fnmatch(luminosityOrOpticalDepth,"LuminositiesStellar"):
             # i) stellar luminosities
-            result = np.array(out["nodeData/"+luminosityDataset]) - np.array(out["nodeData/"+recentLuminosityDataset]) 
-            result += np.array(out["nodeData/"+recentLuminosityDataset])*attenuationClouds
-            result *= attenuationISM
+            result = self.applyAttenuation(np.array(out["nodeData/"+luminosityDataset]),np.array(out["nodeData/"+recentLuminosityDataset]),\
+                                               opticalDepthISM,opticalDepthClouds)
+            #result = np.array(out["nodeData/"+luminosityDataset]) - np.array(out["nodeData/"+recentLuminosityDataset]) 
+            #result += np.array(out["nodeData/"+recentLuminosityDataset])*attenuationClouds
+            #result *= attenuationISM
         elif fnmatch.fnmatch(luminosityOrOpticalDepth,"LineLuminosity"):
             # ii) emission lines
-            result = np.array(out["nodeData/"+luminosityDataset])*attenuationClouds*attenuationISM
+            result = self.applyAttenuation(np.array(out["nodeData/"+luminosityDataset]),np.array(out["nodeData/"+luminosityDataset]),\
+                                               opticalDepthISM,opticalDepthClouds)
+            #result = np.array(out["nodeData/"+luminosityDataset])*attenuationClouds*attenuationISM
         else:
             # iii) return appropriate optical depth
             if fnmatch.fnmatch(luminosityOrOpticalDepth,"CentralOpticalDepthISM"):
