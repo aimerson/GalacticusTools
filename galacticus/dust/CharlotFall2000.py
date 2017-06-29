@@ -43,7 +43,7 @@ class CharlotFall2000(DustProperties):
         opticalDepthISM = self.opticalDepthISMFactor*opticalDepth
         return opticalDepthISM
                            
-    def computeOpticalDepthClouds(self,gasMass,gasMetalMass):
+    def computeOpticalDepthClouds(self,gasMass,gasMetalMass,effectiveWavelength):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         # Compute gas metallicity
         gasMetallicity = self.computeGasMetallicity(np.copy(gasMass),np.copy(gasMetalMass))
@@ -121,7 +121,7 @@ class CharlotFall2000(DustProperties):
         scaleLength = np.array(out["nodeData/"+component+"Radius"])
         # Compute central optical depths
         opticalDepthISM = np.copy(self.computeOpticalDepthISM(gasMetalMass,scaleLength,effectiveWavelength))
-        opticalDepthClouds = np.copy(self.computeOpticalDepthClouds(gasMass,gasMetalMass))
+        opticalDepthClouds = np.copy(self.computeOpticalDepthClouds(gasMass,gasMetalMass,effectiveWavelength))
         del gasMass,gasMetalMass,scaleLength        
         # Compute the attenutations of ISM and clouds
         attenuationISM = np.exp(-opticalDepthISM)
