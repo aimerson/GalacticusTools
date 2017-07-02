@@ -33,23 +33,27 @@ class CharlotFall2000(DustProperties):
         return
 
 
-    def computeOpticalDepthISM(self,gasMetalMass,scaleLength,effectiveWavelength):
+    def computeOpticalDepthISM(self,gasMetalMass,scaleLength,effectiveWavelength,opticalDepthISMFactor=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        if opticalDepthISMFactor is None:
+            opticalDepthISMFactor = self.opticalDepthISMFactor
         # Compute gas metals central surface density in M_Solar/pc^2
         gasMetalsSurfaceDensityCentral = self.computeCentralGasMetalsSurfaceDensity(np.copy(gasMetalMass),np.copy(scaleLength))
         # Compute central optical depth
         wavelengthFactor = (effectiveWavelength/self.wavelengthZeroPoint)**self.wavelengthExponent
         opticalDepth = self.opticalDepthNormalization*np.copy(gasMetalsSurfaceDensityCentral)/wavelengthFactor
-        opticalDepthISM = self.opticalDepthISMFactor*opticalDepth
+        opticalDepthISM = opticalDepthISMFactor*opticalDepth
         return opticalDepthISM
                            
-    def computeOpticalDepthClouds(self,gasMass,gasMetalMass,effectiveWavelength):
+    def computeOpticalDepthClouds(self,gasMass,gasMetalMass,effectiveWavelength,opticalDepthCloudsFactor=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        if opticalDepthCloudsFactor is None:
+            opticalDepthCloudsFactor = self.opticalDepthCloudsFactor
         # Compute gas metallicity
         gasMetallicity = self.computeGasMetallicity(np.copy(gasMass),np.copy(gasMetalMass))
         # Compute central optical depth
         wavelengthFactor = (effectiveWavelength/self.wavelengthZeroPoint)**self.wavelengthExponent
-        opticalDepthClouds = self.opticalDepthCloudsFactor*np.copy(gasMetallicity)/self.localISMMetallicity/wavelengthFactor
+        opticalDepthClouds = opticalDepthCloudsFactor*np.copy(gasMetallicity)/self.localISMMetallicity/wavelengthFactor
         return opticalDepthClouds
     
     def applyAttenuation(self,luminosity,recentLuminosity,opticalDepthISM,opticalDepthClouds):
