@@ -174,41 +174,21 @@ class dustAtlas(DustProperties):
         return gasMetalsSurfaceDensityCentral
     
 
-
-
-    
-    def getCentralGasMetalsSurfaceDensity(self,galHDF5Obj,z,component):
+    def getBulgeSizes(self,component,spheroidMassDistribution,spheroidRadius,diskRadius)
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
-        # Get nearest redshift output
-        out = galHDF5Obj.selectOutput(z)
-        # Get metal mass
-        gasMetalMass = np.array(out["nodeData/"+component+"AbundancesGasMetals"])
-        # Get scale length
-        scaleLength = np.array(out["nodeData/diskRadius"])
-        np.place(scaleLength,scaleLength<=0.0,np.nan)
-        # Compute surface density
-        mega = 1.0e6
-        gasMetalsSurfaceDensityCentral = gasMetalMass/(2.0*Pi*(mega*scaleLength)**2)
-        np.place(gasMetalsSurfaceDensityCentral,np.isnan(scaleLength),0.0)
-        return gasMetalsSurfaceDensityCentral
-
-    
-    def getBulgeSizes(self,galHDF5Obj,z,component):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
-        # Get nearest redshift output
-        out = galHDF5Obj.selectOutput(z)
-        # Get bulge sizes
-        if fnmatch.fnmatch(component,"spheroid"):
-            spheroidMassDistribution = galHDF5Obj.parameters["spheroidMassDistribution"].lower()
-            spheroidRadius = np.array(out["nodeData/spheroidRadius"])
-            diskRadius = np.array(out["nodeData/diskRadius"])
-            np.place(diskRadius,diskRadius<=0.0,1.0)
-            if fnmatch.fnmatch(spheroidMassDistribution,"hernquist"):
+        if component.lower() not in ["disk","spheroid"]:
+            raise ValueError(funcname+"(): 'component' must be 'spheroid' or 'disk'!")
+        if spheroidMassDistribution not in ["hernquist","sersic"]:
+            raise ValueError(funcname+"(): 'spheroidMassDistribution' must be 'hernquist' or 'sersic'!")        
+        np.place(diskRadius,diskRadius<=0.0,1.0)
+        # Component bulge sizes
+        if component.lower() == "spheroid":            
+            if fnmatch.fnmatch(spheroidMassDistribution.lower(),"hernquist"):
                 sizes = (1.0+np.sqrt(2.0))*spheroidRadius/diskRadius
-            elif fnmatch.fnmatch(spheroidMassDistribution,"sersic"):
+            elif fnmatch.fnmatch(spheroidMassDistribution.lower(),"sersic"):
                 sizes = spheroidRadius/diskRadius
             else:
-                raise ValueError(funcname+"(): Value for parameter 'spheroidMassDistribution' must be either 'hernquist' or 'sersic'!")
+                pass
             if not self.extrapolateInSize:
                 sizeMinimum = self.spheroidAttenuation["size"].min()
                 sizeMaximum = self.spheroidAttenuation["size"].max()
@@ -217,6 +197,23 @@ class dustAtlas(DustProperties):
         else:
             sizes = None
         return sizes
+
+
+    def getOpticalDepthCentral(self,gasMetalsSurfaceDensityCentral):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        opticalDepthCentral = self.opticalDepthNormalization*np.copy(gasMetalsSurfaceDensityCentral)
+        if not self.extrapolateInTau:
+            if fnmatch.fnmatch(component,"spheroid"):
+                tauMinimum = self.spheroidAttenuation["opticalDepth"].min()
+                tauMaximum = self.spheroidAttenuation["opticalDepth"].max()
+            elif fnmatch.fnmatch(component,"disk"):
+                tauMinimum = self.diskAttenuation["opticalDepth"].min()
+                tauMaximum = self.diskAttenuation["opticalDepth"].max()
+            else:
+                raise ValueError(funcname+"(): Value for 'component' not recognised -- must be 'spheroid' or 'disk'!")
+            np.place(opticalDepthCentral,opticalDepthCentral<tauMinimum,tauMinimum)
+            np.place(opticalDepthCentral,opticalDepthCentral>tauMaximum,tauMaximum)
+        return opticalDepthCentral
 
 
     def computeAttenuation(self,galHDF5Obj,z,datasetName):
@@ -273,26 +270,19 @@ class dustAtlas(DustProperties):
         else:
             inclinations = getInclination(galHDF5Obj,z,overwrite=False,returnDataset=True)
         # Get bulge sizes
-        sizes = self.getBulgeSizes(galHDF5Obj,z,component)
+        spheroidMassDistribution = galHDF5Obj.parameters["spheroidMassDistribution"].lower()
+        spheroidRadius = np.array(out["nodeData/spheroidRadius"])
+        diskRadius = np.array(out["nodeData/diskRadius"])
+        sizes = self.getBulgeSizes(component,spheroidMassDistribution,np.copy(spheroidRadius),np.copy(diskRadius))
+        del spheroidRadius,diskRadius
         # Compute gas metallicity and central surface density in M_Solar/pc^2
         gasMetalMass = np.array(out["nodeData/"+component+"AbundancesGasMetals"])
         scaleLength = np.array(out["nodeData/"+component+"Radius"])
         gasMetalsSurfaceDensityCentral = self.computeCentralGasMetalsSurfaceDensity(np.copy(gasMetalMass),np.copy(scaleLength))
         del gasMetalMass,scaleLength        
         # Compute central optical depths
-        opticalDepthCentral = self.opticalDepthNormalization*np.copy(gasMetalsSurfaceDensityCentral)        
-        del gasMetalsSurfaceDensityCentral
-        if not self.extrapolateInTau:
-            if fnmatch.fnmatch(component,"spheroid"):
-                tauMinimum = self.spheroidAttenuation["opticalDepth"].min()
-                tauMaximum = self.spheroidAttenuation["opticalDepth"].max()
-            elif fnmatch.fnmatch(component,"disk"):
-                tauMinimum = self.diskAttenuation["opticalDepth"].min()
-                tauMaximum = self.diskAttenuation["opticalDepth"].max()
-            else:
-                raise ValueError(funcname+"(): Value for 'component' not recognised -- must be 'spheroid' or 'disk'!")
-            np.place(opticalDepthCentral,opticalDepthCentral<tauMinimum,tauMinimum)
-            np.place(opticalDepthCentral,opticalDepthCentral>tauMaximum,tauMaximum)
+        opticalDepthCentral = self.getOpticalDepthCentral(np.copy(gasMetalsSurfaceDensityCentral))
+        del gasMetalsSurfaceDensityCentral        
         # Interpolate dustAtlas table to get attenuations
         wavelengths = effectiveWavelength*np.ones_like(inclinations)
         attenuations = self.InterpolateDustTable(component,wavelengths,inclinations,opticalDepthCentral,bulgeSize=sizes)
