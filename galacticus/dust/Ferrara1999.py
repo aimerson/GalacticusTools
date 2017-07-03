@@ -252,7 +252,7 @@ class dustAtlasClouds(DustProperties):
 
 
     def computeAttenuationISM(self,component,effectiveWavelength,inclination,spheroidMassDistribution,\
-                                  spheroidRadius,diskRadius,gasMass,gaMetalMass,scaleLength):
+                                  spheroidRadius,diskRadius,gasMass,gasMetalMass,scaleLength):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         sizes = self.getBulgeSizes(component,spheroidMassDistribution,np.copy(spheroidRadius),np.copy(diskRadius))
         gasMetalsSurfaceDensityCentral = self.computeCentralGasMetalsSurfaceDensity(np.copy(gasMetalMass),np.copy(scaleLength))
