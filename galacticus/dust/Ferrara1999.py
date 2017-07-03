@@ -258,7 +258,7 @@ class dustAtlasClouds(DustProperties):
         gasMetalsSurfaceDensityCentral = self.computeCentralGasMetalsSurfaceDensity(np.copy(gasMetalMass),np.copy(scaleLength))
         opticalDepthCentral = self.getOpticalDepthCentral(gasMetalsSurfaceDensityCentral)
         wavelengths = np.ones_like(effectiveWavelength)
-        attenuationISM = self.InterpolateDustTable(component,wavelengths,inclinations,opticalDepthCentral,bulgeSize=sizes)
+        attenuationISM = self.InterpolateDustTable(component,wavelengths,inclination,opticalDepthCentral,bulgeSize=sizes)
         return attenuationISM
         
 
