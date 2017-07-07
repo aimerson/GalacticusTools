@@ -333,7 +333,7 @@ class SnapshotOutput(object):
                     print("WARNING! "+funcname+"(): at one of lightconePosition[XYZ] not found -- unable to compute "+datasetName+"!")
                     self.galaxies[dataTypeName] = np.ones_like(self.galaxies[dataTypeName])*999.9
                 else:
-                    rightAscension,Declination = getRaDec(np.array(self.out["nodeData/lightconePositionX"]),np.array(self.out["nodeData/lightconePositionY"]),\
+                    rightAscension,declination = getRaDec(np.array(self.out["nodeData/lightconePositionX"]),np.array(self.out["nodeData/lightconePositionY"]),\
                                                               np.array(self.out["nodeData/lightconePositionZ"]),degrees=True)
                     if datasetName == "lightconeRightAscension":
                         self.galaxies[dataTypeName] = np.copy(rightAscension)
