@@ -6,10 +6,10 @@ from .hdf5 import HDF5
 from .utils.datatypes import getDataType
 from .utils.progress import Progress
 from .cosmology import Cosmology
-
+from .lightcones.utils import getRaDec
 
 # Special cases for dataset names
-special_cases = ["weight","mergerTreeWeight","snapshotRedshift"]
+special_cases = ["weight","mergerTreeWeight","snapshotRedshift","lightconeRightAscension","lightconeDeclination"]
 
 
 ######################################################################################
@@ -327,6 +327,19 @@ class SnapshotOutput(object):
                 del cts,wgt
             if datasetName == "snapshotRedshift":
                 self.galaxies[dataTypeName] = np.ones_like(self.galaxies[dataTypeName])*self.redshift
+            if datasetName in ["lightconeRightAscension","lightconeDeclination"]:
+                available = list(set(["lightconePositionX","lightconePositionY","lightconePositionZ"]).intersection(self.galHDF5Obj.availableDatasets(self.redshift)))
+                if len(available) != 3:
+                    print("WARNING! "+funcname+"(): at one of lightconePosition[XYZ] not found -- unable to compute "+datasetName+"!")
+                    self.galaxies[dataTypeName] = np.ones_like(self.galaxies[dataTypeName])*999.9
+                else:
+                    rightAscension,declination = getRaDec(np.array(self.out["nodeData/lightconePositionX"]),np.array(self.out["nodeData/lightconePositionY"]),\
+                                                              np.array(self.out["nodeData/lightconePositionZ"]),degrees=True)
+                    if datasetName == "lightconeRightAscension":
+                        self.galaxies[dataTypeName] = np.copy(rightAscension)
+                    if datasetName == "lightconeDeclination":
+                        self.galaxies[dataTypeName] = np.copy(declination)
+                    del rightAscension,declination
         return
 
 
