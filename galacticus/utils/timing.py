@@ -45,3 +45,7 @@ class STOPWATCH:
             value =  'time elapsed = {0:0.3f} hr'.format(dt)
         print(classname+"(): "+value)
         return
+
+    def reset(self):
+        self.t = time.time()
+        return
