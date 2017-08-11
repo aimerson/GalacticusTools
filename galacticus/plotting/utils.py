@@ -91,7 +91,8 @@ def colour_array(n=1,i=None,cmap="jet"):
     if n == 1:
         return "k"
     else:
-        colarr = np.arange(float(n))/float(n)
+        colarr = np.linspace(0.0,1.0,n)
+        #colarr = np.arange(float(n))/float(n)
         colarr = cm(colarr)
         if i is not None:
             if i in range(n):
