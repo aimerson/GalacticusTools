@@ -69,6 +69,23 @@ def minor_ticks(axObj):
     return
 
 
+def yEdgeAxes(iplot):
+    iplot = str(iplot)
+    nrow = int(list(iplot)[0])
+    ncol = int(list(iplot)[1])
+    ntot = nrow*ncol
+    i = np.arange(ntot).reshape(nrow,ncol)
+    return i[:,0]
+
+def xEdgeAxes(iplot):
+    iplot = str(iplot)
+    nrow = int(list(iplot)[0])
+    ncol = int(list(iplot)[1])
+    ntot = nrow*ncol
+    i = np.arange(ntot).reshape(nrow,ncol)
+    return i[-1,:]
+
+
 def get_position(ax,xfrac,yfrac):
     xlims = ax.get_xlim()
     ylims = ax.get_ylim()
