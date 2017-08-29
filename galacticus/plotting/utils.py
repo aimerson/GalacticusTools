@@ -250,11 +250,12 @@ def sigfig(number,sigfig,latex=True):
 # LEGEND FUNCTIONS
 ####################################################################################
 
-def Legend(ax,ec='none',fc='none',fontcolor="k",**kwargs):
+def Legend(ax,ec='none',fc='none',fontcolor="k",alpha=1.0,**kwargs):
     leg = ax.legend(**kwargs)
     frame = leg.get_frame()
-    frame.set_edgecolor(ec)
+    frame.set_edgecolor(ec)    
     frame.set_facecolor(fc)
+    frame.set_alpha(alpha)
     for text in leg.get_texts():
         text.set_color(fontcolor)
     return
