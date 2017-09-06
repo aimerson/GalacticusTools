@@ -69,6 +69,8 @@ class GalacticusHDF5(HDF5):
                     self.outputs["a"][i] = a
                     self.outputs["z"][i] = (1.0/a) - 1.0
                 self.outputs = self.outputs.view(np.recarray)
+        # Array to store galaxy data
+        self.galaxies = None
         return
 
     def availableDatasets(self,z):
