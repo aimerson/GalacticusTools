@@ -22,9 +22,17 @@ from pylab import *
 import matplotlib.pyplot as plt
 from decimal import *
 
+#mpl.style.use('classic')
 mpl.rcParams['font.family'] = 'serif'
+mpl.rcParams['xtick.top'] = True
+mpl.rcParams['ytick.right'] = True
+mpl.rcParams['errorbar.capsize'] = 3
 mpl.rcParams['legend.numpoints'] = 1
-#mpl.rcParams['legend.scatterpoints'] = 1
+mpl.rcParams['legend.fontsize'] = 'large'
+mpl.rcParams['mathtext.fontset'] = 'cm'
+mpl.rcParams['mathtext.rm'] = 'serif'
+mpl.rcParams['xtick.direction'] = 'in'
+mpl.rcParams['ytick.direction'] = 'in'
 mpl.rcParams['legend.fontsize'] = 'small'
 mpl.rcParams['legend.markerscale'] = 1
 mpl.rcParams['axes.labelsize'] = 12.0
