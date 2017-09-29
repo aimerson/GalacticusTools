@@ -5,9 +5,60 @@ import numpy as np
 from .io import GalacticusHDF5
 from .GalacticusErrors import ParseError
 from .utils.progress import Progress
-from .constants import metallicitySolar
+from .constants import metallicitySolar,Pi
+from .constants import gravitationalConstant,massSolar,megaParsec,speedOfLight
+from .constants import plancksConstant,erg,massHydrogen
 
 
+
+
+def massHI(massColdGas,massMetalsGas,diskMassStellar,diskVelocity,diskRadius,fixedPeak=False,\
+               ratioHeH=0.73,pressureInStars=2.35e-13,Rgal=0.4,meanDispersionRatio=0.4):
+    # Paper references:
+    # http://adsabs.harvard.edu/abs/2010MNRAS.406...43P (fixed peak case)
+    # http://adsabs.harvard.edu/abs/2009ApJ...698.1467O
+    # http://adsabs.harvard.edu/abs/2009ApJ...696L.129O
+    if not fixedPeak:
+        K = gravitationalConstant/(8.0*Pi*pressureInStars)        
+        scaleRadius = diskRadius*megaParsec/1.68    
+        massFactor = massColdGas(massColdGas+meanDispersionRatio*diskMassStellar)*(massSolar**2)
+        Rmol = (K*(scaleRadius**-4)*massFactor)**0.8
+        Rgal = (3.44*(Rmol**-0.506)+4.82*(Rmol**-1.054))**(-1.0)
+    massHydrogen = (massColdGas-massMetalasGas)/(1.0+ratioHeH)
+    massHI = massHydrogen/(1.0+Rgal)
+    return massHI
+
+def luminosityHI(massHI,diskVelocity,inclination=None):
+    # Paper reference: http://adsabs.harvard.edu/abs/2010MNRAS.406...43P
+    einsteinA12 = 2.869e-15 # 1/s
+    # Compute disk velocity line width
+    if inclination is None:        
+        velocityLineWidth = 1.57*diskVelocity
+    else:
+        velocityLineWidth = 2.0*diskVelocity*np.sin(inclination*Pi/180.0)
+    velocityLineWidth *= 1000.0 # km --> m
+    # Compute rest-frame luminosity
+    luminosityHI = 0.75*plancksConstant*speedOfLight*einsteinA12
+    luminosityHI *= massHI*massSolar/massHydrogen
+    luminosityHI /= velocityLineWidth
+    # Convert from J/s to erg/s
+    luminosityHI /= erg
+    return luminosityHI
+
+
+def lineWidth21cm(diskVelocity,redshift,inclination=None):
+    restWavelength = 21.0e-2 # 21cm in m
+    restFrequency21cm = (speedOfLight/restWavelength)/1.0e6 # MHz
+    # Compute disk velocity line width
+    if inclination is None:        
+        velocityLineWidth = 1.57*diskVelocity
+    else:
+        velocityLineWidth = 2.0*diskVelocity*np.sin(inclination*Pi/180.0)
+    velocityLineWidth *= 1000.0 # km --> m
+    # Compute line width in frequency space
+    lineWidth = velocityLineWidth*restFrequency21cm/speedOfLight
+    lineWidth /= (1.0+redshift)
+    return lineWidth
 
 
 
