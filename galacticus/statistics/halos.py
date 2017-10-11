@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 
 import numpy as np
+import warnings
 from ....utils.match_search_sorted import match
 
 class HaloOccupationDistribution(object):
@@ -62,6 +63,8 @@ class HaloOccupationDistribution(object):
         index = match(galaxyIDs,hostHalos.ID)
         if any(index==-1):
             problemHalos = index==-1
+            nProblems = len(index[problemHalos])
+            warnings.warn(funcname+"(): "+str(nProblems)+" satellite galaxies do not have a host halo!")
             index = index[np.invert(problemHalos)]
         uniqueIndex,number = np.unique(index,return_counts=True)
         hostHalos.ngals[uniqueIndex] += number
