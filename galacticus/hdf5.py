@@ -49,6 +49,18 @@ class HDF5(object):
         self.fileObj.close()
         return
 
+    def lsObjects(self,hdfdir,recursive=False):
+        ls = []
+        thisdir = self.fileObj[hdfdir]
+        if recursive:
+            def _append_item(name, obj):
+                if isinstance(obj, h5py.Dataset):
+                    ls.append(name)
+            thisdir.visititems(_append_item)
+        else:
+            ls = thisdir.keys()
+        return list(map(str,ls))
+
     ##############################################################################
     # GROUPS
     ##############################################################################
@@ -183,7 +195,7 @@ class HDF5(object):
         return
 
     def lsDatasets(self,hdfdir):
-        objs = self.lsGroups(hdfdir,recursive=False)             
+        objs = self.lsObjects(hdfdir,recursive=False)             
         dsets = []
         def _is_dataset(obj):
             return isinstance(self.fileObj[hdfdir+"/"+obj],h5py.Dataset)        
