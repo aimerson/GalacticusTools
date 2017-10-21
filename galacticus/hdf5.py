@@ -15,6 +15,17 @@ def readonlyWrapper(func):
 class HDF5(object):
     
     def __init__(self,*args,**kwargs):
+        """ HDF5 Class for reading/writing HDF5 files
+
+        USAGE: OBJ = HDF5(filename,ioStatus,verbose=<verbose>)
+
+        Inputs: filename -- Path to HDF5 file.  
+                ioStatus -- Read ('r'), write ('w') or append ('a') to file.  
+                verbose -- Print extra information (default value = False).
+
+        Returns HDF5 class object.
+        """
+
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
 
@@ -110,6 +121,7 @@ class HDF5(object):
             thisdir.visititems(_append_item)
         else:
             ls = thisdir.keys()
+            ls = [obj for obj in ls if isinstance(self.fileObj[obj], h5py.Group)]
         return list(map(str,ls))
 
     ##############################################################################

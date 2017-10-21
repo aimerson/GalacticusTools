@@ -33,9 +33,9 @@ class Halpha(object):
             self.data.phi *= 1.0e-3
             self.data.phiErr *= 1.0e-3
             hubble = 0.71
-            self.data.log10L = self.data.log10L + np.log10((hubble/self.hubble)**2)
+            self.data.log10L = self.data.log10L + np.log10((hubble/self.hubble)**-2)
             self.data.phi = self.data.phi*((self.hubble/hubble)**3)
-            self.data.phiErr = self.data.phiErr*((self.hubble/hubble)**3)
+            self.data.phiErr = self.data.phiErr#*((self.hubble/hubble)**3)
         elif fnmatch.fnmatch(dataset.lower(),"*colbert*"):
             self.dataset = "Colbert et al. (2013)"
             ifile = pkg_resources.resource_filename(__name__,"../../data/LuminosityFunctions/Colbert13_Halpha.dat")
@@ -54,13 +54,12 @@ class Halpha(object):
             self.data = np.loadtxt(ifile,dtype=dtype,usecols=range(len(dtype))).view(np.recarray)
             hubble = 0.7
             self.data.log10L -= 2.0/5.0
-            self.data.log10L = self.data.log10L + np.log10((hubble/self.hubble)**2)
-            
-            self.data.errlog10L = self.data.errlog10L + np.log10((hubble/self.hubble)**2)
-            self.data.phiObs = self.data.phiObs*((self.hubble/hubble)**3)
-            self.data.phiObsErr = self.data.phiObsErr*((self.hubble/hubble)**3)
-            self.data.phiCorr = self.data.phiCorr*((self.hubble/hubble)**3)
-            self.data.phiCorrErr = self.data.phiCorrErr*((self.hubble/hubble)**3)
+            self.data.log10L = self.data.log10L + np.log10((hubble/self.hubble)**-2)
+            self.data.errlog10L = self.data.errlog10L 
+            self.data.phiObs = self.data.phiObs + np.log10((self.hubble/hubble)**3)
+            self.data.phiObsErr = self.data.phiObsErr
+            self.data.phiCorr = self.data.phiCorr + np.log10((self.hubble/hubble)**3)
+            self.data.phiCorrErr = self.data.phiCorrErr
             self.data.volume *= 1.0e4            
             self.data.volume *= ((hubble/self.hubble)**3)
         elif fnmatch.fnmatch(dataset.lower(),"*gunawardhana*"):
