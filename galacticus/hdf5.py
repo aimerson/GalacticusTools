@@ -133,7 +133,7 @@ class HDF5(object):
             thisdir.visititems(_append_item)
         else:
             ls = thisdir.keys()
-            ls = [obj for obj in ls if isinstance(self.fileObj[obj], h5py.Group)]
+            ls = [obj for obj in ls if isinstance(thisdir[obj], h5py.Group)]
         return list(map(str,ls))
 
     ##############################################################################
