@@ -18,6 +18,59 @@ def getBatchVariable(variable,verbose=False,manager=None):
             print(variable+" = "+str(value))                
     return value    
     
+
+class JOBCLASS(object):    
+    def __init__(self,manager,verbose=False):
+        self.manager = manager
+        self.verbose = verbose
+        return
+
+    def getEnvironmentVariable(self,variable):
+        if variable not in os.environ.keys():
+            if self.verbose:
+                if self.manager is None:
+                    print("WARNING! Environment variable '"+variable+"' not found!")
+                else:
+                    print("WARNING! "+self.manager+" environment variable '"+variable+"' not found!")
+            value = None
+        else:         
+            value = os.environ[variable]
+            if self.verbose:
+                print(variable+" = "+str(value))                
+        return value    
+
+
+
+class NULLjob(JOBCLASS):    
+    def __init__(self,verbose=False):
+        super(NULLjob, self).__init__(None,verbose=verbose)
+        self.interactive = True
+        self.jobID = None
+        self.jobArray = False
+        self.jobArrayID = None
+        self.jobArrayIndex = None
+        self.taskID = None
+        self.minJobArrayID = None
+        self.maxJobArrayID = None
+        self.minTaskID = None
+        self.maxTaskID = None
+        self.account = None
+        self.userID = os.environ["USER"]
+        self.machine = os.environ['HOST']
+        self.queue = None
+        self.jobStatus = None
+        self.walltime = None
+        self.nodefile = None
+        self.nodes = 1
+        if "OMP_NUM_THREADS" in os.environ.keys():
+            self.cpus = int(os.environ["OMP_NUM_THREADS"])
+        else:
+            self.cpus = 1
+        self.submitDir = subprocess.check_output(["pwd"]).replace("\n","")
+        self.workDir = subprocess.check_output(["pwd"]).replace("\n","")
+        return
+
+    
 ########################################################################################################
 #   SLURM classes/functions
 ########################################################################################################
@@ -146,81 +199,54 @@ def submitSLURM(script,args=None,PARTITION=None,QOS=None,WALLTIME=None,JOBNAME=N
 #   PBS classes/functions
 ########################################################################################################
 
-class PBS(object):
+
+class PBSjob(JOBCLASS):
     
     def __init__(self,verbose=False):
-        self.verbose = verbose
-        self.manager = "PBS"
-        return
-
-
-
-class PBSjob(PBS):
-    
-    def __init__(self,verbose=False):
-        super(PBSjob, self).__init__(verbose=verbose)
-
+        super(PBSjob, self).__init__("PBS",verbose=verbose)
         # Get job name and ID and identify whether job array
-        self.jobName = getBatchVariable("PBS_JOBNAME",verbose=verbose,manager=self.manager)
+        self.jobName = self.getEnvironmentVariable("PBS_JOBNAME")
         if self.jobName is None or self.jobName == "STDIN":
             self.interactive = True
         else:
             self.interactive = False
-        try:
-            jobID = os.environ["PBS_ARRAY_ID"]
-        except KeyError:
-            self.jobID = getBatchVariable("PBS_JOBID",verbose=verbose,manager=self.manager)
+        # Get job ID
+        self.jobID = self.getEnvironmentVariable("PBS_JOBID")
+        # Get job array information
+        self.jobArrayID = self.getEnvironmentVariable("PBS_ARRAY_ID")
+        self.jobArrayIndex = self.getEnvironmentVariable("PBS_ARRAY_INDEX")        
+        if self.jobArrayIndex:
+            self.jobArray = True            
+        else:
             self.jobArray = False
-        else:
-            jobID = getBatchVariable("PBS_ARRAY_ID",verbose=verbose,manager=self.manager)
-            self.jobArray = True
+        self.minJobArrayID = None
+        self.minTaskID = None
+        self.maxJobArrayID = None
+        self.maxTaskID = None
         # Get user ID
-        self.userID = getBatchVariable("PBS_O_LOGNAME",verbose=verbose,manager=self.manager)
+        self.userID = self.getEnvironmentVariable("PBS_O_LOGNAME")
         # Get machine and queue
-        self.machine = getBatchVariable("PBS_O_HOST",verbose=verbose,manager=self.manager)
-        self.queue = getBatchVariable("PBS_QUEUE",verbose=verbose,manager=self.manager)
+        self.machine = self.getEnvironmentVariable("PBS_O_HOST")
+        self.queue = self.getEnvironmentVariable("PBS_QUEUE")
         # Get submission dir
-        self.submitDir = getBatchVariable("PBS_O_WORKDIR",verbose=verbose,manager=self.manager)
-        self.workDir = getBatchVariable("PBS_O_WORKDIR",verbose=verbose,manager=self.manager)
-        # Store variables for job array
-        if self.jobArray:
-            self.jobArrayID = getBatchVariable("PBS_ARRAY_INDEX",verbose=verbose,manager=self.manager)
-            self.taskID = self.jobArrayID
-            self.minJobArrayID = None
-            self.minTaskID = None
-            self.maxJobArrayID = None
-            self.maxTaskID = None
-        else:
-            self.jobArrayID = None
-            self.taskID = None
-            self.minJobArrayID = None
-            self.maxJobArrayID = None
-            self.minTaskID = None
-            self.maxTaskID = None
-        # Get nodes information
-        nodefile = getBatchVariable("PBS_NODEFILE",verbose=False,manager=self.manager)
-        if nodefile is not None:
-            nodes = np.loadtxt(nodefile,dtype=str)
-            if np.ndim(nodes) == 0:
-                self.nodes = 1
-                self.ppn = 1
-                self.cpus = 1
-            else:
-                self.nodes = len(np.unique(nodes))        
-                self.ppn = len(nodes[nodes==nodes[0]])
-                self.cpus = len(nodes)        
-            del nodes
-        else:
-            self.nodes = None
-            self.ppn = None
-            self.cpus = None
+        self.submitDir = self.getEnvironmentVariable("PBS_O_WORKDIR")
+        self.workDir = self.getEnviromentVariable("PBS_O_WORKDIR")
+        # Query qstat and store result
+        self.jobStatus = subprocess.check_output(["qstat","-f",self.jobID]).split("\n")
+        # Get nodes resource information
+        self.nodefile = self.getEnvironmentVariable("PBS_NODEFILE")
+        self.nodes = int(fnmatch.filter(self.jobStatus,"*Resource_List.nodect =*")[0].split("=")[-1].strip())
+        self.cpus = int(fnmatch.filter(self.jobStatus,"*Resource_List.ncpus =*")[0].split("=")[-1].strip())
+        self.ppn = int(float(self.cpus)/float(self.nodes))
+        # Get walltime
+        self.walltime = fnmatch.filter(self.jobStatus,"*Resource_List.walltime =*")[0].split("=")[-1].strip()
         return
 
 
-class submitPBS(PBS):
+class submitPBS(JOBCLASS):
     
     def __init__(self,verbose=False,overwrite=False):
-        super(submitPBS, self).__init__(verbose=verbose)
+        super(submitPBS, self).__init__("PBS",verbose=verbose)
         self.cmd = "qsub -V"
         self.appendable = True
         self.overwrite = overwrite
@@ -361,7 +387,6 @@ class submitPBS(PBS):
             nJobs = len(np.arange(start,end,step))
         return nJobs
 
-
     def passScriptArguments(self,args):
         if args is None: return
         S = re.search(' -v (\S*) ',self.cmd)        
@@ -463,25 +488,6 @@ def submitPBS_old(script,args=None,QUEUE=None,PRIORITY=None,WALLTIME=None,JOBNAM
 
 
 
-
-
-
-
-class BATCHJOB(object):
-    
-    def __init__(self,verbose=False):        
-
-        # Determine manager
-        keys = os.environ.keys()
-        if len(fnmatch.filter(keys,"PBS*"))>0:
-            self.manager = "PBS"
-        elif len(fnmatch.filter(keys,"SLURM*"))>0:
-            self.manager = "SLURM"
-        elif len(fnmatch.filter(keys,"LSF*"))>0:
-            self.manager = "LSF"
-        else:
-            self.manager = None
-        return
 
 
 
