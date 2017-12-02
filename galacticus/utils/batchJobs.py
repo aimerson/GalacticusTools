@@ -229,7 +229,7 @@ class submitPBS(PBS):
     def canAppend(self):
         if not self.appendable:
             print("PBS submission string is not appendable!")
-        return
+        return self.appendable
 
     def replaceOption(self,old,new):
         S = re.search(old,self.cmd)
@@ -248,7 +248,7 @@ class submitPBS(PBS):
                 self.replaceOption(S.group(0)," -S "+shell)
         else:            
             if not self.canAppend(): return            
-            self.cmd = self.cm + " -S "+shell
+            self.cmd = self.cmd + " -S "+shell
         return
             
     def addQueue(self,queue):
@@ -262,7 +262,7 @@ class submitPBS(PBS):
                 self.replaceOption(S.group(0)," -q "+queue)
         else:            
             if not self.canAppend(): return            
-            self.cmd = self.cm + " -q "+queue
+            self.cmd = self.cmd + " -q "+queue
         return
 
     def addJobName(self,name):
@@ -276,7 +276,7 @@ class submitPBS(PBS):
                 self.replaceOption(S.group(0)," -N "+name)                
         else:
             if not self.canAppend(): return            
-            self.cmd = self.cm + " -N "+name
+            self.cmd = self.cmd + " -N "+name
         return
 
     def addAccount(self,account):
@@ -290,7 +290,7 @@ class submitPBS(PBS):
                 self.replaceOption(S.group(0)," -A "+account)                
         else:
             if not self.canAppend(): return            
-            self.cmd = self.cm + " -A "+account
+            self.cmd = self.cmd + " -A "+account
         return
 
     def addResource(self,resourceStr):
@@ -309,7 +309,7 @@ class submitPBS(PBS):
                 self.replaceOption(S.group(0)," -o "+outPath)                
         else:
             if not self.canAppend(): return            
-            self.cmd = self.cm + " -o "+outPath
+            self.cmd = self.cmd + " -o "+outPath
         return
 
     def addErrorPath(self,errPath):
@@ -323,7 +323,7 @@ class submitPBS(PBS):
                 self.replaceOption(S.group(0)," -e "+errPath)                
         else:
             if not self.canAppend(): return            
-            self.cmd = self.cm + " -e "+errPath
+            self.cmd = self.cmd + " -e "+errPath
         return
 
     def joinOutErr(self):
@@ -344,7 +344,7 @@ class submitPBS(PBS):
                 self.replaceOption(S.group(0)," -J "+arrayString)                
         else:
             if not self.canAppend(): return            
-            self.cmd = self.cm + " -J "+arrayString
+            self.cmd = self.cmd + " -J "+arrayString
         return
 
     def passScriptArguments(self,args):
@@ -354,19 +354,19 @@ class submitPBS(PBS):
             existing = {}
             for obj in S.group(1).split(","):
                 existing[obj.split("=")[0]] = obj.split("=")[1]
-            keys = list(set(args.keys() + existing.keys()))
+            keys = list(map(str,list(set(args.keys() + existing.keys()))))
             argString = None
             for key in keys:
                 if key in args.keys() and key in existing.keys():
                     if self.overwrite:
-                        thisArg = key+"="+args[key]
+                        thisArg = key+"="+str(args[key])
                     else:
-                        thisArg = key+"="+existing[key]
+                        thisArg = key+"="+str(existing[key])
                 else:                    
                     if key in args.keys():
-                        thisArg = key+"="+args[key]
+                        thisArg = key+"="+str(args[key])
                     if key in existing.keys():
-                        thisArg = key+"="+existing[key]
+                        thisArg = key+"="+str(existing[key])
                 if argString is None:
                     argString = thisArg
                 else:
@@ -374,6 +374,7 @@ class submitPBS(PBS):
             self.replaceOption(S.group(0)," -v "+argString)
         else:
             if not self.canAppend(): return            
+            argString = ",".join([str(key)+"="+str(args[key]) for key in args.keys()])
             self.cmd = self.cmd + "-v "+argString
         return
             
