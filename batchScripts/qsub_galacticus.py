@@ -1,99 +1,114 @@
 #! /usr/bin/env python
+"""
+qsub_galacticus.py -- submit a Galacticus job
 
+USAGE: ./qsub_galacticus.py -s <scratchPath> [-c] [-p <paramfile>] [-q <queue>] 
+                            [-J <arrayOptions>] [-n <jobname>] [-l <resource>] 
+                            [-logs]
+
+"""
 import sys,os,getpass,fnmatch,subprocess,glob
 import numpy as np
 import datetime
-
 from galacticus.utils.batchJobs import submitPBS
 
-user = getpass.getuser()
+# If no arguments specified, print docstring and quit
+if len(sys.argv) == 1:
+    print(__doc__)
+    quit()
+
+
+USER = getpass.getuser()
 pwd = subprocess.check_output(["pwd"]).replace("\n","")
 
-#######################################
-# PBS envinronment variables
-SHELL = "/bin/tcsh"
-QUEUE = "shortq"  
-NODES = 1
-PROCS = 12
-RUNS = None # e.g. "1-100"
-WALLTIME = None # e.g. "08:00:00"
-#######################################
 
-compile = False
-paramfile = None
-clrlogs = False
+# Initialise PBS class
+SUBMIT = submitPBS(overwrite=True)
+
+# Get arguments
+JOBNAME = "galacticus"
+COMPILE = False
+PARAMS = None
+rmlogs = False
+SCRATCH = None
+RUNS = None
+QUEUE = None
 iarg = 0
 while iarg < len(sys.argv):
+    if fnmatch.fnmatch(sys.argv[iarg],"-s*"):
+        iarg += 1
+        SCRATCH = sys.argv[iarg]
     if fnmatch.fnmatch(sys.argv[iarg],"-c*"):
-        compile = True
-    if fnmatch.fnmatch(sys.argv[iarg],"-l"):
-        clrlogs = True
+        COMPILE = True
     if fnmatch.fnmatch(sys.argv[iarg],"-p*"):
         iarg += 1
-        paramfile = sys.argv[iarg]
+        PARAMS = sys.argv[iarg]
+    if fnmatch.fnmatch(sys.argv[iarg],"-n*"):
+        iarg += 1
+        JOBNAME = sys.argv[iarg]
+    if fnmatch.fnmatch(sys.argv[iarg],"-logs"):
+        rmlogs = True
+    if fnmatch.fnmatch(sys.argv[iarg],"-q"):
+        iarg += 1
+        QUEUE = sys.argv[iarg]
+    if fnmatch.fnmatch(sys.argv[iarg],"-J"):
+        iarg += 1
+        RUNS = sys.argv[iarg]
+    if fnmatch.fnmatch(sys.argv[iarg],"-l"):
+        iarg += 1
+        SUBMIT.addResource(sys.argv[iarg])        
     iarg += 1
 
+
+
+# Set path to output and log directories
+if SCRATCH is None:
+    raise RuntimeError("Path to scratch disk not provided!")
+if not SCRATCH.endswith("/"):
+    SCRATCH = SCRATCH+"/"
+# Create logs directory
+LOGDIR = SCRATCH+"Galacticus_Logs/"
+if PARAMS is None:
+    LOGDIR = LOGDIR + PARAMS.replace(".xml","") + "/"
+subprocess.call(["mkdir","-p",LOGDIR])        
+if rmlogs:
+    for logfile in glob.glob(LOGDIR+"*"):
+        os.remove(logfile)
+SUBMIT.addOutputPath(LOGDIR)
+SUBMIT.addErrorPath(LOGDIR)
+SUBMIT.joinOutErr()
+
+EXE = "Galacticus.exe"
+ARGS = {"executable":EXE}
+
+# Create output directory
+if PARAMS is not None:
+    ARGS['paramfile'] = PARAMS
+    datestr = str(datetime.datetime.now()).split()[0].replace("-","")
+    OUTDIR = SCRATCH+"Galacticus_Out/v0.9.4/"+PARAMS.replace(".xml","")+"/"
+    ARGS['outdir'] = OUTDIR
+    subprocess.call(["mkdir","-p",OUTDIR])        
+    if not os.path.exists(EXE):
+        COMPILE = True
+    else:
+        os.system("cp "+EXE+" "+OUTDIR)        
+    
 # If need to compile run a single job
-if compile:
+ARGS["compile"] = int(COMPILE)
+if COMPILE:
     RUNS = None
 
-# Set storage directory depending on system
-HOST = os.environ["HOST"]
-if HOST.lower == "zodiac":
-    # JPL
-    storeDir = "/nobackupNFS/sunglass/"
-else:
-    # NERSC
-    storeDir = "/global/projects/projectdir/hacc/"
-
-# Construct logs directory
-jobname = "galacticus"
-logdir = storeDir+user+"/logs/galacticus/"
-subprocess.call(["mkdir","-p",logdir])
-logfile = logdir + jobname
-if clrlogs:
-    print("Clearing old log files...")
-    logfiles = glob.glob(logdir+"*.OU")
-    for log in logfiles:
-        os.remove(log)
-
-# Make output directory ofr array jobs
-if RUNS is not None:
-    version = pwd.split("/")[-1]
-    outdir = storeDir+user+"/Galacticus_Out/"+version+"/"
-    datestr = str(datetime.datetime.now()).split()[0].replace("-","")
-    outdir = outdir + paramfile.replace(".xml","") + "/" + datestr
-    subprocess.call(["mkdir","-p",outdir])
-    print("OUTPUT DIRECTORY = "+outdir)    
-    if not compile:
-        os.system("cp Galacticus.exe "+outdir)
-        if type(RUNS) == list:        
-            size = len(RUNS)
-    else:
-        size = 0
-        allruns = RUNS.split(",")
-        for r in allruns:
-            if "-" in r:
-                minjob = int(r.split("-")[0])
-                maxjob = int(r.split("-")[-1])
-                size += (maxjob+1-minjob)
-            else:
-                size += 1
-    JOB_ARRAY_SIZE = size
-else:
-    outdir = None
-    JOB_ARRAY_SIZE = None
-
+# Set remaing PBS options
+SUBMIT.addQueue(QUEUE)
+SUBMIT.addJobName(JOBNAME)
+SUBMIT.specifyJobArray(RUNS)
+SUBMIT.passScriptArguments(ARGS)
+SUBMIT.setScript(os.path.basename(__file__).replace("qsub","run"))
 
 # Submit job
 print("Submitting Galacticus job...")
-args = {"compile":str(int(compile)),"paramfile":paramfile}
-if outdir is not None:
-    args["outdir"] = outdir
-if JOB_ARRAY_SIZE is not None:
-    args["JOB_ARRAY_SIZE"] = JOB_ARRAY_SIZE
-submitPBS("run_galacticus.py",args=args,QUEUE=QUEUE,RUNS=RUNS,NODES=NODES,PPN=PROCS,WALLTIME=WALLTIME,\
-              SHELL=SHELL,JOBNAME=jobname,LOGDIR=logdir,verbose=True,submit=True)
+SUBMIT.printJobString()
+#SUBMIT.submitJob()
 
 
 
