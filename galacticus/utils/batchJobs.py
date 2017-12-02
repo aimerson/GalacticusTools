@@ -238,6 +238,7 @@ class submitPBS(PBS):
         return
             
     def addQueue(self,queue):
+        if queue is None: return
         S = re.search(' -q (\w+) ',self.cmd)
         if S:
             if not self.overwrite:
@@ -251,6 +252,7 @@ class submitPBS(PBS):
         return
 
     def addJobName(self,name):
+        if name is None: return
         S = re.search(' -N (\w+) ',self.cmd)
         if S:
             if not self.overwrite:
@@ -264,6 +266,7 @@ class submitPBS(PBS):
         return
 
     def addAccount(self,account):
+        if account is None: return
         S = re.search(' -A (\w+) ',self.cmd)
         if S: 
             if not self.overwrite:
@@ -282,6 +285,7 @@ class submitPBS(PBS):
         return
         
     def addOutPath(self,outPath):
+        if outPath is None: return
         S = re.search(' -o (\S*) ',self.cmd)
         if S:
             if not self.overwrite:
@@ -295,6 +299,7 @@ class submitPBS(PBS):
         return
 
     def addOutPath(self,errPath):
+        if errPath is None: return
         S = re.search(' -e (\S*) ',self.cmd)
         if S:
             if not self.overwrite:
@@ -315,6 +320,7 @@ class submitPBS(PBS):
         return
 
     def specifyJobArray(self,arrayString):
+        if arrayString is None: return
         S = re.search(' -J (\S*) ',self.cmd)
         if S:
             if not self.overwrite:
@@ -328,6 +334,7 @@ class submitPBS(PBS):
         return
 
     def passScriptArguments(self,args):
+        if args is None: return
         S = re.search(' -v (\S*) ',self.cmd)        
         if S:
             existing = {}
@@ -357,6 +364,7 @@ class submitPBS(PBS):
         return
             
     def addScript(self,script):
+        if script is None: return
         if not self.canAppend(): return            
         appendable = False
         self.cmd = self.cmd + " " +script
