@@ -220,7 +220,7 @@ class PBSjob(PBS):
 class submitPBS(PBS):
     
     def __init__(self,verbose=False,overwrite=False):
-        super(PBSjob, self).__init__(verbose=verbose)
+        super(submitPBS, self).__init__(verbose=verbose)
         self.cmd = "qsub -V"
         self.appendable = True
         self.overwrite = overwrite
