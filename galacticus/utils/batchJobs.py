@@ -385,6 +385,10 @@ class submitPBS(PBS):
         return
 
     def printJobString(self):
+        print(self.cmd)
+        return 
+
+    def getJobString(self):
         return self.cmd
 
     def submitJob(self):
