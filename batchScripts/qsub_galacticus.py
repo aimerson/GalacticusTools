@@ -17,10 +17,8 @@ if len(sys.argv) == 1:
     print(__doc__)
     quit()
 
-
 USER = getpass.getuser()
 pwd = subprocess.check_output(["pwd"]).replace("\n","")
-
 
 # Initialise PBS class
 SUBMIT = submitPBS(overwrite=True)
@@ -61,8 +59,6 @@ while iarg < len(sys.argv):
         iarg += 1
         SUBMIT.addResource(sys.argv[iarg])        
     iarg += 1
-
-
 
 # Set path to output and log directories
 if SCRATCH is None:
@@ -106,6 +102,7 @@ SUBMIT.addQueue(QUEUE)
 SUBMIT.addJobName(JOBNAME)
 SUBMIT.specifyJobArray(RUNS)
 ARGS["JOB_ARRAY_SIZE"] = SUBMIT.countJobs()
+ARGS["JOB_MANAGER"] = SUBMIT.manager
 SUBMIT.passScriptArguments(ARGS)
 SUBMIT.setScript(os.path.basename(__file__).replace("qsub","run"))
 
