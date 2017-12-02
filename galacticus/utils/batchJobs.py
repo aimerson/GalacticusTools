@@ -337,9 +337,10 @@ class submitPBS(PBS):
     def submitJob(self):
         os.system(job)
         return
+
     
-def submitPBS(script,args=None,QUEUE=None,PRIORITY=None,WALLTIME=None,JOBNAME=None,LOGDIR=None,RUNS=None,SHELL="/bin/tcsh",\
-                    NODES=None,PPN=None,ACCOUNT=None,mergeOE=True,verbose=False,submit=True):
+def submitPBS_old(script,args=None,QUEUE=None,PRIORITY=None,WALLTIME=None,JOBNAME=None,LOGDIR=None,RUNS=None,SHELL="/bin/tcsh",\
+                      NODES=None,PPN=None,ACCOUNT=None,mergeOE=True,verbose=False,submit=True):
     import sys,os,getpass,fnmatch,subprocess,glob
     job = "qsub -V "
     if QUEUE is not None:
