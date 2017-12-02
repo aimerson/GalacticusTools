@@ -4,7 +4,7 @@ qsub_galacticus.py -- submit a Galacticus job
 
 USAGE: ./qsub_galacticus.py -s <scratchPath> [-c] [-p <paramfile>] [-q <queue>] 
                             [-J <arrayOptions>] [-n <jobname>] [-l <resource>] 
-                            [-logs]
+                            [-logs] [-SUBMIT]
 
 """
 import sys,os,getpass,fnmatch,subprocess,glob
@@ -33,6 +33,7 @@ rmlogs = False
 SCRATCH = None
 RUNS = None
 QUEUE = None
+SUBMIT_JOB_TO_QUEUE = False
 iarg = 0
 while iarg < len(sys.argv):
     if fnmatch.fnmatch(sys.argv[iarg],"-s*"):
@@ -48,6 +49,8 @@ while iarg < len(sys.argv):
         JOBNAME = sys.argv[iarg]
     if fnmatch.fnmatch(sys.argv[iarg],"-logs"):
         rmlogs = True
+    if fnmatch.fnmatch(sys.argv[iarg],"-SUBMIT"):
+        SUBMIT_JOB_TO_QUEUE = True
     if fnmatch.fnmatch(sys.argv[iarg],"-q"):
         iarg += 1
         QUEUE = sys.argv[iarg]
@@ -68,7 +71,7 @@ if not SCRATCH.endswith("/"):
     SCRATCH = SCRATCH+"/"
 # Create logs directory
 LOGDIR = SCRATCH+"Galacticus_Logs/"
-if PARAMS is None:
+if PARAMS is not None:
     LOGDIR = LOGDIR + PARAMS.replace(".xml","") + "/"
 subprocess.call(["mkdir","-p",LOGDIR])        
 if rmlogs:
@@ -102,13 +105,15 @@ if COMPILE:
 SUBMIT.addQueue(QUEUE)
 SUBMIT.addJobName(JOBNAME)
 SUBMIT.specifyJobArray(RUNS)
+ARGS["JOB_ARRAY_SIZE"] = SUBMIT.countJobs()
 SUBMIT.passScriptArguments(ARGS)
 SUBMIT.setScript(os.path.basename(__file__).replace("qsub","run"))
 
 # Submit job
-print("Submitting Galacticus job...")
 SUBMIT.printJobString()
-#SUBMIT.submitJob()
+if SUBMIT_JOB_TO_QUEUE:
+    print("Submitting Galacticus job...")
+    SUBMIT.submitJob()
 
 
 
