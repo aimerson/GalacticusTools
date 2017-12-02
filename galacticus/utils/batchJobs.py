@@ -248,7 +248,7 @@ class submitPBS(PBS):
                 self.replaceOption(S.group(0)," -S "+shell)
         else:            
             if not self.canAppend(): return            
-            self.cmd = self.cmd + " -S "+shell
+            self.cmd = self.cmd + " -S "+shell+" "
         return
             
     def addQueue(self,queue):
@@ -262,7 +262,7 @@ class submitPBS(PBS):
                 self.replaceOption(S.group(0)," -q "+queue)
         else:            
             if not self.canAppend(): return            
-            self.cmd = self.cmd + " -q "+queue
+            self.cmd = self.cmd + " -q "+queue+" "
         return
 
     def addJobName(self,name):
@@ -276,7 +276,7 @@ class submitPBS(PBS):
                 self.replaceOption(S.group(0)," -N "+name)                
         else:
             if not self.canAppend(): return            
-            self.cmd = self.cmd + " -N "+name
+            self.cmd = self.cmd + " -N "+name+" "
         return
 
     def addAccount(self,account):
@@ -290,7 +290,7 @@ class submitPBS(PBS):
                 self.replaceOption(S.group(0)," -A "+account)                
         else:
             if not self.canAppend(): return            
-            self.cmd = self.cmd + " -A "+account
+            self.cmd = self.cmd + " -A "+account+" "
         return
 
     def addResource(self,resourceStr):
@@ -309,7 +309,7 @@ class submitPBS(PBS):
                 self.replaceOption(S.group(0)," -o "+outPath)                
         else:
             if not self.canAppend(): return            
-            self.cmd = self.cmd + " -o "+outPath
+            self.cmd = self.cmd + " -o "+outPath+" "
         return
 
     def addErrorPath(self,errPath):
@@ -323,14 +323,14 @@ class submitPBS(PBS):
                 self.replaceOption(S.group(0)," -e "+errPath)                
         else:
             if not self.canAppend(): return            
-            self.cmd = self.cmd + " -e "+errPath
+            self.cmd = self.cmd + " -e "+errPath+" "
         return
 
     def joinOutErr(self):
         if not self.canAppend(): return            
         S = re.search(' -j oe ',self.cmd)
         if not S:
-            self.cmd = self.cmd + " -j oe"
+            self.cmd = self.cmd + " -j oe "
         return
 
     def specifyJobArray(self,arrayString):
@@ -344,8 +344,23 @@ class submitPBS(PBS):
                 self.replaceOption(S.group(0)," -J "+arrayString)                
         else:
             if not self.canAppend(): return            
-            self.cmd = self.cmd + " -J "+arrayString
+            self.cmd = self.cmd + " -J "+arrayString+" "
         return
+
+    def countJobs(self):
+        nJobs = 1
+        S = re.search(' -J (\S*) ',self.cmd)
+        if S:
+            T = re.match('(\d+)-(\d+)?(:\d+)?',S.group(1))
+            start = int(T.group(1))
+            end = int(T.group(2))+1
+            if T.group(3):
+                step = int(T.group(3).replace(":",""))               
+            else:
+                step = 1
+            nJobs = len(np.arange(start,end,step))
+        return nJobs
+
 
     def passScriptArguments(self,args):
         if args is None: return
@@ -375,25 +390,25 @@ class submitPBS(PBS):
         else:
             if not self.canAppend(): return            
             argString = ",".join([str(key)+"="+str(args[key]) for key in args.keys()])
-            self.cmd = self.cmd + " -v "+argString
+            self.cmd = self.cmd + " -v "+argString+" "
         return
             
     def setScript(self,script):
         if script is None: return
         if not self.canAppend(): return            
         appendable = False
-        self.cmd = self.cmd + " " +script
+        self.cmd = self.cmd + " " +script+" "
         return
 
     def printJobString(self):
-        print(self.cmd)
+        print(self.cmd.replace("  "," "))
         return 
 
     def getJobString(self):
-        return self.cmd
+        return self.cmd.replace("  "," ")
 
     def submitJob(self):
-        os.system(job)
+        os.system(self.cmd.replace("  "," "))
         return
 
     
