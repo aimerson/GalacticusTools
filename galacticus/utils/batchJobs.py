@@ -219,10 +219,11 @@ class PBSjob(PBS):
 
 class submitPBS(PBS):
     
-    def __init__(self,verbose=False):
+    def __init__(self,verbose=False,overwrite=False):
         super(PBSjob, self).__init__(verbose=verbose)
         self.cmd = "qsub -V"
         self.appendable = True
+        self.overwrite = overwrite
         return
 
     def canAppend(self):
@@ -230,34 +231,48 @@ class submitPBS(PBS):
             print("PBS submission string is not appendable!")
         return
 
-
+    def replaceOption(self,old,new):
+        S = re.search(old,self.cmd)
+        if S:
+            self.cmd = self.cmd.replace(old,new)
+        return
+            
     def addQueue(self,queue):
-        if not self.canAppend(): return            
         S = re.search(' -q (\w+) ',self.cmd)
         if S:
-            print("Queue already specified! Queue = "+S.group(1))
-            return
-        else:
+            if not self.overwrite:
+                print("Queue already specified! Queue = "+S.group(1))
+                return
+            else:
+                self.replaceOption(S.group(0)," -q "+queue)
+        else:            
+            if not self.canAppend(): return            
             self.cmd = self.cm + " -q "+queue
         return
 
     def addJobName(self,name):
-        if not self.canAppend(): return            
         S = re.search(' -N (\w+) ',self.cmd)
         if S:
-            print("Job name already specified! Job Name = "+S.group(1))
-            return
+            if not self.overwrite:
+                print("Job name already specified! Job Name = "+S.group(1))
+                return
+            else:
+                self.replaceOption(S.group(0)," -N "+name)                
         else:
+            if not self.canAppend(): return            
             self.cmd = self.cm + " -N "+name
         return
 
     def addAccount(self,account):
-        if not self.canAppend(): return            
         S = re.search(' -A (\w+) ',self.cmd)
-        if S:
-            print("Account already specified! Account = "+S.group(1))
-            return
+        if S: 
+            if not self.overwrite:
+                print("Account already specified! Account = "+S.group(1))
+                return
+            else:
+                self.replaceOption(S.group(0)," -A "+account)                
         else:
+            if not self.canAppend(): return            
             self.cmd = self.cm + " -A "+account
         return
 
@@ -267,22 +282,28 @@ class submitPBS(PBS):
         return
         
     def addOutPath(self,outPath):
-        if not self.canAppend(): return            
         S = re.search(' -o (\S*) ',self.cmd)
         if S:
-            print("Output path already specified! Output path = "+S.group(1))
-            return
+            if not self.overwrite:
+                print("Output path already specified! Output path = "+S.group(1))
+                return
+            else:
+                self.replaceOption(S.group(0)," -o "+outPath)                
         else:
+            if not self.canAppend(): return            
             self.cmd = self.cm + " -o "+outPath
         return
 
     def addOutPath(self,errPath):
-        if not self.canAppend(): return            
         S = re.search(' -e (\S*) ',self.cmd)
         if S:
-            print("Error path already specified! Error path = "+S.group(1))
-            return
+            if not self.overwrite:
+                print("Error path already specified! Error path = "+S.group(1))
+                return
+            else:
+                self.replaceOption(S.group(0)," -e "+errPath)                
         else:
+            if not self.canAppend(): return            
             self.cmd = self.cm + " -e "+errPath
         return
 
@@ -294,35 +315,45 @@ class submitPBS(PBS):
         return
 
     def specifyJobArray(self,arrayString):
-        if not self.canAppend(): return            
         S = re.search(' -J (\S*) ',self.cmd)
         if S:
-            print("Job array options already specified! Job array options= "+S.group(1))
-            return
+            if not self.overwrite:
+                print("Job array options already specified! Job array options= "+S.group(1))
+                return
+            else:
+                self.replaceOption(S.group(0)," -J "+arrayString)                
         else:
+            if not self.canAppend(): return            
             self.cmd = self.cm + " -J "+arrayString
         return
 
     def passScriptArguments(self,args):
-        if not self.canAppend(): return            
         S = re.search(' -v (\S*) ',self.cmd)        
         if S:
             existing = {}
             for obj in S.group(1).split(","):
                 existing[obj.split("=")[0]] = obj.split("=")[1]
-        keys = list(set(args.keys() + existing.keys()))
-        argString = None
-        for key in keys:
-            if key in args.keys():
-                thisArg = key+"="+args[key]
-            else:
-                if key in existing.keys():
-                    thisArg = key+"="+existing[key]
-            if argString is None:
-                argString = thisArg
-            else:
-                argString = argString+","+thisArg
-        self.cmd = self.cmd + "-v "+argString
+            keys = list(set(args.keys() + existing.keys()))
+            argString = None
+            for key in keys:
+                if key in args.keys() and key in existing.keys():
+                    if self.overwrite:
+                        thisArg = key+"="+args[key]
+                    else:
+                        thisArg = key+"="+existing[key]
+                else:                    
+                    if key in args.keys():
+                        thisArg = key+"="+args[key]
+                    if key in existing.keys():
+                        thisArg = key+"="+existing[key]
+                if argString is None:
+                    argString = thisArg
+                else:
+                    argString = argString+","+thisArg
+            self.replaceOption(S.group(0)," -v "+argString)
+        else:
+            if not self.canAppend(): return            
+            self.cmd = self.cmd + "-v "+argString
         return
             
     def addScript(self,script):
