@@ -4,7 +4,7 @@ qsub_galacticus.py -- submit a Galacticus job
 
 USAGE: ./qsub_galacticus.py -s <scratchPath> [-c] [-p <paramfile>] [-q <queue>] 
                             [-J <arrayOptions>] [-n <jobname>] [-l <resource>] 
-                            [-logs] [-SUBMIT]
+                            [-logs] [-SUBMIT] [-run]
 
 """
 import sys,os,getpass,fnmatch,subprocess,glob
@@ -26,6 +26,7 @@ SUBMIT = submitPBS(overwrite=True)
 # Get arguments
 JOBNAME = "galacticus"
 COMPILE = False
+RUN_GALACTICUS = False
 PARAMS = None
 rmlogs = False
 SCRATCH = None
@@ -39,6 +40,8 @@ while iarg < len(sys.argv):
         SCRATCH = sys.argv[iarg]
     if fnmatch.fnmatch(sys.argv[iarg],"-c*"):
         COMPILE = True
+    if fnmatch.fnmatch(sys.argv[iarg],"-run"):
+        RUN_GALACTICUS = True
     if fnmatch.fnmatch(sys.argv[iarg],"-p*"):
         iarg += 1
         PARAMS = sys.argv[iarg]
@@ -78,14 +81,14 @@ SUBMIT.addErrorPath(LOGDIR)
 SUBMIT.joinOutErr()
 
 EXE = "Galacticus.exe"
-ARGS = {"executable":EXE}
+ARGS = {"EXECUTABLE":EXE}
 
 # Create output directory
 if PARAMS is not None:
-    ARGS['paramfile'] = PARAMS
+    ARGS['PARAMFILE'] = PARAMS
     datestr = str(datetime.datetime.now()).split()[0].replace("-","")
     OUTDIR = SCRATCH+"Galacticus_Out/v0.9.4/"+PARAMS.replace(".xml","")+"/"
-    ARGS['outdir'] = OUTDIR
+    ARGS['OUTDIR'] = OUTDIR
     subprocess.call(["mkdir","-p",OUTDIR])        
     if not os.path.exists(EXE):
         COMPILE = True
@@ -93,7 +96,7 @@ if PARAMS is not None:
         os.system("cp "+EXE+" "+OUTDIR)        
     
 # If need to compile run a single job
-ARGS["compile"] = int(COMPILE)
+ARGS["COMPILE"] = int(COMPILE)
 if COMPILE:
     RUNS = None
 
@@ -103,6 +106,7 @@ SUBMIT.addJobName(JOBNAME)
 SUBMIT.specifyJobArray(RUNS)
 ARGS["JOB_ARRAY_SIZE"] = SUBMIT.countJobs()
 ARGS["JOB_MANAGER"] = SUBMIT.manager
+ARGS["RUN_GALACTICUS"] = int(RUN_GALACTICUS)
 SUBMIT.passScriptArguments(ARGS)
 SUBMIT.setScript(os.path.basename(__file__).replace("qsub","run"))
 
