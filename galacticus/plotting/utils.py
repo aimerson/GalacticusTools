@@ -24,8 +24,8 @@ from decimal import *
 
 #mpl.style.use('classic')
 mpl.rcParams['font.family'] = 'serif'
-mpl.rcParams['xtick.top'] = True
-mpl.rcParams['ytick.right'] = True
+#mpl.rcParams['xtick.top'] = True
+#mpl.rcParams['ytick.right'] = True
 mpl.rcParams['errorbar.capsize'] = 3
 mpl.rcParams['legend.numpoints'] = 1
 mpl.rcParams['legend.fontsize'] = 'large'
@@ -77,18 +77,61 @@ def minor_ticks(axObj):
     return
 
 
+class axisGridArray(object):
+    def __init__(self,nrow,ncol):
+        self.nrow = nrow
+        self.ncol = ncol
+        self.ntot = self.nrow*self.ncol
+        self.axisNumbers = np.arange(self.ntot).reshape(self.nrow,self.ncol)
+        self.yEdges = self.axisNumbers[:,0]
+        self.xEdges = self.axisNumbers[-1,:]
+        return
+    
+    def getRow(self,i):
+        return self.axisNumbers[i,:]
+
+    def getColumn(self,i):
+        return self.axisNumbers[:,i]
+
+    def yEdge(self,iplot):
+        if type(iplot) == int or type(iplot) == str:
+            iax = int(list(str(iplot))[-1])
+        else:
+            iax = int(iplot[-1])
+        return iax-1 in self.yEdges
+
+    def xEdge(self,iplot):
+        if type(iplot) == int or type(iplot) == str:
+            iax = int(list(str(iplot))[-1])
+        else:
+            iax = int(iplot[-1])
+        return iax-1 in self.xEdges
+        
+
+
+
 def yEdgeAxes(iplot):
-    iplot = str(iplot)
-    nrow = int(list(iplot)[0])
-    ncol = int(list(iplot)[1])
+    if type(iplot) == int:
+        iplot = str(iplot)
+    if type(iplot) == str:
+        nrow = int(list(iplot)[0])
+        ncol = int(list(iplot)[1])    
+    else:    
+        nrow = int(iplot[0])
+        ncol = int(iplot[1])
     ntot = nrow*ncol
     i = np.arange(ntot).reshape(nrow,ncol)
     return i[:,0]
 
 def xEdgeAxes(iplot):
-    iplot = str(iplot)
-    nrow = int(list(iplot)[0])
-    ncol = int(list(iplot)[1])
+    if type(iplot) == int:
+        iplot = str(iplot)
+    if type(iplot) == str:
+        nrow = int(list(iplot)[0])
+        ncol = int(list(iplot)[1])    
+    else:    
+        nrow = int(iplot[0])
+        ncol = int(iplot[1])
     ntot = nrow*ncol
     i = np.arange(ntot).reshape(nrow,ncol)
     return i[-1,:]
