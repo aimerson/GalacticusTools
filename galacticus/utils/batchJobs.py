@@ -1,8 +1,8 @@
 #! /usr/bin/env python
 
-import os,fnmatch
+import sys,os,fnmatch,re
 import numpy as np
-
+import getpass,subprocess,glob
 
 
 def getBatchVariable(variable,verbose=False,manager=None):
@@ -146,10 +146,19 @@ def submitSLURM(script,args=None,PARTITION=None,QOS=None,WALLTIME=None,JOBNAME=N
 #   PBS classes/functions
 ########################################################################################################
 
-class PBSjob(object):
+class PBS(object):
     
     def __init__(self,verbose=False):
+        self.verbose = verbose
         self.manager = "PBS"
+        return
+
+
+
+class PBSjob(PBS):
+    
+    def __init__(self,verbose=False):
+        super(PBSjob, self).__init__(verbose=verbose)
 
         # Get job name and ID and identify whether job array
         self.jobName = getBatchVariable("PBS_JOBNAME",verbose=verbose,manager=self.manager)
@@ -208,6 +217,127 @@ class PBSjob(object):
         return
 
 
+class submitPBS(PBS):
+    
+    def __init__(self,verbose=False):
+        super(PBSjob, self).__init__(verbose=verbose)
+        self.cmd = "qsub -V"
+        self.appendable = True
+        return
+
+    def canAppend(self):
+        if not self.appendable:
+            print("PBS submission string is not appendable!")
+        return
+
+
+    def addQueue(self,queue):
+        if not self.canAppend(): return            
+        S = re.search(' -q (\w+) ',self.cmd)
+        if S:
+            print("Queue already specified! Queue = "+S.group(1))
+            return
+        else:
+            self.cmd = self.cm + " -q "+queue
+        return
+
+    def addJobName(self,name):
+        if not self.canAppend(): return            
+        S = re.search(' -N (\w+) ',self.cmd)
+        if S:
+            print("Job name already specified! Job Name = "+S.group(1))
+            return
+        else:
+            self.cmd = self.cm + " -N "+name
+        return
+
+    def addAccount(self,account):
+        if not self.canAppend(): return            
+        S = re.search(' -A (\w+) ',self.cmd)
+        if S:
+            print("Account already specified! Account = "+S.group(1))
+            return
+        else:
+            self.cmd = self.cm + " -A "+account
+        return
+
+    def addResource(self,resourceStr):
+        if not self.canAppend(): return            
+        self.cmd = self.cmd + " -l "+resourceStr
+        return
+        
+    def addOutPath(self,outPath):
+        if not self.canAppend(): return            
+        S = re.search(' -o (\S*) ',self.cmd)
+        if S:
+            print("Output path already specified! Output path = "+S.group(1))
+            return
+        else:
+            self.cmd = self.cm + " -o "+outPath
+        return
+
+    def addOutPath(self,errPath):
+        if not self.canAppend(): return            
+        S = re.search(' -e (\S*) ',self.cmd)
+        if S:
+            print("Error path already specified! Error path = "+S.group(1))
+            return
+        else:
+            self.cmd = self.cm + " -e "+errPath
+        return
+
+    def joinOutErr(self):
+        if not self.canAppend(): return            
+        S = re.search(' -j oe ',self.cmd)
+        if not S:
+            self.cmd = self.cmd + " -j oe"
+        return
+
+    def specifyJobArray(self,arrayString):
+        if not self.canAppend(): return            
+        S = re.search(' -J (\S*) ',self.cmd)
+        if S:
+            print("Job array options already specified! Job array options= "+S.group(1))
+            return
+        else:
+            self.cmd = self.cm + " -J "+arrayString
+        return
+
+    def passScriptArguments(self,args):
+        if not self.canAppend(): return            
+        S = re.search(' -v (\S*) ',self.cmd)        
+        if S:
+            existing = {}
+            for obj in S.group(1).split(","):
+                existing[obj.split("=")[0]] = obj.split("=")[1]
+        keys = list(set(args.keys() + existing.keys()))
+        argString = None
+        for key in keys:
+            if key in args.keys():
+                thisArg = key+"="+args[key]
+            else:
+                if key in existing.keys():
+                    thisArg = key+"="+existing[key]
+            if argString is None:
+                argString = thisArg
+            else:
+                argString = argString+","+thisArg
+        self.cmd = self.cmd + "-v "+argString
+        return
+            
+    def addScript(self,script):
+        if not self.canAppend(): return            
+        appendable = False
+        self.cmd = self.cmd + " " +script
+        return
+
+    def printJobString(self):
+        return self.cmd
+
+    def submitJob(self):
+        os.system(job)
+        return
+    
 def submitPBS(script,args=None,QUEUE=None,PRIORITY=None,WALLTIME=None,JOBNAME=None,LOGDIR=None,RUNS=None,SHELL="/bin/tcsh",\
                     NODES=None,PPN=None,ACCOUNT=None,mergeOE=True,verbose=False,submit=True):
     import sys,os,getpass,fnmatch,subprocess,glob
