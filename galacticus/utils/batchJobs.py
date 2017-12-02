@@ -236,6 +236,20 @@ class submitPBS(PBS):
         if S:
             self.cmd = self.cmd.replace(old,new)
         return
+
+    def addShell(self,shell):
+        if shell is None: return
+        S = re.search(' -S (\w+) ',self.cmd)
+        if S:
+            if not self.overwrite:
+                print("Shell already specified! Shell = "+S.group(1))
+                return
+            else:
+                self.replaceOption(S.group(0)," -S "+shell)
+        else:            
+            if not self.canAppend(): return            
+            self.cmd = self.cm + " -S "+shell
+        return
             
     def addQueue(self,queue):
         if queue is None: return
