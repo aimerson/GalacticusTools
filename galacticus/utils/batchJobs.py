@@ -375,7 +375,7 @@ class submitPBS(PBS):
         else:
             if not self.canAppend(): return            
             argString = ",".join([str(key)+"="+str(args[key]) for key in args.keys()])
-            self.cmd = self.cmd + "-v "+argString
+            self.cmd = self.cmd + " -v "+argString
         return
             
     def setScript(self,script):
