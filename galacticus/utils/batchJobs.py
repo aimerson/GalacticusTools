@@ -298,7 +298,7 @@ class submitPBS(PBS):
         self.cmd = self.cmd + " -l "+resourceStr
         return
         
-    def addOutPath(self,outPath):
+    def addOutputPath(self,outPath):
         if outPath is None: return
         S = re.search(' -o (\S*) ',self.cmd)
         if S:
@@ -312,7 +312,7 @@ class submitPBS(PBS):
             self.cmd = self.cm + " -o "+outPath
         return
 
-    def addOutPath(self,errPath):
+    def addErrorPath(self,errPath):
         if errPath is None: return
         S = re.search(' -e (\S*) ',self.cmd)
         if S:
@@ -377,7 +377,7 @@ class submitPBS(PBS):
             self.cmd = self.cmd + "-v "+argString
         return
             
-    def addScript(self,script):
+    def setScript(self,script):
         if script is None: return
         if not self.canAppend(): return            
         appendable = False
