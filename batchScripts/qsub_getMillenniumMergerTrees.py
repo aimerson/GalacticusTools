@@ -3,7 +3,7 @@
 qsub_getMillenniumMergerTrees.py -- submit a job array to build Millennium merger trees
 
 USAGE: ./qsub_getMillenniumMergerTrees.py -s <scratchPath> [-c] [-e <exe>] [-sim <simulation>] 
-                                          [-u <username>] [-p <password>] [-force] [-logs]
+                                          [-u <username>] [-p <password>] [-all] [-force] [-logs]
                                           [-q <queue>] [-J <arrayOptions>] [-n <jobname>] 
                                           [-l <resource>] [-SUBMIT] 
 
@@ -35,6 +35,7 @@ OVERWRITE = False
 USERNAME = None
 PASSWORD = None
 SCRATCH = None
+PROCESS_ALL_SUBVOLUMES = False
 JOBNAME = "millenniumTrees"
 rmlogs = False
 RUNS = "1-512"
@@ -45,6 +46,8 @@ while iarg < len(sys.argv):
     if fnmatch.fnmatch(sys.argv[iarg],"-s"):
         iarg += 1
         SCRATCH = sys.argv[iarg]
+    if fnmatch.fnmatch(sys.argv[iarg],"-all"):
+        PROCESS_ALL_SUBVOLUMES = True
     if fnmatch.fnmatch(sys.argv[iarg],"-c*"):
         COMPILE = True
     if fnmatch.fnmatch(sys.argv[iarg],"-sim"):
@@ -120,6 +123,11 @@ ARGS["OVERWRITE"] = int(OVERWRITE)
 ARGS["COMPILE"] = int(COMPILE)
 if COMPILE:
     RUNS = None
+
+# Process all subvolumes sequentially in single job
+if PROCESS_ALL_SUBVOLUMES:
+    RUNS = None
+    ARGS["SUBVOLUME"] = "ALL"
 
 # Set simulation and output directory
 simulations = {"MR":"MillenniumWMAP1","MR7":"MillenniumWMAP7","MRII":"MillenniumIIWMAP1",\
