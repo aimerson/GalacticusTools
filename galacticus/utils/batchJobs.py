@@ -230,7 +230,7 @@ class PBSjob(JOBCLASS):
         self.queue = self.getEnvironmentVariable("PBS_QUEUE")
         # Get submission dir
         self.submitDir = self.getEnvironmentVariable("PBS_O_WORKDIR")
-        self.workDir = self.getEnviromentVariable("PBS_O_WORKDIR")
+        self.workDir = self.getEnvironmentVariable("PBS_O_WORKDIR")
         # Query qstat and store result
         self.jobStatus = subprocess.check_output(["qstat","-f",self.jobID]).split("\n")
         # Get nodes resource information
