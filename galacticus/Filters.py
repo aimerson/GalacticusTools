@@ -8,6 +8,7 @@ import pkg_resources
 import xml.etree.ElementTree as ET
 from .config import *
 from .cloudy import cloudyTable
+from .stellarPopulations import stellarPopulationSynthesisModel
 from .GalacticusErrors import ParseError
 from .xmlTree import formatFile
 
@@ -273,6 +274,53 @@ class TopHat(object):
                             for w,t in zip(self.transmission.wavelength,self.transmission.transmission)]
             print("".join(infoLine))
         return 
+
+
+def buildSEDTopHatArray(lambdaMin,lambdaMax,lambdaWidth,redshift):
+    # Create rest frame limits
+    lambdaRestMin = lambdaMin/(1.0+redshift)
+    lambdaRestMax = lambdaMax/(1.0+redshift)
+    lambdaRestWidth = lambdaWidth/(1.0+redshift)
+    # Manually build first filter
+    lambdaCentral = lambdaRestMin
+    lambdaWidth = np.maximum(lambdaRestWidth,spsWavelengthInterval(lambdaCentral))
+    filterCentres = [lambdaCentral]
+    filterWidths = [lambdaWidth]
+    # Loop to create remaining filters
+    while lambdaCentral < lambdaMax:
+        lowerEdge = lambdaCentral + lambdaWidth/2.0
+        tabulatedWidth = spsWavelengthInterval(lowerEdge)
+        # Filter inside rest-frame range
+        if lowerEdge < lambdaRestMax:
+            lambdaWidth = lambdaRestWidth
+            if tabulatedWidth > lambdaRestWidth:
+                lambdaWidth = tabulatedWidth
+            lambdaCentral = lowerEdge + lambdaWidth/2.0
+        else:
+            # Filter inside observer-frame range
+            if lowerEdge > lambdaMin:
+                lambdaWidth = lambdaWidth
+                if tabulatedWidth > lambdaWidth:
+                    lambdaWidth = tabulatedWidth
+                lambdaCentral = lowerEdge + lambdaWidth/2.0
+            else:
+                # Filter is between rest-frame and observer frame
+                lambdaCentral = lambdaMin
+                lambdaWidth = lambdaWidth
+                tabulatedWidth = spsWavelengthInterval(lambdaCentral)
+                if tabulatedWidth > lambdaWidth:
+                    lambdaWidth = tabulatedWidth
+                if lambdaCentral - lambdaWidth/2.0 < lowerEdge:
+                    tabulatedWidth = spsWavelengthInterval(lowerEdge)
+                    lambdaWidth = lambdaWidth
+                    if tabulatedWidth > lambdaWidth:
+                        lambdaWidth = tabulatedWidth
+                    lambdaCentral = lowerEdge + lambdaWidth/2.0
+        filterCentres.append(lambdaCentral)
+        filterWidths.append(lambdaWidth)
+    return zip(filterCentres,filterWidths)
+    
+
 
 
 ###############################################################################
