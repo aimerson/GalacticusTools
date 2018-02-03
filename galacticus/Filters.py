@@ -276,14 +276,14 @@ class TopHat(object):
         return 
 
 
-def buildSEDTopHatArray(lambdaMin,lambdaMax,lambdaWidth,redshift):
+def buildSEDTopHatArray(lambdaMin,lambdaMax,lambdaWidth,redshift,SPS):
     # Create rest frame limits
     lambdaRestMin = lambdaMin/(1.0+redshift)
     lambdaRestMax = lambdaMax/(1.0+redshift)
     lambdaRestWidth = lambdaWidth/(1.0+redshift)
     # Manually build first filter
     lambdaCentral = lambdaRestMin
-    lambdaWidth = np.maximum(lambdaRestWidth,spsWavelengthInterval(lambdaCentral))
+    lambdaWidth = np.maximum(lambdaRestWidth,SPS.wavelengthInterval(lambdaCentral))
     filterCentres = [lambdaCentral]
     filterWidths = [lambdaWidth]
     # Loop to create remaining filters
