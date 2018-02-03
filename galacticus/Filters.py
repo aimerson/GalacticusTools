@@ -289,7 +289,7 @@ def buildSEDTopHatArray(lambdaMin,lambdaMax,lambdaWidth,redshift,SPS):
     # Loop to create remaining filters
     while lambdaCentral < lambdaMax:
         lowerEdge = lambdaCentral + lambdaWidth/2.0
-        tabulatedWidth = spsWavelengthInterval(lowerEdge)
+        tabulatedWidth = SPS.wavelengthInterval(lowerEdge)
         # Filter inside rest-frame range
         if lowerEdge < lambdaRestMax:
             lambdaWidth = lambdaRestWidth
@@ -307,11 +307,11 @@ def buildSEDTopHatArray(lambdaMin,lambdaMax,lambdaWidth,redshift,SPS):
                 # Filter is between rest-frame and observer frame
                 lambdaCentral = lambdaMin
                 lambdaWidth = lambdaWidth
-                tabulatedWidth = spsWavelengthInterval(lambdaCentral)
+                tabulatedWidth = SPS.wavelengthInterval(lambdaCentral)
                 if tabulatedWidth > lambdaWidth:
                     lambdaWidth = tabulatedWidth
                 if lambdaCentral - lambdaWidth/2.0 < lowerEdge:
-                    tabulatedWidth = spsWavelengthInterval(lowerEdge)
+                    tabulatedWidth = SPS.wavelengthInterval(lowerEdge)
                     lambdaWidth = lambdaWidth
                     if tabulatedWidth > lambdaWidth:
                         lambdaWidth = tabulatedWidth
