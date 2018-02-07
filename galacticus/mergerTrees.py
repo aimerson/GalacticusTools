@@ -23,7 +23,6 @@ class GalacticusMergerTree(HDF5):
 
         # Store simulation data
         self.simulation = self.readAttributes("simulation")        
-        self.boxSize = COS["boxSize"]
         # Store group finder information
         self.groupFinder = self.readAttributes("groupFinder")        
         # Store units information
@@ -38,12 +37,25 @@ class GalacticusMergerTree(HDF5):
         self.trees["treeIndex"] = np.array(self.fileObj[self._indexDir+"/"+self._indexDir])
         self.trees = self.trees.view(np.recarray)
 
-        # Store path to tree data
-        self._treeDir = fnmatch.filter(self.fileObj.keys(),"*Trees")[0]
-        self.treeProperties = list(map(str,self.fileObj[self._treeDir].keys()))
-        
+        # Store path to node data
+        if len(fnmatch.filter(self.fileObj.keys(),"*Trees")) == 0:
+            self.nodeDir = fnmatch.filter(self.fileObj.keys(),"forestHalos")[0]
+        else:
+            self.nodeDir = fnmatch.filter(self.fileObj.keys(),"*Trees")[0]
+        self.nodeProperties = list(map(str,self.fileObj[self.nodeDir].keys()))        
         return
 
+
+    
+    def getNodeProperty(self,propertyName,raiseErrorOnMissing=False):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        if propertyName not in self.nodeProperties:
+            if raiseErrorOnMissing:
+                raise KeyError(funcname+"(): Property '"+propertyName+"' not found in node properties!")
+            else:
+                return None
+        return np.array(self.fileObj[self.nodeDir+"/"+propertyName])
+        
 
     def getNodeIndices(self,treeIndex,verbose=False):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
@@ -65,15 +77,15 @@ class GalacticusMergerTree(HDF5):
         # Create mask to select halo properties        
         nodes = self.getNodeIndices(treeIndex)
         # Extract directory for tree data
-        TREE = self.fileObj[self._treeDir]
+        TREE = self.fileObj[self.nodeDir]
         # Begin extracting properties
         higherDimensions = ["position","velocity"]
-        oneDimensionalDatasets = list(set(self.treeProperties).difference(higherDimensions))
-        dummy = [hdf5Obj.addDataset(self._treeDir,name,np.array(TREE[name])[nodes],append=True)\
+        oneDimensionalDatasets = list(set(self.nodeProperties).difference(higherDimensions))
+        dummy = [hdf5Obj.addDataset(self.nodeDir,name,np.array(TREE[name])[nodes],append=True)\
                      for name in oneDimensionalDatasets]
         del dummy
         # Extract positions and velocities        
-        dummy = [hdf5Obj.addDataset(self._treeDir,name,np.array(TREE[name])[nodes,:],append=True,maxshape=tuple([None,3]))\
+        dummy = [hdf5Obj.addDataset(self.nodeDir,name,np.array(TREE[name])[nodes,:],append=True,maxshape=tuple([None,3]))\
                      for name in higherDimensions]
         del dummy
         return
@@ -84,7 +96,7 @@ class GalacticusMergerTree(HDF5):
         # Open output file
         OUT = HDF5(outFile,'w')
         # Copy cosmology/simulation/group-finder/units information
-        cpDirs = list(set(list(map(str,self.fileObj.keys()))).difference([self._indexDir,self._treeDir]))
+        cpDirs = list(set(list(map(str,self.fileObj.keys()))).difference([self._indexDir,self.nodeDir]))
         dummy = [OUT.cpGroup(self.filename,dir) for dir in cpDirs]
         del dummy
         # Write tree indices and node locations

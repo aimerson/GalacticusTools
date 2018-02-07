@@ -323,7 +323,7 @@ class submitPBS(JOBCLASS):
         if not self.canAppend(): return            
         self.cmd = self.cmd + " -l "+resourceStr
         return
-        
+
     def addOutputPath(self,outPath):
         if outPath is None: return
         S = re.search(' -o (\S*) ',self.cmd)
