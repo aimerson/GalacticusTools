@@ -107,6 +107,10 @@ class GalacticusHDF5(HDF5):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         return len(fnmatch.filter(self.availableDatasets(z),datasetName))>0
 
+    def getOutputRedshift(self,outputName):        
+        i = int(np.argwhere(self.outputs.name=="Output"+out.replace("Output","")))
+        return self.outputs.z[i]
+
     def getRedshiftString(self,z):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         return fnmatch.filter(fnmatch.filter(self.availableDatasets(z),"*z[0-9].[0-9]*")[0].split(":"),"z*")[0]
@@ -196,7 +200,6 @@ class GalacticusHDF5(HDF5):
                     galaxies[p.lower()] = np.copy(np.repeat(wgt,cts))
                     del cts,wgt            
         return galaxies
-
 
 
     def readGalaxies(self,z,props=None,SIunits=False,removeRedshiftString=False):                
