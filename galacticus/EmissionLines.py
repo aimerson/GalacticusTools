@@ -300,13 +300,13 @@ class GalacticusEmissionLine(emissionLineBase):
 
         
     def writeLineLuminosityToFile(self,overwrite=False):
-        if not self.datasetName.group(0) in self.galacticusOBJ.availableDatasets(self.redshift) or overwrite:
-            out = self.galacticusOBJ.selectOutput(self.redshift)
+        if not self.datasetName.group(0) in self.galHDF5Obj.availableDatasets(self.redshift) or overwrite:
+            out = self.galHDF5Obj.selectOutput(self.redshift)
             # Add luminosity to file
-            self.galacticusOBJ.addDataset(out.name+"/nodeData/",self.datasetName.group(0),np.copy(self.lineLuminosity))
+            self.galHDF5Obj.addDataset(out.name+"/nodeData/",self.datasetName.group(0),np.copy(self.lineLuminosity))
             # Add appropriate attributes to new dataset
             attr = {"unitsInSI":luminositySolar}
-            self.galacticusOBJ.addAttributes(out.name+"/nodeData/"+self.datasetName.group(0),attr)
+            self.galHDF5Obj.addAttributes(out.name+"/nodeData/"+self.datasetName.group(0),attr)
         return
 
 
