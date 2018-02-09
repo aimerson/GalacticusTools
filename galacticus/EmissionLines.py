@@ -103,7 +103,7 @@ class GalacticusEmissionLine(emissionLineBase):
     def setDatasetName(self,datasetName):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         searchString = "^(?P<component>disk|spheroid|total)LineLuminosity:(?P<lineName>[^:]+)(?P<frame>:[^:]+)"+\
-                       "(?P<filterName>:[^:]+)?(?P<redshiftString>:z(?P<redshift>[\d\.]+))?(?P<recent>:recent)?$"        
+                       "(?P<filterName>:[^:]+)?(?P<redshiftString>:z(?P<redshift>[\d\.]+))(?P<recent>:recent)?$"        
         self.datasetName = re.search(searchString,datasetName)
         if not self.datasetName:
             raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
@@ -218,11 +218,11 @@ class GalacticusEmissionLine(emissionLineBase):
         radius = np.copy(self.hdf5Output["nodeData/"+component+"Radius"])
         starFormationRate = np.copy(self.hdf5Output["nodeData/"+component+"StarFormationRate"])
         abundanceGasMetals = np.copy(self.hdf5Output["nodeData/"+component+"AbundancesGasMetals"])
-        LyDatasetName = component+"LymanContinuumLuminosity:"+redshiftString+recent
+        LyDatasetName = component+"LymanContinuumLuminosity"+redshiftString+recent
         LyContinuum = self.IONISATION.getIonizingLuminosity(self.galHDF5Obj,self.redshift,LyDatasetName)
-        HeDatasetName = component+"HeliumContinuumLuminosity:"+redshiftString+recent
+        HeDatasetName = component+"HeliumContinuumLuminosity"+redshiftString+recent
         HeContinuum = self.IONISATION.getIonizingLuminosity(self.galHDF5Obj,self.redshift,HeDatasetName)
-        OxDatasetName = component+"OxygenContinuumLuminosity:"+redshiftString+recent
+        OxDatasetName = component+"OxygenContinuumLuminosity"+redshiftString+recent
         OxContinuum = self.IONISATION.getIonizingLuminosity(self.galHDF5Obj,self.redshift,OxDatasetName)
         # Useful masks to avoid dividing by zero etc.
         #hasGas = gasMass > 0.0
