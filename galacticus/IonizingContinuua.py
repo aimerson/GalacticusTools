@@ -22,6 +22,7 @@ def getWavelengthLimits(filterFile):
     
 
 class IonizingContinuua(object):
+
     def __init__(self):            
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
@@ -42,38 +43,43 @@ class IonizingContinuua(object):
         self.wavelengthRanges["Oxygen"] = getWavelengthLimits(filterFile)        
         return
 
-    
-    def computeIonizingLuminosity(self,galHDF5Obj,z,datasetName,postProcessingInformation=None):
+    def setDatasetName(self,datasetName):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Extract information from dataset name
-        MATCH = re.search(r"^(disk|spheroid|total)(Lyman|Helium|Oxygen)ContinuumLuminosity:z([\d\.]+)",datasetName)
+        searchString = "^(?<component>disk|spheroid|total)(?<continuum>Lyman|Helium|Oxygen)ContinuumLuminosity"+\
+            ":z(?P<redshift>[\d\.]+)(?P<recent>:recent)?(?P<dust>:dust[^:]+)?$"
+        MATCH = re.search(searchString,datasetName)
         if not MATCH:
             raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
-        component = MATCH.group(1)
-        continuumName = MATCH.group(2)
-        redshift = MATCH.group(3)
-        # Get appropriate stellar luminosity
-        if postProcessingInformation is not None and postProcessingInformation != "":
-            if not postProcessingInformation.startswith(":"):
-                postProcessingInformation = ":"+postProcessingInformation
-        else:
-            postProcessingInformation = ""
-        OUT = galHDF5Obj.selectOutput(z)
-        if component == "total":
-            luminosityName = "diskLuminositiesStellar:"+self.filterNames[continuumName]+":rest:z"+str(redshift)+postProcessingInformation
-            if not galHDF5Obj.datasetExists(luminosityName,z):
-                raise IndexError(funcname+"(): dataset '"+luminosityName+"' not found!")
-            luminosity = np.copy(OUT["nodeData/"+luminosityName])
-            luminosityName = "spheroidLuminositiesStellar:"+self.filterNames[continuumName]+":rest:z"+str(redshift)+postProcessingInformation
-            if not galHDF5Obj.datasetExists(luminosityName,z):
-                raise IndexError(funcname+"(): dataset '"+luminosityName+"' not found!")
-            luminosity += np.copy(OUT["nodeData/"+luminosityName])
-        else:
-            luminosityName = component+"LuminositiesStellar:"+self.filterNames[continuumName]+":rest:z"+str(redshift)+postProcessingInformation
-            if not galHDF5Obj.datasetExists(luminosityName,z):
-                raise IndexError(funcname+"(): dataset '"+luminosityName+"' not found!")
-            luminosity = np.copy(OUT["nodeData/"+luminosityName])
+        return MATCH
+
+    def getLuminosityConversionFactor(self,continuumName):
         conversion = (luminosityAB/plancksConstant/self.continuumUnits)
         conversion *= np.log(self.wavelengthRanges[continuumName][1]/self.wavelengthRanges[continuumName][0])
-        return luminosity*conversion
-        
+        return conversion
+
+    def getIonizingLuminosity(self,galHDF5Obj,z,datasetName):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Extract information from dataset name
+        MATCH = self.setDatasetName(datasetName)
+        component = MATCH.group('component')
+        continuumName = MATCH.group('continuum')
+        redshift = MATCH.group('redshift')
+        recent = MATCH.group('recent')
+        if not recent:
+            recent = ""
+        dust = MATCH.group('dust')
+        if not recent:
+            dust = ""
+        # Get appropriate stellar luminosity
+        OUT = galHDF5Obj.selectOutput(z)
+        luminosityName = component+"LuminositiesStellar:"+self.filterNames[continuumName]+":rest:z"+str(redshift)+recent+dust   
+        if component == "total":
+            luminosity = self.computeIonizingLuminosity(galHDF5Obj,z,luminosityName.replace("total","disk")) + \
+                self.computeIonizingLuminosity(galHDF5Obj,z,luminosityName.replace("total","spheroid"))
+        else:
+            if not galHDF5Obj.datasetExists(luminosityName,z):
+                raise IndexError(funcname+"(): dataset '"+luminosityName+"' not found!")
+            luminosity = np.copy(OUT["nodeData/"+luminosityName])*self.getLuminosityConversion(continuumName)
+        return luminosity
+    

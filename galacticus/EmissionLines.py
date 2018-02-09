@@ -218,11 +218,11 @@ class GalacticusEmissionLine(emissionLineBase):
         starFormationRate = np.copy(self.hdf5Output["nodeData/"+component+"StarFormationRate"])
         abundanceGasMetals = np.copy(self.hdf5Output["nodeData/"+component+"AbundancesGasMetals"])
         LyDatasetName = component+"LymanContinuumLuminosity:"+redshiftString
-        LyContinuum = self.IONISATION.computeIonizingLuminosity(self.galHDF5Obj,self.redshift,LyDatasetName,postProcessingInformation=recent)
+        LyContinuum = self.IONISATION.getIonizingLuminosity(self.galHDF5Obj,self.redshift,LyDatasetName,postProcessingInformation=recent)
         HeDatasetName = component+"HeliumContinuumLuminosity:"+redshiftString
-        HeContinuum = self.IONISATION.computeIonizingLuminosity(self.galHDF5Obj,self.redshift,HeDatasetName,postProcessingInformation=recent)
+        HeContinuum = self.IONISATION.getIonizingLuminosity(self.galHDF5Obj,self.redshift,HeDatasetName,postProcessingInformation=recent)
         OxDatasetName = component+"OxygenContinuumLuminosity:"+redshiftString
-        OxContinuum = self.IONISATION.computeIonizingLuminosity(self.galHDF5Obj,self.redshift,OxDatasetName,postProcessingInformation=recent)
+        OxContinuum = self.IONISATION.getIonizingLuminosity(self.galHDF5Obj,self.redshift,OxDatasetName,postProcessingInformation=recent)
         # Useful masks to avoid dividing by zero etc.
         #hasGas = gasMass > 0.0
         hasGas = np.logical_and(gasMass>0.0,abundanceGasMetals>0.0)
@@ -553,11 +553,11 @@ class GalacticusEmissionLines(object):
         starFormationRate = np.copy(out["nodeData/"+component+"StarFormationRate"])
         abundanceGasMetals = np.copy(out["nodeData/"+component+"AbundancesGasMetals"])
         LyDatasetName = component+"LymanContinuumLuminosity:z"+redshift
-        LyContinuum = self.IONISATION.computeIonizingLuminosity(galHDF5Obj,z,LyDatasetName,postProcessingInformation=recent)
+        LyContinuum = self.IONISATION.getIonizingLuminosity(galHDF5Obj,z,LyDatasetName,postProcessingInformation=recent)
         HeDatasetName = component+"HeliumContinuumLuminosity:z"+redshift
-        HeContinuum = self.IONISATION.computeIonizingLuminosity(galHDF5Obj,z,HeDatasetName,postProcessingInformation=recent)
+        HeContinuum = self.IONISATION.getIonizingLuminosity(galHDF5Obj,z,HeDatasetName,postProcessingInformation=recent)
         OxDatasetName = component+"OxygenContinuumLuminosity:z"+redshift
-        OxContinuum = self.IONISATION.computeIonizingLuminosity(galHDF5Obj,z,OxDatasetName,postProcessingInformation=recent)
+        OxContinuum = self.IONISATION.getIonizingLuminosity(galHDF5Obj,z,OxDatasetName,postProcessingInformation=recent)
         # Useful masks to avoid dividing by zero etc.
         #hasGas = gasMass > 0.0
         hasGas = np.logical_and(gasMass>0.0,abundanceGasMetals>0.0)
