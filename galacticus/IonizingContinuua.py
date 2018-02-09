@@ -46,8 +46,8 @@ class IonizingContinuua(object):
     def setDatasetName(self,datasetName):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Extract information from dataset name
-        searchString = "^(?<component>disk|spheroid|total)(?<continuum>Lyman|Helium|Oxygen)ContinuumLuminosity"+\
-            ":z(?P<redshift>[\d\.]+)(?P<recent>:recent)?(?P<dust>:dust[^:]+)?$"
+        searchString = "^(?P<component>disk|spheroid|total)(?P<continuum>Lyman|Helium|Oxygen)ContinuumLuminosity"+\
+                       ":z(?P<redshift>[\d\.]+)(?P<recent>:recent)?(?P<dust>:dust[^:]+)?$"
         MATCH = re.search(searchString,datasetName)
         if not MATCH:
             raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
@@ -69,17 +69,17 @@ class IonizingContinuua(object):
         if not recent:
             recent = ""
         dust = MATCH.group('dust')
-        if not recent:
+        if not dust:
             dust = ""
         # Get appropriate stellar luminosity
         OUT = galHDF5Obj.selectOutput(z)
         luminosityName = component+"LuminositiesStellar:"+self.filterNames[continuumName]+":rest:z"+str(redshift)+recent+dust   
         if component == "total":
-            luminosity = self.computeIonizingLuminosity(galHDF5Obj,z,luminosityName.replace("total","disk")) + \
-                self.computeIonizingLuminosity(galHDF5Obj,z,luminosityName.replace("total","spheroid"))
+            luminosity = self.getIonizingLuminosity(galHDF5Obj,z,datasetName.replace("total","disk")) + \
+                self.getIonizingLuminosity(galHDF5Obj,z,datasetName.replace("total","spheroid"))
         else:
             if not galHDF5Obj.datasetExists(luminosityName,z):
                 raise IndexError(funcname+"(): dataset '"+luminosityName+"' not found!")
-            luminosity = np.copy(OUT["nodeData/"+luminosityName])*self.getLuminosityConversion(continuumName)
+            luminosity = np.copy(OUT["nodeData/"+luminosityName])*self.getLuminosityConversionFactor(continuumName)
         return luminosity
     
