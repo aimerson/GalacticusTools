@@ -16,6 +16,60 @@ def ergPerSecond(luminosity):
     return luminosity
 
 
+class StellarLuminosities(object):
+    
+    def __init__(self,galHDF5Obj):
+        classname = self.__class__.__name__
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        self.galHDF5Obj = galHDF5Obj
+        self.unitsInSI = luminosityAB
+        return
+
+    def getLuminosity(self,datasetName,z,overwrite=False):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        OUT = self.galHDF5Obj.selectOutput(z)
+        if self.galHDF5Obj.datasetExists(datasetName,z) and not overwrite:
+            return np.array(OUT["nodeData/"+datasetName])
+        # Check dataset name corresponds to a luminosity
+        searchString = "^(?P<component>disk|spheroid|total)LuminositiesStellar:(?P<filter>[^:]+):(?P<frame>[^:]+)"+\
+                       "(?P<redshiftString>:z(?P<redshift>[\d\.]+))(?P<recent>:recent)?(?P<dust>:dust[^:]+)?"
+        MATCH = re.search(searchString,datasetName)    
+        if not MATCH:
+            raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
+        # Extract luminosity
+        if MATCH.group('component') == "total":
+            luminosity = self.getLuminosity(datasetName.replace("total","disk"),z,overwrite=overwrite) + \
+                         self.getLuminosity(datasetName.replace("total","spheroid"),z,overwrite=overwrite)
+        else:
+            luminosity = np.array(OUT["nodeData/"+datasetName])
+        return luminosity
+        
+    def getBulgeToTotal(self,datasetName,z,overwrite=False):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        OUT = self.galHDF5Obj.selectOutput(z)
+        if self.galHDF5Obj.datasetExists(datasetName,z) and not overwrite:
+            return np.array(OUT["/nodeData/"+datasetName])
+        # Check dataset name corresponds to a bulge-to-total ratio
+        searchString = "bulgeToTotalLuminosities:(?P<filter>[^:]+):(?P<frame>[^:]+)"+\
+                       "(?P<redshiftString>:z(?P<redshift>[\d\.]+))(?P<recent>:recent)?(?P<dust>:dust[^:]+)?"
+        MATCH = re.search(searchString,datasetName)    
+        if not MATCH:
+            raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
+        recent = MATCH.group('recent')
+        if not recent:        
+            recent = ""
+        dust = MATCH.group('dust')
+        if not dust:        
+            dust = ""
+        # Compute bulge-to-total luminosity
+        spheroidName = "spheroidLuminositiesStellar:"+MATCH.group('filter')+":"+MATCH.group('frame')+":"+\
+                       MATCH.group('redshiftString')+recent+dust
+        totalName = "totalLuminositiesStellar:"+MATCH.group('filter')+":"+MATCH.group('frame')+":"+\
+                       MATCH.group('redshiftString')+recent+dust
+        ratio = self.getLuminosity(spheroidName,z,overwrite=overwrite)/self.getLuminosity(totalName,z,overwrite=overwrite)
+        return ratio
+
+
 def getLuminosity(galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True,progressObj=None):
     funcname = sys._getframe().f_code.co_name
     # Check dataset name correspnds to a luminosity

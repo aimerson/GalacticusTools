@@ -4,7 +4,7 @@ import sys,os,fnmatch
 import numpy as np
 from .io import GalacticusHDF5
 from .EmissionLines import GalacticusEmissionLine,ContaminateEmissionLine
-
+from .Luminosities import StellarLuminosities
 
 
 class processGalacticusHDF5(GalacticusHDF5):
@@ -20,20 +20,33 @@ class processGalacticusHDF5(GalacticusHDF5):
         # Initialise classes for galaxy properties
         self.emissionLines = GalacticusEmissionLine(self)
         self.contaminateLines = ContaminateEmissionLine(self)
+        self.stellarLuminosities = StellarLuminosities(self)
         return
 
     def writeDatasetToFile(self,datasetName,z,dataset,attrs=None):        
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        if self.datasetExists(datasetName,z) and not self.overwrite:
+            return
         if self.verbose:
             print(funcname+"(): writing dataset "+datasetName+" to file...")
+            OUT = self.selectOutput(z)
+            self.addDataset(OUT.name+"/nodeData",datasetName,dataset,append=False,overwrite=self.overwrite,\
+                            maxshape=tuple([None]),chunks=True,compression="gzip",\
+                            compression_opts=6)
+            if attrs is not None:
+                self.addAttributes(OUT.name+"/nodeData/"+datasetName,attrs)
         return
 
     def processDataset(self,datasetName,z):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         if self.datasetExists(datasetName,z) and not self.overwrite:
             return
-        if fnmatch.fnmatch("*LineLuminosity:*"):
+        if fnmatch.fnmatch(datasetName,"*LineLuminosity:*"):
             self.processEmissionLine(datasetName,z)
+        if fnmatch.fnmatch(datasetName,"*LuminositiesStellar:*"):
+            self.processStellarLuminosity(datasetName,z)            
+        if fnmatch.fnmatch(datasetName,"bulgeToTotalLuminosities:*"):
+            self.processBulgeToTotalRatio(datasetName,z)            
         return
         
     def processDustAttenuation(self,datasetName,z,attrs=None):
@@ -43,15 +56,17 @@ class processGalacticusHDF5(GalacticusHDF5):
         return
 
     def processEmissionLine(self,datasetName,z):
+        if self.datasetExists(datasetName,z) and not self.overwrite:
+            return
         # Remove any contaminants and iteratively process line for each individual contaminant
         contaminants = []
         contaminatedName = datasetName
         if ":contam_" in datasetName:
             contaminants = " ".join(fnmatch.filter(datasetName.split(":"),"contam_*"))
             contaminants = contaminants.replace("contam_","").split()
-            datasetName = [name if not fnmatch.fnmatch(name,"contam_*") for name in datasetName.split(":")]
+            datasetName = [name for name in datasetName.split(":") if not fnmatch.fnmatch(name,"contam_*")]
             datasetName = ":".join(datasetName)
-            lineName = datasetName.split(:)[1]
+            lineName = datasetName.split(":")[1]
             dummy = [self.processEmissionLine(datasetName.replace(lineName,contam),z) for contam in contaminants]
         # Remove any dust attenuation and process dust free case
         dust = ""
@@ -59,8 +74,8 @@ class processGalacticusHDF5(GalacticusHDF5):
             dust = fnmatch.filter(datasetName.split(":"),"dust*")
             if len(dust)>0:
                 dust = dust[0]                
-        self.processEmissionLine(datasetName.replace(dust,""),z)
-        # Process dust attneuation or write dust-free emission line to file
+            self.processEmissionLine(datasetName.replace(dust,""),z)
+        # Process dust attenuation or write dust-free emission line to file
         if dust is not "":
             # First check if need to process luminosity from recent star formation
             if "CharlotFall" in dust:
@@ -77,4 +92,39 @@ class processGalacticusHDF5(GalacticusHDF5):
             self.writeDatasetToFile(contaminatedName,z,luminosity,attrs={"unitsInSI":self.emissionLines.unitsInSI})
         return
 
+    def processStellarLuminosity(self,datasetName,z):
+        if self.datasetExists(datasetName,z) and not self.overwrite:
+            return
+        # Remove any dust attenuation and process dust free case
+        dust = ""
+        if ":dust" in datasetName:
+            dust = fnmatch.filter(datasetName.split(":"),"dust*")
+            if len(dust)>0:
+                dust = dust[0]                
+            self.processStellarLuminosity(datasetName.replace(dust,""),z)
+        # Process dust attenuation or write dust-free emission line to file
+        if dust is not "":
+            # First check if need to process luminosity from recent star formation
+            if "CharlotFall" in dust:
+                self.processStellarLuminosity(datasetName.replace(dust,"")+":recent",z)
+            # Process dust attenuation
+            self.processDustAttenuation(datasetName,z)
+        else:
+            luminosity = self.stellarLuminosities.getLuminosity(datasetName,z=z)
+            self.writeDatasetToFile(datasetName,z,luminosity,attrs={"unitsInSI":self.stellarLuminosities.unitsInSI})
+        return
+
+    def processBulgeToTotalRatio(self,datasetName,z):
+        if self.datasetExists(datasetName,z) and not self.overwrite:
+            return
+        # Cosntruct names of separate stellar luminosities to process
+        spheroidName = datasetName.replace("bulgeToTotalLuminosities","spheroidLuminositiesStellar")
+        totalName = datasetName.replace("bulgeToTotalLuminosities","totalLuminositiesStellar")
+        # Process separate components        
+        self.processStellarLuminosity(spheroidName,z)
+        self.processStellarLuminosity(totalName,z)
+        # Extract ratio and write to file
+        ratio = self.stellarLuminosities.getBulgeToTotal(datasetName,z)
+        self.writeDatasetToFile(datasetName,z,ratio)
+        return
 
