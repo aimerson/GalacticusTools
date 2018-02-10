@@ -51,7 +51,7 @@ def interpolateSED(wavelengths,seds,newWavelength,**kwargs):
 
 class sedTopHatArray(object):
     
-    def __init__(self,galObj,z,verbose=False):
+    def __init__(self,galHDF5Obj,z,verbose=False):
         """
         sedTopHatArray: Class to store information for array of SED top hat filters included in Galacticus HDF5 output.
 
@@ -68,17 +68,42 @@ class sedTopHatArray(object):
         """
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        self.galacticusOBJ = galObj
+        self.galHDF5Obj = galHDF5Obj
+        # Initialise variables to store top hat information
+        self.redshift = None
+        self.topHats = None
+        self.filters = None        
+        self._filterOrder = None
+        self.wavelengths = None
+        return
+
+    def reset(self):
+        self.redshift = None
+        self.topHats = None
+        self.filters = None        
+        self._filterOrder = None
+        self.wavelengths = None
+        return
+
+    def setHDF5Output(z):
         self.redshift = z
         # Store list of all possible top hat filters in specified output of HDF5 file
-        self.topHats = fnmatch.filter(self.galacticusOBJ.availableDatasets(self.redshift),"*LuminositiesStellar:sedTopHat*")	
+        self.topHats = fnmatch.filter(self.galHDF5Obj.availableDatasets(self.redshift),"*LuminositiesStellar:sedTopHat*")	
         # Get list of filter wavelengths and widths
-        MATCH = re.search(r"^(disk|spheroid|total)LuminositiesStellar:sedTopHat_([\d\.]+)_([\d\.]+):([^:]+):z([\d\.]+)(:dust[^:]+)?(:recent)?",self.topHats[0])
-        searchString = MATCH.group(1)+"LuminositiesStellar:sedTopHat_*_*:"+MATCH.group(4)+":z"+MATCH.group(5)
-        if MATCH.group(6) is not None:
-            searchString = searchString+MATCH.group(6)
-        if MATCH.group(7) is not None:
-            searchString = searchString+MATCH.group(7)
+        regexString = "^(?P<component>disk|spheroid|total)LuminositiesStellar:"+\
+                       "sedTopHat_([\d\.]+)_([\d\.]+)"+\
+                       ":(?P<frame>[^:]+)"+\
+                       "(:z(?P<redshift>[\d\.]+))"+\
+                       "(?P<recent>:recent)?"+\
+                       "(?P<dust>:dust[^:]+)?$"
+        MATCH = re.search(regexString,self.topHats[0])
+        recent = MATCH.group('recent')
+        if not recent:
+            recent = ""
+        dust = MATCH.group('dust')
+        if not dust:
+            dust = ""            
+        searchString = MATCH.group('component')+"LuminositiesStellar:sedTopHat_*_*:"+MATCH.group('frame')+":z"+MATCH.group('redshift')+recent+dust
         prefix = searchString.split(":")[0] + ":sedTopHat_"
         suffix = ":"+":".join(searchString.split(":")[2:])
         topHats = " ".join(fnmatch.filter(self.topHats,searchString)).replace(prefix,"").replace(suffix,"")
@@ -144,41 +169,82 @@ class sedTopHatArray(object):
         
 
 
-
-
 class GalacticusSED(object):
     
-    def __init__(self,galObj,verbose=False):
+    def __init__(self,galHDF5Obj,verbose=False):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         self.verbose = verbose  
         # Store GalacticusHDF5 object
-        self.galacticusOBJ = galObj
+        self.galHDF5Obj = galHDF5Obj
+        # Initialise top hat array object
+        self.topHatArray = sedTopHatArray(self.galHDF5Obj)
         # Initialise emission lines object
-        self.EmissionLines = GalacticusEmissionLines()
-        # Initialise variables to store SED information
+        self.EmissionLines = GalacticusEmissionLine()
+        # Initialise variables to store HDF5 output information
+        self.hdf5Output = None
+        self.hdf5Redshift = None
+        self.haveLightconeRedshifts = None
+        self.totalNumberGalaxies = 0
+        # Initialise variables to store SED and galaxy information
         self.datasetName = None
         self.wavelengths = None
-        self.sed = None
+        self.galaxyRedshift = None
+        self.galaxySED = None
+        self.galaxyMask = None
+        return
+            
+    def resetHDF5Output(self):
+        self.topHatArray.reset()
         self.redshift = None
-        self.MASK = None
+        self.hdf5Output = None
+        self.redshiftString = None
+        self.haveLightconeRedshifts = None
+        self.totalNumberGalaxies = 0
+        return
+
+    def setHDF5Output(self,z):
+        self.resetHDF5Output()
+        self.redshift = self.galHDF5Obj.nearestRedshift(z)
+        self.hdf5Output = self.galHDF5Obj.selectOutput(self.redshift)
+        self.topHatArray.setHDF5Output(self.redshift,verbose=self.verbose)
+        self.totalNumberGalaxies = self.galHDF5Obj.countGalaxiesAtRedshift(float(self.redshift))
+        if self.totalNumberGalaxies > 0:
+            self.haveLightconeRedshifts = self.galHDF5Obj.datasetExists("lightconeRedshift",self.redshift)        
+            if self.haveLightconeRedshifts:
+                self.galaxyRedshift = np.array(self.hdf5Output["nodeData/lightconeRedshift"])
+            else:
+                self.galaxyRedshift = np.ones(self.totalNumberGalaxies,dtype=float)*float(self.redshift)
+        return
+
+    def resetSED(self):
+        self.wavelengths = None
+        self.galaxyRedshift = None
+        self.galaxySED = None
+        self.galaxyMask = None
+        return
+
+    def resetDatasetName(self):
+        self.datasetName = None
         return
         
-    def reset(self):
-        self.datasetName = None
-        self.wavelengths = None
-        self.sed = None
-        self.redshift = None
-        self.MASK = None
+    def initialiseSED(self,wavelengths,z=None,galaxyMask=None):
+        if z is not None:
+            self.setHDF5Output(z)
+        self.wavelengths = wavelengths
+        self.galaxyMask = galaxyMask
+        self.galaxySED = np.zeros((np.count_nonzero(self.galaxyMask),len(self.wavelengths)),dtype=float)
         return
-
-    def setSelectionMask(self,mask):
-        self.MASK = mask
-        return
-
+        
     def setDatasetName(self,datasetName):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        self.datasetName = re.search(r"^(disk|spheroid|total)SED:([^:]+)?(:[^:]+)??(:snr[\d\.]+)?:z([\d\.]+)(:dust[^:]+)?(:recent)?",datasetName)
+        searchString = "^(?P<component>disk|spheroid|total)SED:"+\
+                       "(?P<frame>[^:]+)"+\
+                       "(?P<emlines>:(?P<lineProfile>[^:_]+)_(?P<lineWidth>[^:]+))?"+\
+                       "(?P<snrString>:snr(?P<snr>[\d\.]+))?"+\
+                       "(?P<redshiftString>:z(?P<redshift>[\d\.]+))"+\
+                       "(?P<recent>:recent)?(?P<dust>:dust[^:]+)?"
+        self.datasetName = re.search(searchString,datasetName)
         # Check dataset name corresponds to an SED
         if not self.datasetName:
             raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
@@ -193,33 +259,28 @@ class GalacticusSED(object):
         counts = norm.rvs(loc=counts,scale=counts/SNR)
         return counts*energy/luminosityAB
         
-
     def getContinuumSED(self):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Extract necessary information
-        component = self.datasetName.group(1)
-        frame = self.datasetName.group(2)        
-        snr = self.datasetName.group(4)
-        if snr is not None:
-            snr = snr.replace(":snr","")
-        redshift = self.datasetName.group(5)
-        dust = self.datasetName.group(6)
+        component = self.datasetName.group('component')
+        frame = self.datasetName.group('frame')        
+        snr = self.datasetName.group('snr')
+        redshift = self.datasetName.group('redshift')
+        dust = self.datasetName.group('dust')
         if dust is None:
             dust = ""
-        option = self.datasetName.group(7)
-        if option is None:
-            option = ""
-        # Get top hat luminosities
-        sTHA = sedTopHatArray(self.galacticusOBJ,float(redshift),verbose=self.verbose)
-        # Store additional SED information
-        self.redshift = float(redshift)
-        self.wavelengths = sTHA.wavelengths
+        recent = self.datasetName.group('recent')
+        if recent is None:
+            recent = ""
         # Compute continuum SED
-        self.sed = sTHA.getLuminosities(component,frame,dust=dust,recent=option,selectionMask=self.MASK)
+        sed = interpolateSED(self.topHatArray.wavelengths,
+                             self.topHatArray.getLuminosities(component,frame,dust=dust,\
+                                                              recent=recent,selectionMask=self.MASK),\                                  
+                             self.wavelengths,axis=1)
         # Add noise?
         if snr is not None:
-            self.sed = self.addContinuumNoise(self.wavelengths,self.sed,float(snr))    
-        return
+            sed = self.addContinuumNoise(self.wavelengths,sed,float(snr))    
+        return sed
 
     def updateResolution(self,wavelengthInterval):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
@@ -238,18 +299,15 @@ class GalacticusSED(object):
         self.sed = 10.0**self.sed
         return
 
-    def buildSED(self,datasetName,selectionMask=None,wavelengthInterval,statistic=None):
+    def buildSED(self,datasetName,wavelengths,z=z,galaxyMask=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         # Set dataset name
         self.setDatasetName(datasetName)
-        # Set selection mask
-        self.setSelectionMask(selectionMask)
+        # Initialise SED        
+        self.initialiseSED(wavelengths,z=z,galaxyMask=galaxyMask)
         # Get continuum luminosity
-        self.getContinuumSED()
-        # Update resolution
-        if False:
-            self.updateResolution(newResolution)
-        ## Introduce emission lines
+        self.galaxySED = self.getContinuumSED()
+        # Introduce emission lines
         if self.datasetName.group(3):
             frame = self.datasetName.group(2)
             redshift = float(self.datasetName.group(5))
@@ -378,8 +436,8 @@ class EmissionLineProfiles(object):
         self.hdf5Output = None
         # Initialise variables to store SED and addtional galaxy specifications        
         self.frame = None
-        self.sedWavelegnths = None
-        self.selectionMask = None
+        self.sedWavelengths = None
+        self.galaxyMask = None
         self.galaxyRedshift = None        
         self.linesObservable = None
         return
