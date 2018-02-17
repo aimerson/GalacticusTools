@@ -238,7 +238,7 @@ class GalacticusSED(object):
         self.sed = 10.0**self.sed
         return
 
-    def buildSED(self,datasetName,selectionMask=None,wavelengthInterval,statistic=None):
+    def buildSED(self,datasetName,wavelengthInterval,selectionMask=None,statistic=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         # Set dataset name
         self.setDatasetName(datasetName)

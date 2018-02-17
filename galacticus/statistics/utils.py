@@ -117,6 +117,7 @@ def binstats2D(X,Y,Xbins,Ybins=None,Z=None,statistic="median",weights=None):
     statisticName = str(statistic)
     FUNC = statisticalFunctions()
     func = FUNC(statisticName,weights=weights)
+    numb = None
     # Evaluate statistic
     if statisticName.lower() == "count" or fnmatch.fnmatch(statisticName.lower(),"perc*") or \
             fnmatch.fnmatch(statisticName.lower(),"frac*"):

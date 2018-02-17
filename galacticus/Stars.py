@@ -5,6 +5,38 @@ import numpy as np
 from .utils.progress import Progress
 from .io import GalacticusHDF5
 from .GalacticusErrors import ParseError
+from .constants import massSolar
+
+
+class GalacticusStellarMass(object):
+    
+    def __init__(self,galHDF5,verbose=False):
+        classname = self.__class__.__name__
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        self.galHDF5Obj = galHDF5Obj
+        self.verbose = verbose
+        self.unitsInSI = massSolar
+        return
+
+    def setDatasetName(self,datasetName):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        MATCH = re.search("(?P<component>\w+)MassStellar",datasetName)
+        if not MATCH:
+            raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
+        return MATCH
+        
+    def getStellarMass(self,datasetName,z):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        hdf5Output = self.galHDF5Obj.selectOutput(z)
+        if datasetName in self.galHDF5Obj.availableDatasets(z):
+            return np.array(hdf5Output["nodeData/"+datasetName])
+        datasetName = self.setDatasetName(datasetName)
+        if fnmatch.fnmatch(datasetName.group('component'),"total"):
+            stellarMass = self.getStellarMass("diskMassStellar",z) + \
+                          self.getStellarMass("spheroidMassStellar",z)
+        else:
+            stellarMass = np.array(hdf5Output["nodeData/"+datasetName.group(0)])
+        return stellarMass
 
 
 def getStellarMass(galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True,progressObj=None):    
@@ -71,6 +103,38 @@ def getStellarMass(galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True,p
         return totalStellarMass
     return
 
+
+
+class GalacticusStarFormationRate(object):
+
+    def __init__(self,galHDF5,verbose=False):
+        classname = self.__class__.__name__
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        self.galHDF5Obj = galHDF5Obj
+        self.verbose = verbose
+        self.Gyr = 60.0*60.0*24.*365*1.0e9
+        self.unitsInSI = massSolar/self.Gyr
+        return
+
+    def setDatasetName(self,datasetName):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        MATCH = re.search("(?P<component>\w+)StarFormationRate",datasetName)
+        if not MATCH:
+            raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
+        return MATCH
+
+    def getStarFormationRate(self,datasetName,z):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        hdf5Output = self.galHDF5Obj.selectOutput(z)
+        if datasetName in self.galHDF5Obj.availableDatasets(z):
+            return np.array(hdf5Output["nodeData/"+datasetName])
+        datasetName = self.setDatasetName(datasetName)
+        if fnmatch.fnmatch(datasetName.group('component'),"total"):
+            sfr = self.getStellarMass("diskStarFormationRate",z) + \
+                  self.getStellarMass("spheroidStarFormationRate",z)
+        else:
+            sfr = np.array(hdf5Output["nodeData/"+datasetName.group(0)])
+        return sfr
 
 
 def getStarFormationRate(galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True,progressObj=None):    

@@ -5,6 +5,7 @@ import numpy as np
 from .io import GalacticusHDF5
 from .EmissionLines import GalacticusEmissionLine,ContaminateEmissionLine
 from .Luminosities import StellarLuminosities
+from .Stars import GalacticusStellarMass,GalacticusStarFormationRate
 
 
 class processGalacticusHDF5(GalacticusHDF5):
@@ -21,6 +22,8 @@ class processGalacticusHDF5(GalacticusHDF5):
         self.emissionLines = GalacticusEmissionLine(self)
         self.contaminateLines = ContaminateEmissionLine(self)
         self.stellarLuminosities = StellarLuminosities(self)
+        self.stellarMass = GalacticusStellarMass(self)
+        self.starFormationRate = GalacticusStarFormationRate(self)
         return
 
     def writeDatasetToFile(self,datasetName,z,dataset,attrs=None):        
@@ -47,8 +50,32 @@ class processGalacticusHDF5(GalacticusHDF5):
             self.processStellarLuminosity(datasetName,z)            
         if fnmatch.fnmatch(datasetName,"bulgeToTotalLuminosities:*"):
             self.processBulgeToTotalRatio(datasetName,z)            
+        if fnmatch.fnmatch(datasetName,"*MassStellar"):
+            self.processStellarMass(datasetName,z)            
+        if fnmatch.fnmatch(datasetName,"*StarFormationRate"):
+            self.processStarFormationRate(datasetName,z)            
         return
         
+    def processStellarMass(self,datasetName,z):
+        if self.datasetExists(datasetName,z) and not self.overwrite:
+            return
+        if datasetName.startswith("total"):
+            # Extract stellar mass
+            stellarMass = self.stellarMass.getStellarMass(datasetName,z)
+            # Write to file 
+            self.writeDatasetToFile(datasetName,z,stellarMass,attrs={"unitsInSI":self.stellarMass.unitsInSI})
+        return
+
+    def processStarFormationRate(self,datasetName,z):
+        if self.datasetExists(datasetName,z) and not self.overwrite:
+            return
+        if datasetName.startswith("total"):
+            # Extract star formation rate
+            stellarMass = self.starFormationRate.getStarFormationRate(datasetName,z)
+            # Write to file 
+            self.writeDatasetToFile(datasetName,z,stellarMass,attrs={"unitsInSI":self.starFormationRate.unitsInSI})
+        return
+
     def processDustAttenuation(self,datasetName,z,attrs=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         # Store name of dataset for output
