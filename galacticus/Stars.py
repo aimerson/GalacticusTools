@@ -130,8 +130,8 @@ class GalacticusStarFormationRate(object):
             return np.array(hdf5Output["nodeData/"+datasetName])
         datasetName = self.setDatasetName(datasetName)
         if fnmatch.fnmatch(datasetName.group('component'),"total"):
-            sfr = self.getStellarMass("diskStarFormationRate",z) + \
-                  self.getStellarMass("spheroidStarFormationRate",z)
+            sfr = self.getStarFormationRate("diskStarFormationRate",z) + \
+                  self.getStarFormationRate("spheroidStarFormationRate",z)
         else:
             sfr = np.array(hdf5Output["nodeData/"+datasetName.group(0)])
         return sfr

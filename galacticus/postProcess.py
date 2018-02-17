@@ -27,10 +27,10 @@ class processGalacticusHDF5(GalacticusHDF5):
         return
 
     def writeDatasetToFile(self,datasetName,z,dataset,attrs=None):        
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name                
         if self.datasetExists(datasetName,z) and not self.overwrite:
             return
-        if self.verbose:
+        if self.verbose:     
             print(funcname+"(): writing dataset "+datasetName+" to file...")
             OUT = self.selectOutput(z)
             self.addDataset(OUT.name+"/nodeData",datasetName,dataset,append=False,overwrite=self.overwrite,\
