@@ -10,7 +10,7 @@ from .constants import massSolar
 
 class GalacticusStellarMass(object):
     
-    def __init__(self,galHDF5,verbose=False):
+    def __init__(self,galHDF5Obj,verbose=False):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         self.galHDF5Obj = galHDF5Obj
@@ -107,7 +107,7 @@ def getStellarMass(galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True,p
 
 class GalacticusStarFormationRate(object):
 
-    def __init__(self,galHDF5,verbose=False):
+    def __init__(self,galHDF5Obj,verbose=False):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         self.galHDF5Obj = galHDF5Obj
