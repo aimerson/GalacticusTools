@@ -5,6 +5,7 @@ import numpy as np
 from .io import GalacticusHDF5
 from .EmissionLines import GalacticusEmissionLine,ContaminateEmissionLine
 from .Luminosities import StellarLuminosities
+from .Inclination import getInclination
 from .Stars import GalacticusStellarMass,GalacticusStarFormationRate
 
 
@@ -54,7 +55,18 @@ class processGalacticusHDF5(GalacticusHDF5):
             self.processStellarMass(datasetName,z)            
         if fnmatch.fnmatch(datasetName,"*StarFormationRate"):
             self.processStarFormationRate(datasetName,z)            
+        if fnmatch.fnmatch(datasetName,"inclination"):
+            self.processInclination(datasetName,z)            
         return
+
+
+    def processInclination(self,datasetName,z):
+        if self.datasetExists(datasetName,z) and not self.overwrite:
+            return
+        inclination = getInclination(self,z)
+        self.writeDatasetToFile(datasetName,z,inclination)
+        return
+        
         
     def processStellarMass(self,datasetName,z):
         if self.datasetExists(datasetName,z) and not self.overwrite:

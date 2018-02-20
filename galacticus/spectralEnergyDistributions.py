@@ -314,7 +314,7 @@ class GalacticusSED(object):
         # Introduce emission lines
         if self.datasetName.group('emlines'):
             self.EmissionLines.reset()
-            self.EmissionLines.buildLineProfiles(datasetName,self.wavelengths,z=z,galaxyMask=self.galaxyMask)
+            self.EmissionLines.buildLineProfiles(datasetName,self.wavelengths,z=self.redshift,galaxyMask=self.galaxyMask)
             self.galaxySED += self.EmissionLines.profileSum
         # Convert units to microJanskys
         self.ergPerSecond()
