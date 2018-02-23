@@ -485,6 +485,8 @@ class EmissionLineProfiles(object):
             inclination = getInclination(self.galHDF5Obj,float(self.redshift))*Pi/180.0
             diskVelocity *= np.sqrt(np.sin(inclination)**2+(scaleVelocityRatio*np.cos(inclination))**2)            
             np.place(approximateVelocityDispersion,diskDominated,diskVelocity[diskDominated])
+        
+        print np.mean(approximateVelocityDispersion[self.galaxyMask]),np.min(approximateVelocityDispersion[self.galaxyMask]),np.max(approximateVelocityDispersion[self.galaxyMask])
         return approximateVelocityDispersion[self.galaxyMask]
 
 

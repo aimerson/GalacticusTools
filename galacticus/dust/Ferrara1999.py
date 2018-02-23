@@ -88,369 +88,6 @@ def loadSpheroidAttenuation(component,verbose=False):
 
 
 
-class dustAtlasBase(DustProperties):
-    
-    def __init__(self,verbose=False,interpolateBoundsError=False,interpolateFillValue=None):
-        classname = self.__class__.__name__
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        # Set verbosity
-        self.verbose = verbose        
-        # Initialise DustProperties class
-        super(dustAtlasClouds, self).__init__()
-        # Load dust atlas file
-        self.dustFile = pkg_resources.resource_filename(__name__,"../data/dust/Ferrara2000/attenuations_MilkyWay_dustHeightRatio1.0.xml")
-        if not os.path.exists(self.dustFile):
-            raise IOError(classname+"(): Cannot find Ferrara et al. (2000) dust atlas file!")
-        else:
-            if self.verbose:
-                print(classname+"(): Loading Ferrara et al. (2000) dust atlas file...")
-        self.dustData = ET.parse(self.dustFile)
-        # Construct map of XML parents/descendents
-        self.dustRoot = self.dustData.getroot()
-        self.dustMap = {c.tag:p for p in self.dustRoot.iter() for c in p}        
-        # Load wavelengths
-        if self.verbose:
-            print(classname+"(): Extracting wavelengths...")
-        self.wavelengths = np.copy([ float(lam.text) for lam in self.dustMap["wavelengths"].iter("lambda")])        
-        # Load attenuations for components
-        self.diskAttenuation = None
-        self.spheroidAttenuation = None
-        for comp in self.dustData.iter("components"):
-            if comp.find("name").text == "bulge":                
-                if self.verbose:
-                    print(classname+"(): Loading spheroid attenuations...")
-                self.spheroidAttenuation = loadSpheroidAttenuation(comp,verbose=self.verbose)                
-                axes = (self.spheroidAttenuation["size"],self.spheroidAttenuation["inclination"],\
-                            self.spheroidAttenuation["opticalDepth"],self.wavelengths)                
-                self.spheroidInterpolator = RegularGridInterpolator(axes,self.spheroidAttenuation["attenuation"],\
-                                                                        bounds_error=interpolateBoundsError,\
-                                                                        fill_value=interpolateFillValue)
-            else:
-                if self.verbose:
-                    print(classname+"(): Loading disk attenuations...")
-                self.diskAttenuation = loadDiskAttenuation(comp,verbose=self.verbose)
-                axes = (self.diskAttenuation["inclination"],self.diskAttenuation["opticalDepth"],self.wavelengths)
-                self.diskInterpolator = RegularGridInterpolator(axes,self.diskAttenuation["attenuation"],\
-                                                                    bounds_error=interpolateBoundsError,\
-                                                                    fill_value=interpolateFillValue)                                                                
-        # Set options whether to extrapolate for various properties
-        self.extrapolateInSize = extrapolateInSize
-        self.extrapolateInTau = extrapolateInTau
-        # Initialise class for filters
-        self.filtersDatabase = GalacticusFilters()
-        # Set Galacticus HDF5 file ojects
-        self.galHDF5Obj = None
-        self.hdf5Output = None
-        # Set dataset name
-        self.datasetName = None
-        return
-
-    def reset(self):
-        self.hdf5Output = None
-        self.datasetName = None
-        return
-
-    
-
-
-
-
-    def setCharlotFallParameters(self,opticalDepthISMFactor=0.0,opticalDepthCloudsFactor=0.0,\
-                                 wavelengthZeroPoint=5500,wavelengthExponent=0.7):
-        # Specify constants in extinction model
-        # -- "wavelengthExponent" is set to the value of 0.7 found by Charlot & Fall (2000).
-        # -- "opticalDepthCloudsFactor" is set to unity, such that in gas with Solar metallicity the cloud optical depth will be 1.
-        # -- "opticalDepthISMFactor" is set to 1.0 such that we reproduce the standard (Bohlin et al 1978) relation between visual
-        #     extinction and column density in the local ISM (essentially solar metallicity).
-        self.opticalDepthISMFactor = opticalDepthCloudsFactor
-        self.opticalDepthCloudsFactor = opticalDepthCloudsFactor
-        self.wavelengthZeroPoint = wavelengthZeroPoint
-        self.wavelengthExponent = wavelengthExponent
-        return
-
-
-    def InterpolateDustTable(self,wavelength,inclination,opticalDepth,bulgeSize=None):        
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
-        component = self.datasetName.group('component')
-        if component.lower() == "disk":
-            attenuation = self.diskInterpolator(zip(inclination,opticalDepth,wavelength))
-        elif component.lower() == "spheroid":
-            if bulgeSize is None:
-                raise TypeError(funcname+"(): For spheroid dust attenuation, need to provide bulge sizes!")
-            attenuation = self.spheroidInterpolator(zip(bulgeSize,inclination,opticalDepth,wavelength))
-        else:
-            raise ValueError(funcname+"(): Value for 'component' not recognised! Must be either 'spheroid' or 'disk'!")
-        np.place(attenuation,attenuation>1.0,1.0)
-        np.place(attenuation,attenuation<0.0,0.0)
-        return attenuation
-
-
-    def getCloudGasMetalsSurfaceDensity(self,gasMass,gasMetalMass,mcloud=1.0e6,rcloud=16.0e-6):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
-        metallicity = gasMetalMass/gasMass
-        # Compute surface density
-        mega = 1.0e6
-        gasMetalsSurfaceDensityCentral = metallicity*mcloud/(2.0*Pi*(mega*rcloud)**2)
-        np.place(gasMetalsSurfaceDensityCentral,np.isnan(scaleLength),0.0)
-        return gasMetalsSurfaceDensityCentral
-    
-    def getBulgeSizes(self):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        # Extract component
-        component = self.datasetName.group('component')
-        if component.lower() not in ["disk","spheroid"]:
-            raise ValueError(funcname+"(): 'component' must be 'spheroid' or 'disk'!")
-        # Extract spheroid mass profile
-        spheroidMassDistribution = self.galHDF5Obj.parameters["spheroidMassDistribution"].lower()
-        if spheroidMassDistribution not in ["hernquist","sersic"]:
-            raise ValueError(funcname+"(): 'spheroidMassDistribution' must be 'hernquist' or 'sersic'!")
-        # Extract component radii            
-        spheroidRadius = np.array(self.hdf5Output["nodeData/spheroidRadius"])
-        diskRadius = np.array(self.hdf5Output["nodeData/diskRadius"])
-        np.place(diskRadius,diskRadius<=0.0,1.0)
-        # Component bulge sizes
-        if component.lower() == "spheroid":
-            if fnmatch.fnmatch(spheroidMassDistribution.lower(),"hernquist"):
-                sizes = (1.0+np.sqrt(2.0))*spheroidRadius/diskRadius
-            elif fnmatch.fnmatch(spheroidMassDistribution.lower(),"sersic"):
-                sizes = spheroidRadius/diskRadius
-            else:
-                pass
-            if not self.extrapolateInSize:
-                sizeMinimum = self.spheroidAttenuation["size"].min()
-                sizeMaximum = self.spheroidAttenuation["size"].max()
-                np.place(sizes,sizes<sizeMinimum,sizeMinimum)
-                np.place(sizes,sizes>sizeMaximum,sizeMaximum)
-        else:
-            sizes = None
-        return sizes
-
-
-    def getOpticalDepthCentral(self,gasMetalsSurfaceDensityCentral):        
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        opticalDepthCentral = self.opticalDepthNormalization*np.copy(gasMetalsSurfaceDensityCentral)
-        if not self.extrapolateInTau:
-            if fnmatch.fnmatch(component,"spheroid"):
-                tauMinimum = self.spheroidAttenuation["opticalDepth"].min()
-                tauMaximum = self.spheroidAttenuation["opticalDepth"].max()
-            elif fnmatch.fnmatch(component,"disk"):
-                tauMinimum = self.diskAttenuation["opticalDepth"].min()
-                tauMaximum = self.diskAttenuation["opticalDepth"].max()
-            else:
-                raise ValueError(funcname+"(): Value for 'component' not recognised -- must be 'spheroid' or 'disk'!")
-            np.place(opticalDepthCentral,opticalDepthCentral<tauMinimum,tauMinimum)
-            np.place(opticalDepthCentral,opticalDepthCentral>tauMaximum,tauMaximum)
-        return opticalDepthCentral
-
-
-    def computeOpticalDepthISM(self,effectiveWavelength,opticalDepthISMFactor=None):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        component = self.datasetName.group('component')
-        if opticalDepthISMFactor is None:
-            opticalDepthISMFactor = self.opticalDepthISMFactor
-        # Compute gas metals central surface density in M_Solar/pc^2
-        gasMetalMass = np.array(self.hdf5Output["nodeData/"+component+"AbundancesGasMetals"])
-        scaleLength = np.array(self.hdf5Output["nodeData/"+component+"Radius"])
-        gasMetalsSurfaceDensityCentral = self.computeCentralGasMetalsSurfaceDensity(np.copy(gasMetalMass),np.copy(scaleLength))
-        # Compute central optical depth
-        wavelengthFactor = (effectiveWavelength/self.wavelengthZeroPoint)**self.wavelengthExponent
-        opticalDepth = self.opticalDepthNormalization*np.copy(gasMetalsSurfaceDensityCentral)/wavelengthFactor
-        opticalDepthISM = opticalDepthISMFactor*opticalDepth
-        return opticalDepthISM
-
-    def computeOpticalDepthClouds(self,effectiveWavelength,opticalDepthCloudsFactor=None):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        if opticalDepthCloudsFactor is None:
-            opticalDepthCloudsFactor = self.opticalDepthCloudsFactor
-        # Compute gas metallicity
-        gasMass = np.array(self.hdf5Output["nodeData/"+component+"MassGas"])
-        gasMetalMass = np.array(self.hdf5Output["nodeData/"+component+"AbundancesGasMetals"])        
-        gasMetallicity = self.computeGasMetallicity(np.copy(gasMass),np.copy(gasMetalMass))
-        # Compute central optical depth
-        wavelengthFactor = (effectiveWavelength/self.wavelengthZeroPoint)**self.wavelengthExponent
-        opticalDepthClouds = opticalDepthCloudsFactor*np.copy(gasMetallicity)/self.localISMMetallicity/wavelengthFactor
-        return opticalDepthClouds
-
-    def applyAttenuation(self,luminosity,recentLuminosity,opticalDepthISM,opticalDepthClouds):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        attenuationISM = np.exp(-opticalDepthISM)
-        attenuationClouds = np.exp(-opticalDepthClouds)
-        result = ((luminosity-recentLuminosity) + recentLuminosity*attenuationClouds)*attenuationISM
-        return result
-
-
-    def computeAttenuationISM(self,component,effectiveWavelength,inclination,spheroidMassDistribution,\
-                                  spheroidRadius,diskRadius,gasMass,gasMetalMass,scaleLength):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        component = self.datasetName.group('component')        
-        sizes = self.getBulgeSizes()
-        
-        gasMetalsSurfaceDensityCentral = self.computeCentralGasMetalsSurfaceDensity(np.copy(gasMetalMass),np.copy(scaleLength))
-        opticalDepthCentral = self.getOpticalDepthCentral(gasMetalsSurfaceDensityCentral)
-        wavelengths = np.ones_like(inclination)*effectiveWavelength
-        attenuationISM = self.InterpolateDustTable(component,wavelengths,inclination,opticalDepthCentral,bulgeSize=self.getBulgeSizes())
-        np.place(attenuationISM,diskRadius<=0.0,1.0)
-        return attenuationISM
-        
-
-    def computeAttenuation(self,galHDF5Obj,z,datasetName):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
-        # Get nearest redshift output
-        out = galHDF5Obj.selectOutput(z)
-        # Compute attenuation
-        if self.verbose:
-            print(funcname+"(): Processing dataset '"+datasetName+"'")            
-        # Check is a luminosity for attenuation
-        MATCH = re.search(r"^(disk|spheroid)(LuminositiesStellar|LineLuminosity):([^:]+):([^:]+):z([\d\.]+)(:contam_[^:]+)?:dustAtlasClouds([^:]+)?",datasetName)
-        if not MATCH:
-            raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
-        # Extract dataset information
-        component = MATCH.group(1)
-        if component not in ["disk","spheroid"]:
-            raise ParseError(funcname+"(): Cannot identify if '"+datasetName+"' corresponds to disk or spheroid!")
-        luminosityType = MATCH.group(2)        
-        filter = MATCH.group(3)
-        frame = MATCH.group(4)
-        redshift = MATCH.group(5)
-        if self.verbose:
-            infoLine = "filter={0:s}  frame={1:s}  redshift={2:s}".format(filter,frame,redshift)
-            print(funcname+"(): Filter information:\n        "+infoLine)
-        contamination = MATCH.group(6)
-        if contamination is None:
-            contamination = ""
-        dustExtension = ":dustAtlasClouds"
-        dustOption = MATCH.group(7)
-        faceOn = False
-        includeClouds = True
-        if dustOption is not None:
-            dustExtension = dustExtension + dustOption
-            if "noclouds" in dustOption.lower():
-                includeClouds = False
-            else:
-                includeClouds = True
-            if "faceon" in dustOption.lower():
-                faceOn = True
-            else:
-                faceOn = False            
-        # Get name of unattenuated dataset
-        luminosityDataset = datasetName.replace(dustExtension,"")
-        # Get name for luminosity from recent star formation
-        if fnmatch.fnmatch(luminosityType,"LineLuminosity"):
-            recentLuminosityDataset = luminosityDataset
-        else:
-            recentLuminosityDataset = luminosityDataset+":recent"
-            if not recentLuminosityDataset in list(map(str,out["nodeData"].keys())):
-                raise IOError(funcname+"(): Missing luminosity for recent star formation for filter '"+luminosityDataset+"'!")
-        # Construct filter label
-        filterLabel = filter+":"+frame+":z"+redshift+contamination
-        # Compute effective wavelength for filter/line
-        if frame == "observed":
-            effectiveWavelength = self.effectiveWavelength(filter,redshift=float(redshift),verbose=self.verbose)
-        else:
-            effectiveWavelength = self.effectiveWavelength(filter,redshift=None,verbose=self.verbose)
-        # Get inclinations
-        if faceOn:
-            inclinations = np.zeros_like(np.array(out["nodeData/diskRadius"]))
-        else:
-            inclinations = getInclination(galHDF5Obj,z,overwrite=False,returnDataset=True)
-        # Get bulge sizes
-        sizes = self.getBulgeSizes()
-        # Compute gas metallicity and central surface density in M_Solar/pc^2
-        gasMass = np.array(out["nodeData/"+component+"MassGas"])
-        gasMetalMass = np.array(out["nodeData/"+component+"AbundancesGasMetals"])
-        scaleLength = np.array(out["nodeData/"+component+"Radius"])
-        gasMetalsSurfaceDensityCentral = self.computeCentralGasMetalsSurfaceDensity(np.copy(gasMetalMass),np.copy(scaleLength))
-        del scaleLength        
-        # If including molecular cloud attenuation
-        if self.opticalDepthCloudsFactor > 0.0:
-            opticalDepthClouds = self.computeOpticalDepthClouds(effectiveWavelength)
-        else:
-            opticalDepthClouds = 0.0
-        del gasMetalMass        
-        # Compute central optical depths
-        opticalDepthCentral = self.getOpticalDepthCentral(np.copy(gasMetalsSurfaceDensityCentral))
-        del gasMetalsSurfaceDensityCentral
-        # Interpolate dustAtlas table to get attenuations
-        wavelengths = effectiveWavelength*np.ones_like(inclinations)
-        attenuationISM = self.InterpolateDustTable(component,wavelengths,inclinations,opticalDepthCentral,bulgeSize=sizes)
-        # Set attenuation to unity for galaxies with no disk
-        diskRadius = np.array(out["nodeData/diskRadius"])
-        np.place(attenuationISM,diskRadius<=0.0,1.0)       
-        # Print warnings for any un-physical attenuations
-        if any(attenuationISM>1.0) and self.verbose:
-            print("WARNING! "+funcname+"(): Some attenuations greater than unity! This is not physical!")
-        attenuationISM = np.minimum(attenuationISM,1.0)
-        if any(attenuationISM<0.0) and self.verbose:
-            print("WARNING! "+funcname+"(): Some attenuations less than zero! This is not physical!")            
-        attenuationISM = np.maximum(attenuationISM,0.0)
-        attenuationISM *= np.exp(-self.opticalDepthISMFactor)
-        opticalDepthISM = -np.log(attenuationISM)
-        # Compute Charlot & Fall attenuation for clouds
-        attenuationClouds = np.exp(-opticalDepthClouds)
-        # Apply attenuations and return result 
-        if fnmatch.fnmatch(luminosityType,"LuminositiesStellar"):
-            # i) stellar luminosities
-            result = self.applyAttenuation(np.array(out["nodeData/"+luminosityDataset]),np.array(out["nodeData/"+recentLuminosityDataset]),\
-                                               opticalDepthISM,opticalDepthClouds)
-            #result = np.array(out["nodeData/"+luminosityDataset]) - np.array(out["nodeData/"+recentLuminosityDataset])
-            #result += np.array(out["nodeData/"+recentLuminosityDataset])*attenuationClouds
-            #result *= attenuationISM
-        else:
-            # ii) emission lines
-            result = self.applyAttenuation(np.array(out["nodeData/"+luminosityDataset]),np.array(out["nodeData/"+luminosityDataset]),\
-                                               opticalDepthISM,opticalDepthClouds)
-            #result = np.array(out["nodeData/"+luminosityDataset])*attenuationClouds*attenuationISM
-        return result
-
-
-    def attenuate(self,galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True,progressObj=None):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        # Check if dust attenuated luminosity already calculated
-        if datasetName in galHDF5Obj.availableDatasets(z) and not overwrite:
-            if progressObj is not None:
-                progressObj.increment()
-                progressObj.print_status_line()
-            if returnDataset:
-                out = galHDF5Obj.selectOutput(z)
-                return np.array(out["nodeData/"+datasetName])
-            else:
-                return
-        # Check if a total luminosity or disk/spheroid luminosity
-        if datasetName.startswith("total"):
-            diskResult = self.attenuate(galHDF5Obj,z,datasetName.replace("total","disk"),overwrite=False,returnDataset=True)
-            spheroidResult = self.attenuate(galHDF5Obj,z,datasetName.replace("total","spheroid"),overwrite=False,returnDataset=True)
-            result = np.copy(diskResult) + np.copy(spheroidResult)
-            del diskResult,spheroidResult
-        else:
-            result = self.computeAttenuation(galHDF5Obj,z,datasetName)
-        # Write property to file and return result
-        out = galHDF5Obj.selectOutput(z)
-        galHDF5Obj.addDataset(out.name+"/nodeData/",datasetName,result)
-        attr = None
-        if fnmatch.fnmatch(datasetName,"*LuminositiesStellar*"):
-            attr = {"unitsInSI":luminosityAB}
-        if fnmatch.fnmatch(datasetName,"*LineLuminosity*"):
-            attr = {"unitsInSI":luminositySolar}
-        if attr is not None:
-            galHDF5Obj.addAttributes(out.name+"/nodeData/"+datasetName,attr)
-        if progressObj is not None:
-            progressObj.increment()
-            progressObj.print_status_line()
-        if returnDataset:
-            return result
-        return
-
-
-
-
-
-
-
-
-
-
-
-
 class dustAtlasClouds(DustProperties):
     
     def __init__(self,verbose=False,interpolateBoundsError=False,interpolateFillValue=None,\
@@ -460,7 +97,7 @@ class dustAtlasClouds(DustProperties):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Set verbosity
-        self.verbose = verbose        
+        self._verbose = verbose        
         # Initialise DustProperties class
         super(dustAtlasClouds, self).__init__()
         # Load dust atlas file
@@ -468,14 +105,14 @@ class dustAtlasClouds(DustProperties):
         if not os.path.exists(self.dustFile):
             raise IOError(classname+"(): Cannot find Ferrara et al. (2000) dust atlas file!")
         else:
-            if self.verbose:
+            if self._verbose:
                 print(classname+"(): Loading Ferrara et al. (2000) dust atlas file...")
         self.dustData = ET.parse(self.dustFile)
         # Construct map of XML parents/descendents
         self.dustRoot = self.dustData.getroot()
         self.dustMap = {c.tag:p for p in self.dustRoot.iter() for c in p}        
         # Load wavelengths
-        if self.verbose:
+        if self._verbose:
             print(classname+"(): Extracting wavelengths...")
         self.wavelengths = np.copy([ float(lam.text) for lam in self.dustMap["wavelengths"].iter("lambda")])        
         # Load attenuations for components
@@ -483,18 +120,18 @@ class dustAtlasClouds(DustProperties):
         self.spheroidAttenuation = None
         for comp in self.dustData.iter("components"):
             if comp.find("name").text == "bulge":                
-                if self.verbose:
+                if self._verbose:
                     print(classname+"(): Loading spheroid attenuations...")
-                self.spheroidAttenuation = loadSpheroidAttenuation(comp,verbose=self.verbose)                
+                self.spheroidAttenuation = loadSpheroidAttenuation(comp,verbose=self._verbose)                
                 axes = (self.spheroidAttenuation["size"],self.spheroidAttenuation["inclination"],\
                             self.spheroidAttenuation["opticalDepth"],self.wavelengths)                
                 self.spheroidInterpolator = RegularGridInterpolator(axes,self.spheroidAttenuation["attenuation"],\
                                                                         bounds_error=interpolateBoundsError,\
                                                                         fill_value=interpolateFillValue)
             else:
-                if self.verbose:
+                if self._verbose:
                     print(classname+"(): Loading disk attenuations...")
-                self.diskAttenuation = loadDiskAttenuation(comp,verbose=self.verbose)
+                self.diskAttenuation = loadDiskAttenuation(comp,verbose=self._verbose)
                 axes = (self.diskAttenuation["inclination"],self.diskAttenuation["opticalDepth"],self.wavelengths)
                 self.diskInterpolator = RegularGridInterpolator(axes,self.diskAttenuation["attenuation"],\
                                                                     bounds_error=interpolateBoundsError,\
@@ -505,26 +142,6 @@ class dustAtlasClouds(DustProperties):
         # Initialise classes for emission lines and filters
         self.emissionLinesClass = GalacticusEmissionLines()
         self.filtersDatabase = GalacticusFilters()
-        # Set Charlot & Fall parameters
-        self.opticalDepthISMFactor = opticalDepthCloudsFactor
-        self.opticalDepthCloudsFactor = opticalDepthCloudsFactor
-        self.wavelengthZeroPoint = wavelengthZeroPoint
-        self.wavelengthExponent = wavelengthExponent
-        # Set Galacticus HDF5 file ojects
-        self.galHDF5Obj = None
-        self.hdf5Output = None
-        # Set dataset name
-        self.datasetName = None
-        return
-
-    def reset(self):
-        self.hdf5Output = None
-        self.datasetName = None
-        return
-
-
-    def setCharlotFallParameters(self,opticalDepthISMFactor=0.0,opticalDepthCloudsFactor=0.0,\
-                                 wavelengthZeroPoint=5500,wavelengthExponent=0.7):
         # Specify constants in extinction model
         # -- "wavelengthExponent" is set to the value of 0.7 found by Charlot & Fall (2000).
         # -- "opticalDepthCloudsFactor" is set to unity, such that in gas with Solar metallicity the cloud optical depth will be 1.
@@ -626,7 +243,6 @@ class dustAtlasClouds(DustProperties):
         opticalDepthClouds = opticalDepthCloudsFactor*np.copy(gasMetallicity)/self.localISMMetallicity/wavelengthFactor
         return opticalDepthClouds
 
-
     def applyAttenuation(self,luminosity,recentLuminosity,opticalDepthISM,opticalDepthClouds):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         attenuationISM = np.exp(-opticalDepthISM)
@@ -652,7 +268,7 @@ class dustAtlasClouds(DustProperties):
         # Get nearest redshift output
         out = galHDF5Obj.selectOutput(z)
         # Compute attenuation
-        if self.verbose:
+        if self._verbose:
             print(funcname+"(): Processing dataset '"+datasetName+"'")            
         # Check is a luminosity for attenuation
         MATCH = re.search(r"^(disk|spheroid)(LuminositiesStellar|LineLuminosity):([^:]+):([^:]+):z([\d\.]+)(:contam_[^:]+)?:dustAtlasClouds([^:]+)?",datasetName)
@@ -666,7 +282,7 @@ class dustAtlasClouds(DustProperties):
         filter = MATCH.group(3)
         frame = MATCH.group(4)
         redshift = MATCH.group(5)
-        if self.verbose:
+        if self._verbose:
             infoLine = "filter={0:s}  frame={1:s}  redshift={2:s}".format(filter,frame,redshift)
             print(funcname+"(): Filter information:\n        "+infoLine)
         contamination = MATCH.group(6)
@@ -699,9 +315,9 @@ class dustAtlasClouds(DustProperties):
         filterLabel = filter+":"+frame+":z"+redshift+contamination
         # Compute effective wavelength for filter/line
         if frame == "observed":
-            effectiveWavelength = self.effectiveWavelength(filter,redshift=float(redshift),verbose=self.verbose)
+            effectiveWavelength = self.effectiveWavelength(filter,redshift=float(redshift),verbose=self._verbose)
         else:
-            effectiveWavelength = self.effectiveWavelength(filter,redshift=None,verbose=self.verbose)
+            effectiveWavelength = self.effectiveWavelength(filter,redshift=None,verbose=self._verbose)
         # Get inclinations
         if faceOn:
             inclinations = np.zeros_like(np.array(out["nodeData/diskRadius"]))
@@ -735,10 +351,10 @@ class dustAtlasClouds(DustProperties):
         diskRadius = np.array(out["nodeData/diskRadius"])
         np.place(attenuationISM,diskRadius<=0.0,1.0)       
         # Print warnings for any un-physical attenuations
-        if any(attenuationISM>1.0) and self.verbose:
+        if any(attenuationISM>1.0) and self._verbose:
             print("WARNING! "+funcname+"(): Some attenuations greater than unity! This is not physical!")
         attenuationISM = np.minimum(attenuationISM,1.0)
-        if any(attenuationISM<0.0) and self.verbose:
+        if any(attenuationISM<0.0) and self._verbose:
             print("WARNING! "+funcname+"(): Some attenuations less than zero! This is not physical!")            
         attenuationISM = np.maximum(attenuationISM,0.0)
         attenuationISM *= np.exp(-self.opticalDepthISMFactor)

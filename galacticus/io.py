@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-import os,sys,fnmatch
+import os,sys,fnmatch,glob
 import numpy as np
 from .hdf5 import HDF5
 from .utils.datatypes import getDataType
@@ -412,7 +412,65 @@ class SnapshotOutput(object):
 
     
     
+class checkOutputFiles(object):
     
+    def __init__(self,verbose=True):
+        classname = self.__class__.__name__
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        self.verbose = verbose
+        self.complete = []
+        self.incomplete = []
+        self.corrupted = []
+        self.notfound = []
+        return
+
+    def reset(self):
+        self.complete = []
+        self.incomplete = []
+        self.corrupted = []
+        self.notfound = []
+        return
 
 
-    
+    def checkFile(self,hdf5File,PROG=None):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        if not os.path.exists(hdf5File):
+            self.notfound.append(hdf5File)
+        GH5 = GalacticusHDF5(hdf5File,'r')
+        attrib = GH5.readAttributes("/")
+        if "galacticusCompleted" in attrib.keys():
+            if bool(attrib["galacticusCompleted"]):
+                self.complete.append(hdf5File)
+            else:
+                self.incomplete.append(hdf5File)
+        else:
+            self.corrupted.append(hdf5File)
+        GH5.close()
+        if PROG is not None:
+            PROG.increment()
+            if self.verbose:
+                PROG.print_status_line()
+        return
+
+    def checkDirectory(self,outdir,prefix="galacticus_*[0-9]"):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        if not os.path.exists(outdir):
+            raise IOError(funcname+"(): directory "+outdir+" does not exist!")
+        if not outdir.endswith("/"):
+            outdir = outdir + "/"
+        files = glob.glob(outdir+prefix+".hdf5")
+        PROG = None
+        if self.verbose:
+            print(funcname+"(): checking HDF5 files...")
+            PROG = Progress(len(files))
+        dummy = [self.checkFile(ofile,PROG=PROG) for ofile in files]
+        return
+
+    def checkFiles(self,files):
+        PROG = None
+        if self.verbose:            
+            print(funcname+"(): checking HDF5 files...")
+            PROG = Progress(len(files))
+        dummy = [self.checkFile(ofile,PROG=PROG) for ofile in files]
+        return
+
