@@ -33,12 +33,12 @@ class processGalacticusHDF5(GalacticusHDF5):
             return
         if self.verbose:     
             print(funcname+"(): writing dataset "+datasetName+" to file...")
-            OUT = self.selectOutput(z)
-            self.addDataset(OUT.name+"/nodeData",datasetName,dataset,append=False,overwrite=self.overwrite,\
-                            maxshape=tuple([None]),chunks=True,compression="gzip",\
-                            compression_opts=6)
-            if attrs is not None:
-                self.addAttributes(OUT.name+"/nodeData/"+datasetName,attrs)
+        OUT = self.selectOutput(z)
+        self.addDataset(OUT.name+"/nodeData",datasetName,dataset,append=False,overwrite=self.overwrite,\
+                        maxshape=tuple([None]),chunks=True,compression="gzip",\
+                        compression_opts=6)
+        if attrs is not None:
+            self.addAttributes(OUT.name+"/nodeData/"+datasetName,attrs)
         return
 
     def processDataset(self,datasetName,z):
