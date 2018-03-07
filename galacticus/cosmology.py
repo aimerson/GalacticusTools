@@ -444,6 +444,54 @@ class WMAP(Cosmology):
 
 
 
+class HubbleConversions(object):
+    
+    def __init__(self,verbose=False):
+        classname = self.__class__.__name__
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        self.verbose = verbose
+        return
+
+    def convertLuminosity(self,hIn,hOut,values):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        if self.verbose:
+            print(funcname+"(): Converting Hubble values for luminosity...")
+        return values*((hOut/hIn)**2)
+
+    def convertDistance(self,hIn,hOut,values):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        if self.verbose:
+            print(funcname+"(): Converting Hubble values for distance...")
+        return values*(hIn/hOut)
+
+    def convertMass(self,hIn,hOut,values):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        if self.verbose:
+            print(funcname+"(): Converting Hubble values for mass...")
+        return values*(hIn/hOut)
+        
+    def convertVolume(self,hIn,hOut,values):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        if self.verbose:
+            print(funcname+"(): Converting Hubble values for volume...")
+        return values*((hIn/hOut)**3)
+
+    def convertMagnitude(self,hIn,hOut,values):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        if self.verbose:
+            print(funcname+"(): Converting Hubble values for magnitude...")
+        return values-5.0*np.log10(hOut/hIn)
+        
+    def convertDensity(self,hIn,hOut,values):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        if self.verbose:
+            print(funcname+"(): Converting Hubble values for density...")
+        return values*((hOut/hIn)**3)
+        
+
+
+
+
 def adjustHubble(values,hIn,hOut,datatype,verbose=False):
     funcname = sys._getframe().f_code.co_name    
     # Get type of data to convert
