@@ -54,7 +54,7 @@ class Halpha(object):
             self.data = np.loadtxt(ifile,dtype=dtype,usecols=range(len(dtype))).view(np.recarray)
             hubble = 0.7
             self.data.log10L -= 2.0/5.0
-            self.data.log10L = self.data.log10L + np.log10((hubble/self.hubble)**-2)
+            self.data.log10L = self.data.log10L + np.log10((hubble/self.hubble)**2)
             self.data.errlog10L = self.data.errlog10L 
             self.data.phiObs = self.data.phiObs + np.log10((self.hubble/hubble)**3)
             self.data.phiObsErr = self.data.phiObsErr

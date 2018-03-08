@@ -24,8 +24,8 @@ from decimal import *
 
 #mpl.style.use('classic')
 mpl.rcParams['font.family'] = 'serif'
-#mpl.rcParams['xtick.top'] = True
-#mpl.rcParams['ytick.right'] = True
+mpl.rcParams['xtick.top'] = True
+mpl.rcParams['ytick.right'] = True
 mpl.rcParams['errorbar.capsize'] = 3
 mpl.rcParams['legend.numpoints'] = 1
 mpl.rcParams['legend.fontsize'] = 'large'

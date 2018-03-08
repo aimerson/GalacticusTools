@@ -35,7 +35,7 @@ class HaloOccupationDistribution(object):
         self.halos = np.zeros(len(self.massBins)-1,dtype=float)
         return
 
-    def addHalos(self,galaxies,massName="nodeMass200.0",mask=None,verbose=False):
+    def addHalos(self,galaxies,massName="nodeMass200.0",weightHalos=False,mask=None,verbose=False):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         galaxies = galaxies.view(np.recarray)
         # Check require properties are present
@@ -51,7 +51,7 @@ class HaloOccupationDistribution(object):
             else:
                 mask = np.ones(len(galaxies.nodeIndex))
         # Check if weights provided
-        if "weight" in galaxies.dtype.names:
+        if "weight" in galaxies.dtype.names and weightHalos:
             weights = galaxies.weight
         else:
             weights = np.ones_like(galaxies[massName])
