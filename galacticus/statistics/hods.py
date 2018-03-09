@@ -5,6 +5,7 @@ import numpy as np
 import warnings
 from ..utils.match_searchsorted import match
 from .utils import binstats
+from ..satellites import getHostIndex
 from scipy.interpolate import interp1d
 
 class HaloOccupationDistribution(object):
@@ -62,7 +63,8 @@ class HaloOccupationDistribution(object):
         totalHostHalos = len(galaxies.nodeIndex[CENTRALS])
         if verbose:
             print(funcname+"(): located "+str(totalHostHalos)+" host halos...")
-        haloMass = np.log10(np.copy(galaxies[massName]))
+        HOST = getHostIndex(galaxies.nodeIsIsolated)
+        haloMass = np.log10(np.copy(galaxies[massName][HOST]))
         halos,bins = np.histogram(haloMass[CENTRALS],self.massBins,weights=weights[CENTRALS])
         self.halos += np.copy(halos.astype(float))
         # Count all galaxies
