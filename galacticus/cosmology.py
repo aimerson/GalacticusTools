@@ -456,37 +456,37 @@ class HubbleConversions(object):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         if self.verbose:
             print(funcname+"(): Converting Hubble values for luminosity...")
-        return values*((hOut/hIn)**2)
+        return values*((float(hOut)/float(hIn))**2)
 
     def convertDistance(self,hIn,hOut,values):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         if self.verbose:
             print(funcname+"(): Converting Hubble values for distance...")
-        return values*(hIn/hOut)
+        return values*(float(hIn)/float(hOut))
 
     def convertMass(self,hIn,hOut,values):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         if self.verbose:
             print(funcname+"(): Converting Hubble values for mass...")
-        return values*(hIn/hOut)
+        return values*(float(hIn)/float(hOut))
         
     def convertVolume(self,hIn,hOut,values):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         if self.verbose:
             print(funcname+"(): Converting Hubble values for volume...")
-        return values*((hIn/hOut)**3)
+        return values*((float(hIn)/float(hOut))**3)
 
     def convertMagnitude(self,hIn,hOut,values):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         if self.verbose:
             print(funcname+"(): Converting Hubble values for magnitude...")
-        return values-5.0*np.log10(hOut/hIn)
+        return values-5.0*np.log10(float(hOut)/float(hIn))
         
     def convertDensity(self,hIn,hOut,values):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         if self.verbose:
             print(funcname+"(): Converting Hubble values for density...")
-        return values*((hOut/hIn)**3)
+        return values*((float(hOut)/float(hIn))**3)
         
 
 

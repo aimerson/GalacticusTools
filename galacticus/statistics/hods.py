@@ -55,8 +55,10 @@ class HaloOccupationDistribution(object):
             weights = galaxies.weight
         else:
             weights = np.ones_like(galaxies[massName])
+        weights = np.ones_like(galaxies[massName])
         # Find host halos
-        CENTRALS = galaxies.nodeIsIsolated==1
+        CENTRALS = np.copy(galaxies.nodeIsIsolated==1).astype(bool)
+        SATELLITES = np.copy(galaxies.nodeIsIsolated==0).astype(bool)
         totalHostHalos = len(galaxies.nodeIndex[CENTRALS])
         if verbose:
             print(funcname+"(): located "+str(totalHostHalos)+" host halos...")
@@ -79,8 +81,8 @@ class HaloOccupationDistribution(object):
         # Count satellite galaxies
         if verbose:
             print(funcname+"(): counting satellite galaxies...")
-        galaxies,bins = np.histogram(haloMass[np.logical_and(mask,np.invert(CENTRALS))],self.massBins,\
-                                     weights=weights[np.logical_and(mask,np.invert(CENTRALS))])
+        galaxies,bins = np.histogram(haloMass[np.logical_and(mask,SATELLITES)],self.massBins,\
+                                     weights=weights[np.logical_and(mask,SATELLITES)])
         self.satellites += np.copy(galaxies.astype(float))
         self.satellites2 += np.copy(galaxies**2).astype(float)
         return
