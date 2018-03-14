@@ -436,16 +436,20 @@ class checkOutputFiles(object):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         if not os.path.exists(hdf5File):
             self.notfound.append(hdf5File)
-        GH5 = GalacticusHDF5(hdf5File,'r')
-        attrib = GH5.readAttributes("/")
-        if "galacticusCompleted" in attrib.keys():
-            if bool(attrib["galacticusCompleted"]):
-                self.complete.append(hdf5File)
-            else:
-                self.incomplete.append(hdf5File)
-        else:
+        try:
+            GH5 = GalacticusHDF5(hdf5File,'r')
+        except IOError:
             self.corrupted.append(hdf5File)
-        GH5.close()
+        else:
+            attrib = GH5.readAttributes("/")
+            if "galacticusCompleted" in attrib.keys():
+                if bool(attrib["galacticusCompleted"]):
+                    self.complete.append(hdf5File)
+                else:
+                    self.incomplete.append(hdf5File)
+            else:
+                self.corrupted.append(hdf5File)
+            GH5.close()
         if PROG is not None:
             PROG.increment()
             if self.verbose:
@@ -459,6 +463,7 @@ class checkOutputFiles(object):
         if not outdir.endswith("/"):
             outdir = outdir + "/"
         files = glob.glob(outdir+prefix+".hdf5")
+        print files
         PROG = None
         if self.verbose:
             print(funcname+"(): checking HDF5 files...")
