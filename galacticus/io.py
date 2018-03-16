@@ -481,22 +481,23 @@ class checkOutputFiles(object):
         return
 
 
-    def copyFile(self,ofile,PROG=None):
+    def copyFile(self,ofile,overwrite=False,PROG=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         nfile = ofile.replace(".hdf5",".RAW.hdf5")
-        shutil.copy2(ofile,nfile)
+        if os.path.exists(nfile) and not overwrite:
+            shutil.copy2(ofile,nfile)
         if PROG is not None:
             PROG.increment()
             if self.verbose:
                 PROG.print_status_line()
         return
 
-    def copyFiles(self,files):
+    def copyFiles(self,files,overwrite=False):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name                
         PROG = None
         if self.verbose:            
             print(funcname+"(): copying HDF5 files...")
             PROG = Progress(len(files))
-        dummy = [self.copyFile(ofile,PROG=PROG) for ofile in files]
+        dummy = [self.copyFile(ofile,overwrite=overwrite,PROG=PROG) for ofile in files]
         return
 
