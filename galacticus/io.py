@@ -463,7 +463,6 @@ class checkOutputFiles(object):
         if not outdir.endswith("/"):
             outdir = outdir + "/"
         files = glob.glob(outdir+prefix+".hdf5")
-        print files
         PROG = None
         if self.verbose:
             print(funcname+"(): checking HDF5 files...")
