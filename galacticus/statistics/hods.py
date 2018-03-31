@@ -13,9 +13,16 @@ class HaloOccupationDistribution(object):
     def __init__(self,massBins):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Set mass bins
         self.massBins = massBins
         dm = self.massBins[1] - self.massBins[0]
         self.binCentres = self.massBins[:-1] + dm/2.0
+        # Variables to store galaxy data
+        self.MASS = None
+        self.CENTRALS = None
+        self.SATELLITES = None
+        self.WEIGHTS = None
+        # Create vectors to store HODs
         self.galaxies = np.zeros(len(self.massBins)-1,dtype=float)
         self.galaxies2 = np.zeros(len(self.massBins)-1,dtype=float)
         self.centrals = np.zeros(len(self.massBins)-1,dtype=float)
@@ -25,7 +32,16 @@ class HaloOccupationDistribution(object):
         self.halos = np.zeros(len(self.massBins)-1,dtype=float)
         return
 
+    
     def reset(self):
+        self.resetHOD()
+        self.MASS = None
+        self.CENTRALS = None
+        self.SATELLITES = None
+        self.WEIGHTS = None
+        return
+
+    def resetHOD(self):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         self.galaxies = np.zeros(len(self.massBins)-1,dtype=float)
         self.galaxies2 = np.zeros(len(self.massBins)-1,dtype=float)
@@ -36,7 +52,7 @@ class HaloOccupationDistribution(object):
         self.halos = np.zeros(len(self.massBins)-1,dtype=float)
         return
 
-    def addHalos(self,galaxies,massName="nodeMass200.0",weightHalos=False,mask=None,verbose=False):
+    def addHalosToHOD_deprecated(self,galaxies,massName="nodeMass200.0",weightHalos=False,mask=None,verbose=False):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         galaxies = galaxies.view(np.recarray)
         # Check require properties are present
@@ -88,6 +104,64 @@ class HaloOccupationDistribution(object):
         self.satellites += np.copy(galaxies.astype(float))
         self.satellites2 += np.copy(galaxies**2).astype(float)
         return
+
+    def addHalos(self,galaxies,massName="nodeMass200.0",weightHalos=False,verbose=False):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        galaxies = galaxies.view(np.recarray)
+        # Check require properties are present
+        required = [massName,"nodeIsIsolated","nodeIndex","parentIndex"]
+        if not set(required).issubset(galaxies.dtype.names):
+            missing = list(set(required).difference(galaxies.dtype.names))
+            raise KeyError(funcname+"(): Following required properties not found: "+",".join(missing)+".")
+        self.NAME = massName
+        # Check if weights provided
+        if "weight" in galaxies.dtype.names and weightHalos:
+            self.WEIGHTS = galaxies.weight
+        else:
+            self.WEIGHTS = np.ones_like(galaxies[massName])
+        # Find host halos
+        self.CENTRALS = np.copy(galaxies.nodeIsIsolated==1).astype(bool)
+        self.SATELLITES = np.copy(galaxies.nodeIsIsolated==0).astype(bool)
+        totalHostHalos = len(galaxies.nodeIndex[self.CENTRALS])
+        if verbose:
+            print(funcname+"(): located "+str(totalHostHalos)+" host halos...")
+        hosts = getHostIndex(galaxies.nodeIsIsolated)
+        self.MASS = np.log10(np.copy(galaxies[massName][hosts]))
+        return
+
+    def addHalosToHOD(self,mask=None,verbose=False):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Check mask is provided -- if not then provide simple mask
+        if mask is None:
+            mask = np.ones_like(self.MASS)
+        # Count number of host halos
+        halos,bins = np.histogram(self.MASS[self.CENTRALS],self.massBins,weights=self.WEIGHTS[self.CENTRALS])
+        self.halos += np.copy(halos.astype(float))
+        # Exit here if no galaxies satisfy the mask
+        if not any(mask):
+            return
+        # Count all galaxies
+        if verbose:
+            print(funcname+"(): counting galaxies...")
+        galaxies,bins = np.histogram(self.MASS[mask],self.massBins,weights=self.WEIGHTS[mask])
+        self.galaxies += np.copy(galaxies.astype(float))
+        self.galaxies2 += np.copy(galaxies**2).astype(float)
+        # Count central galaxies
+        if verbose:
+            print(funcname+"(): counting central galaxies...")
+        galaxies,bins = np.histogram(self.MASS[np.logical_and(mask,self.CENTRALS)],self.massBins,\
+                                         weights=self.WEIGHTS[np.logical_and(mask,self.CENTRALS)])
+        self.centrals += np.copy(galaxies.astype(float))
+        self.centrals2 += np.copy(galaxies**2).astype(float)
+        # Count satellite galaxies
+        if verbose:
+            print(funcname+"(): counting satellite galaxies...")
+        galaxies,bins = np.histogram(self.MASS[np.logical_and(mask,self.SATELLITES)],self.massBins,\
+                                         weights=self.WEIGHTS[np.logical_and(mask,self.SATELLITES)])
+        self.satellites += np.copy(galaxies.astype(float))
+        self.satellites2 += np.copy(galaxies**2).astype(float)
+        return
+
 
     def computeHOD(self):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
