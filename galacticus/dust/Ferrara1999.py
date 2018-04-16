@@ -368,11 +368,9 @@ class dustAtlasBase(DustProperties):
         opticalDepthCentral = self.getOpticalDepthCentral(gasMetalsSurfaceDensityCentral)
         wavelengths = np.ones_like(inclination)*effectiveWavelength
         attenuationISM = self.InterpolateDustTable(component,wavelengths,inclination,opticalDepthCentral,bulgeSize=sizes)
+        attenuationISM *= np.exp(-self.opticalDepthISMFactor)
         np.place(attenuationISM,diskRadius<=0.0,1.0)
         return attenuationISM
-
-
-
 
 
 
@@ -446,23 +444,10 @@ class dustAtlas(dustAtlasBase):
             effectiveWavelength = self.effectiveWavelength(name,redshift=None,verbose=self.verbose)
         return effectiveWavelength
 
-    def setOpticalDepths(self,datasetName,overwrite=False,z=None,**kwargs):
+    def setOpticalDepths(self,**kwargs):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         # Reset attenuation information
         self.resetAttenuationInformation()
-        # Set datasetName
-        self.setDatasetName(datasetName)
-        # Check HDF5 snapshot specified
-        if z is not None:
-            self.setHDF5Output(z)
-        else:
-            if self.hdf5Output is None:
-                z = self.datasetName.group('redshift')
-                if z is None:
-                    errMsg = funcname+"(): no HDF5 output specified. Either specify the redshift "+\
-                             "of the output or include the redshift in the dataset name."
-                    raise RunTimeError(errMsg)
-                self.setHDF5Output(z)        
         # Set component
         component = self.datasetName.group('component')
         if component not in ["disk","spheroid"]:
@@ -496,30 +481,69 @@ class dustAtlas(dustAtlasBase):
             self.opticalDepthClouds = 0.0
         return
 
-    
-    
-
-
-
-    def getAttenuatedLuminosity(self,datasetName,overwrite=False,z=None,progressObj=None,\
-                                    **kwargs):
+    def applyAttenuation(self,luminosity,recentLuminosity=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        if recentLuminosity is None:
+            recentLuminosity = np.zeros_like(luminosity)
+        attenuationISM = np.exp(-self.opticalDepthISM)
+        attenuationClouds = np.exp(-self.opticalDepthClouds)
+        result = ((luminosity-recentLuminosity) + recentLuminosity*attenuationClouds)*attenuationISM
+        return result
+    
+    def setAttenuatedLuminosity(self,datasetName,overwrite=False,z=None,**kwargs):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Set datasetName
+        self.setDatasetName(datasetName)
+        # Check HDF5 snapshot specified
+        if z is not None:
+            self.setHDF5Output(z)
+        else:
+            if self.hdf5Output is None:
+                z = self.datasetName.group('redshift')
+                if z is None:
+                    errMsg = funcname+"(): no HDF5 output specified. Either specify the redshift "+\
+                             "of the output or include the redshift in the dataset name."
+                    raise RunTimeError(errMsg)
+                self.setHDF5Output(z)        
         # Compute optical depths
-        self.setOpticalDepths(datasetName,overwrite=False,z=None,**kwargs)
-        # Get dust-free luminosity
+        self.setOpticalDepths(**kwargs)
+        # Extract dust free luminosities
         dustExtension = fnmatch.filter(datasetName.split(":"),"dustAtlas*")
         luminosityName = datasetName.replace(dustExtension,"")
-        recentName = datasetName.replace(dustExtension,"recent")
         luminosity = np.copy(np.array(self.hdf5Output["nodeData/"+luminosityName]))
+        recentLuminosity = None
         if "dustAtlasClouds" in dustExtension:
+            if "LineLuminosity" in datasetName.group(0):
+                recentname = luminosityName
+            else:
+                recentName = datasetName.replace(dustExtension,"recent")
             recentLuminosity = np.copy(np.array(self.hdf5Output["nodeData/"+recentName]))
-        
-            
-        return self.lineLuminosity
+        self.attenuatedLuminosity = self.applyAttenuation(luminosity,recentLuminosity=recentLuminosity)
+        return
                 
+    def getAttenuatedLuminosity(self,datasetName,overwrite=False,z=None,**kwargs):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        self.setAttenuatedLuminosity(datasetName,overwrite=overwrite,z=z,**kwargs)
+        return self.attenuatedLuminosity
+
+    def writeLuminosityToFile(self,overwrite=False):
+        if not self.datasetName.group(0) in self.galHDF5Obj.availableDatasets(self.redshift) or overwrite:
+            out = self.galHDF5Obj.selectOutput(self.redshift)
+            # Add luminosity to file
+            self.galHDF5Obj.addDataset(out.name+"/nodeData/",self.datasetName.group(0),np.copy(self.attenuatedLuminosity))
+            # Add appropriate attributes to new dataset
+            if fnmatch.fnmatch(self.datasetName.group(0),"*LineLuminosity*"):
+                attr = {"unitsInSI":luminositySolar}
+            else:
+                attr = {"unitsInSI":luminosityAB}
+            self.galHDF5Obj.addAttributes(out.name+"/nodeData/"+self.datasetName.group(0),attr)
+        return
 
 
 
+class depracated(object):
+
+    def dummy(self):
         # Get nearest redshift output
         out = galHDF5Obj.selectOutput(z)
         # Compute attenuation
@@ -611,7 +635,6 @@ class dustAtlas(dustAtlasBase):
         if any(attenuationISM<0.0) and self._verbose:
             print("WARNING! "+funcname+"(): Some attenuations less than zero! This is not physical!")            
         attenuationISM = np.maximum(attenuationISM,0.0)
-        attenuationISM *= np.exp(-self.opticalDepthISMFactor)
         opticalDepthISM = -np.log(attenuationISM)
         # Compute Charlot & Fall attenuation for clouds
         attenuationClouds = np.exp(-opticalDepthClouds)

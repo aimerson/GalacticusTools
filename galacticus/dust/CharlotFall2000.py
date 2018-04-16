@@ -30,7 +30,19 @@ class CharlotFallBase(DustProperties):
         self.wavelengthZeroPoint = wavelengthZeroPoint
         self.wavelengthExponent = wavelengthExponent
         return
-    
+
+    def resetParameters(self,opticalDepthISMFactor=None,opticalDepthCloudsFactor=None,\
+                     wavelengthZeroPoint=None,wavelengthExponent=0.7):
+        if opticalDepthISMFactor is not None:
+            self.opticalDepthISMFactor = opticalDepthISMFactor
+        if opticalDepthCloudsFactor is not None:
+            self.opticalDepthCloudsFactor = opticalDepthCloudsFactor
+        if wavelengthZeroPoint is not None:
+            self.wavelengthZeroPoint = wavelengthZeroPoint
+        if wavelengthExponent is not None:
+            self.wavelengthExponent = wavelengthExponent
+        return
+
     def computeOpticalDepthISM(self,gasMetalMass,scaleLength,effectiveWavelength,opticalDepthISMFactor=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         if opticalDepthISMFactor is None:
@@ -66,6 +78,7 @@ class CharlotFall2000(CharlotFallBase):
         super(CharlotFall2000,self).__init__(opticalDepthISMFactor=opticalDepthISMFactor,opticalDepthCloudsFactor=opticalDepthCloudsFactor,\
                                                  wavelengthZeroPoint=wavelengthZeroPoint,wavelengthExponent=wavelengthExponent,\
                                                  verbose=verbose)
+        self.datasetName = None
         # Initialise variables to store Galacticus HDF5 objects
         self.galHDF5Obj = galHDF5Obj
         self.redshift = None
@@ -106,7 +119,7 @@ class CharlotFall2000(CharlotFallBase):
                 "(?P<filterName>:[^:]+)?(?P<redshiftString>:z(?P<redshift>[\d\.]+))(?P<dust>:dustCharlotFall2000(?P<options>[^:]+)?)$"
         else:
             searchString = "^(?P<component>disk|spheroid)LuminositiesStellar:(?P<filterName>[^:]+)(?P<frame>:[^:]+)"+\
-                "(?P<redshiftString>:z(?P<redshift>[\d\.]+))(?P<dust>:dustCharlotFall2000([^:]+)?)$"
+                "(?P<redshiftString>:z(?P<redshift>[\d\.]+))(?P<dust>:dustCharlotFall2000(?P<options>[^:]+)?)$"
         self.datasetName = re.search(searchString,datasetName)
         if not self.datasetName:
             raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
@@ -192,9 +205,32 @@ class CharlotFall2000(CharlotFallBase):
        recentLuminosity = np.copy(np.array(self.hdf5Output["nodeData/"+recentName]))
        self.attenuatedLuminosity = self.applyAttenuation(luminosity,recentLuminosity)
        return
-                
+
+   def getAttenuatedLuminosity(self,datasetName,overwrite=False,z=None,**kwargs):
+       funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+       self.setAttenuatedLuminosity(datasetName,overwrite=overwrite,z=z,**kwargs)
+       return self.attenuatedLuminosity
 
 
+   def writeLuminosityToFile(self,overwrite=False):
+       if not self.datasetName.group(0) in self.galHDF5Obj.availableDatasets(self.redshift) or overwrite:
+           out = self.galHDF5Obj.selectOutput(self.redshift)
+           # Add luminosity to file
+           self.galHDF5Obj.addDataset(out.name+"/nodeData/",self.datasetName.group(0),np.copy(self.attenuatedLuminosity))
+           # Add appropriate attributes to new dataset
+           if fnmatch.fnmatch(self.datasetName.group(0),"*LineLuminosity*"):
+               attr = {"unitsInSI":luminositySolar}
+           else:
+               attr = {"unitsInSI":luminosityAB}
+           self.galHDF5Obj.addAttributes(out.name+"/nodeData/"+self.datasetName.group(0),attr)
+       return
+
+
+
+       
+class depracated(object):
+    
+    
     def computeAttenuation(self,galHDF5Obj,z,datasetName):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         # Get nearest redshift output

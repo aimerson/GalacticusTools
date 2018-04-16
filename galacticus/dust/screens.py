@@ -22,6 +22,10 @@ class SCREEN(object):
         self.dustCurve = interp1d(self._dustTable.wavelength,self._dustTable.klambda,kind='linear',fill_value="extrapolate")                
         return
 
+    def updateRv(self,Rv):
+        self.Rv = Rv
+        return
+
     def attenuation(self,wavelength,Av):        
         return self.dustCurve(wavelength*angstrom/micron)*Av
 
@@ -29,16 +33,155 @@ class SCREEN(object):
 
 class dustScreen(DustProperties):
     
-    def __init__(self,verbose=False):
+    def __init__(self,galHDF5Obj,verbose=False):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         # Set verbosity
-        self._verbose = verbose
+        self.verbose = verbose
         # Initialise DustProperties class
-        super(dustScreen, self).__init__()
-        # Dictionary to store classes for different screens
-        self.screenObjs = {}
+        super(dustScreen,self).__init__()
+        # Store screen classes
+        self.screenObjs = {}        
+        # Initialise variables to store Galacticus HDF5 objects
+        self.galHDF5Obj = galHDF5Obj
+        self.redshift = None
+        self.hdf5Output = None
+        self.redshiftString = None
+        # Initialise datset name
+        self.datasetName = None
+        self.screenOptions = None
+        # Set variables to store attenuated luminosity
+        self.attenuatedLuminosiy = None
+        self.Rv = None
         return
+
+    def resetHDF5Output(self):
+        self.redshift = None
+        self.hdf5Output = None
+        self.redshiftString = None
+        return
+
+    def reset(self):
+        self.resetAttenuationInformation()        
+        return
+
+    def resetAttenuationInformation(self):
+        self.attenuatedLuminosity = None
+        self.Rv = None
+        return
+
+    def setHDF5Output(self,z):
+        self.resetHDF5Output()
+        self.redshift = self.galHDF5Obj.nearestRedshift(z)
+        self.hdf5Output = self.galHDF5Obj.selectOutput(self.redshift)
+        return
+
+    def setDatasetName(self,datasetName):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        if fnmatch.fnmatch("*LineLuminosity:*"):
+            searchString = "^(?P<component>disk|spheroid)LineLuminosity:(?P<lineName>[^:]+)(?P<frame>:[^:]+)"+\
+                "(?P<filterName>:[^:]+)?(?P<redshiftString>:z(?P<redshift>[\d\.]+))(?P<dust>:dustScreen_(?P<options>[^:]+))$"
+        else:
+            searchString = "^(?P<component>disk|spheroid)LuminositiesStellar:(?P<filterName>[^:]+)(?P<frame>:[^:]+)"+\
+                "(?P<redshiftString>:z(?P<redshift>[\d\.]+))(?P<dust>:dustScreen_(?P<options>[^:]+)?)$"
+        self.datasetName = re.search(searchString,datasetName)
+        if not self.datasetName:
+            raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
+        optionString = "^(?P<name>[^_]+)(?P<ageString>_age(?P<age>)[\d\.]+))?_Av(?P<av>)[\d\.]+)"
+        self.screenOptions = re.search(optionString,self.datasetName.group('options'))
+        return
+
+    def selectDustScreen(self):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        name = self.screenOptions.group('name').lower()
+        if name not in self.screenObjs.keys():
+            if fnmatch.fnmatch(name,"calzetti*"):                
+                self.screenObjs[name] = Calzetti(Rv=self.Rv)
+            elif fnmatch.fnmatch(name,"allen*"):                
+                self.screenObjs[name] = Allen(Rv=self.Rv)
+            elif fnmatch.fnmatch(name,"fitzpatrick*"):                
+                self.screenObjs[name] = Fitzpatrick(Rv=self.Rv,galaxy="LMC")
+            elif fnmatch.fnmatch(name,"seaton*"):                
+                self.screenObjs[name] = Fitzpatrick(Rv=self.Rv,galaxy="MW")
+            elif fnmatch.fnmatch(name,"prevot*"):                
+                self.screenObjs[name] = Prevot(Rv=self.Rv)
+            else:
+                raise KeyError(funcname+"(): screen name '"+name+"' not recongised!")
+        screenObj = self.screenObjs[name]
+        screenObj.updateRv(Rv)
+        return screenObj
+
+    def applyAttenuation(self,luminosity,Rv=None):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        screenObj = self.selectDustScreen(Rv=Rv)
+        # Get dust screen
+        screenObj = self.selectDustScreen(Rv=Rv)
+        age = None
+        if self.screenOptions.group('ageString') is not None:
+            age = float(self.screenOptions.group('age'))
+        Av = float(self.screenOptions.group('av'))
+        # Apply attenuation
+        attenuation = screenObj.attenuation(effectiveWavelength,Av)
+        # Get optical depth
+        e = np.exp(1.0)
+        opticalDepth = screenObj.attenuation(effectiveWavelength,Av)/(2.5*np.log10(e))
+        attenuation = np.exp(-opticalDepth)        
+        return luminosity*attenuation
+    
+   def setAttenuatedLuminosity(self,datasetName,overwrite=False,z=None,Rv=None):
+       funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+       # Check HDF5 snapshot specified
+       if z is not None:
+           self.setHDF5Output(z)
+       else:
+           if self.hdf5Output is None:
+               z = self.datasetName.group('redshift')
+               if z is None:
+                   errMsg = funcname+"(): no HDF5 output specified. Either specify the redshift "+\
+                       "of the output or include the redshift in the dataset name."
+                   raise RunTimeError(errMsg)
+               self.setHDF5Output(z)
+       # Set datasetName
+       self.setDatasetName(datasetName)
+       # Reset attenuation information
+       self.resetAttenuationInformation()
+       self.Rv = Rv
+       # Compute attenuated luminosity
+       if self.datasetName.group(0) in self.galHDF5Obj.availableDatasets(self.redshift) and not overwrite:
+           self.attenuatedLuminosity = np.array(out["nodeData/"+datasetName])
+           return
+       # Get dust free luminosity
+       luminosityName = datasetName.replace(self.datasetName.group('dust'),"")
+       luminosity = np.copy(np.array(self.hdf5Output["nodeData/"+luminosityName]))
+       # Set luminosity
+       self.attenuatedLuminosity = self.applyAttenuation(luminosity)
+       return
+
+   def getAttenuatedLuminosity(self,datasetName,overwrite=False,z=None,Rv=None):
+       funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+       self.setAttenuatedLuminosity(datasetName,overwrite=overwrite,z=z,Rv=Rv)
+       return self.attenuatedLuminosity
+   
+   
+   def writeLuminosityToFile(self,overwrite=False):
+       if not self.datasetName.group(0) in self.galHDF5Obj.availableDatasets(self.redshift) or overwrite:
+           out = self.galHDF5Obj.selectOutput(self.redshift)
+           # Add luminosity to file
+           self.galHDF5Obj.addDataset(out.name+"/nodeData/",self.datasetName.group(0),np.copy(self.attenuatedLuminosity))
+           # Add appropriate attributes to new dataset               
+           if fnmatch.fnmatch(self.datasetName.group(0),"*LineLuminosity*"):
+               attr = {"unitsInSI":luminositySolar}
+           else:
+               attr = {"unitsInSI":luminosityAB}
+           if self.Rv is not None:
+               attr["Rv"] = self.Rv
+           self.galHDF5Obj.addAttributes(out.name+"/nodeData/"+self.datasetName.group(0),attr)
+       return
+
+
+
+class deprecated(object):
+
 
     def attenuate(self,galHDF5Obj,z,datasetName,overwrite=False,returnDataset=True,progressObj=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
@@ -100,7 +243,7 @@ class dustScreen(DustProperties):
         # Get nearest redshift output
         out = galHDF5Obj.selectOutput(z)
         # Compute attenuation
-        if self._verbose:
+        if self.verbose:
             print(funcname+"(): Processing dataset '"+datasetName+"'")
         # Check is a luminosity for attenuation
         MATCH = re.search(r"^(disk|spheroid)(LuminositiesStellar|LineLuminosity):([^:]+):([^:]+):z([\d\.]+)(:contam_[^:]+)?:dustScreen_([^:]+)",datasetName)
@@ -114,7 +257,7 @@ class dustScreen(DustProperties):
         filter = MATCH.group(3)
         frame = MATCH.group(4)
         redshift = MATCH.group(5)
-        if self._verbose:
+        if self.verbose:
             infoLine = "filter={0:s}  frame={1:s}  redshift={2:s}".format(filter,frame,redshift)
             print(funcname+"(): Filter information:\n        "+infoLine)
         contamination = MATCH.group(6)
@@ -139,9 +282,9 @@ class dustScreen(DustProperties):
         filterLabel = filter+":"+frame+":z"+redshift+contamination
         # Compute effective wavelength for filter/line
         if frame == "observed":
-            effectiveWavelength = self.effectiveWavelength(filter,redshift=float(redshift),verbose=self._verbose)
+            effectiveWavelength = self.effectiveWavelength(filter,redshift=float(redshift),verbose=self.verbose)
         else:
-            effectiveWavelength = self.effectiveWavelength(filter,redshift=None,verbose=self._verbose)
+            effectiveWavelength = self.effectiveWavelength(filter,redshift=None,verbose=self.verbose)
         # Select class for dust screen and compute attenuation in magnitudes
         screenClass = self.selectScreen(screenName,Av,age=age,Rv=None)
         attenuation = screenClass.attenuation(effectiveWavelength,Av)
