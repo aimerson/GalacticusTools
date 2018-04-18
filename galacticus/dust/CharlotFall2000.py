@@ -18,7 +18,7 @@ class CharlotFallBase(DustProperties):
                      verbose=False):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
-        super(CharlotFall2000,self).__init__()
+        super(CharlotFallBase,self).__init__()
         self.verbose = verbose        
         # Specify constants in extinction model 
         # -- "wavelengthExponent" is set to the value of 0.7 found by Charlot & Fall (2000). 
@@ -114,7 +114,7 @@ class CharlotFall2000(CharlotFallBase):
 
     def setDatasetName(self,datasetName):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        if fnmatch.fnmatch("*LineLuminosity:*"):
+        if fnmatch.fnmatch(datasetName,"*LineLuminosity:*"):
             searchString = "^(?P<component>disk|spheroid)LineLuminosity:(?P<lineName>[^:]+)(?P<frame>:[^:]+)"+\
                 "(?P<filterName>:[^:]+)?(?P<redshiftString>:z(?P<redshift>[\d\.]+))(?P<dust>:dustCharlotFall2000(?P<options>[^:]+)?)$"
         else:
@@ -126,17 +126,19 @@ class CharlotFall2000(CharlotFallBase):
         return
 
     def getEffectiveWavelength(self):
-        if 'lineName' in list(self.datasetName.groups()):
+        redshift = None
+        if self.datasetName.group('frame').replace(":","") == "observed":
+            redshift = float(self.redshift)
+        if 'lineName' in self.datasetName.re.groupindex.keys():
             name = self.datasetName.group('lineName')
+            redshift = None
         else:
             name = self.datasetName.group('filterName')
-        if self.datasetName.group('frame').replace(":","") == "observed":
-            effectiveWavelength = self.effectiveWavelength(name,redshift=float(self.redshift),verbose=self.verbose)
-        else:
-            effectiveWavelength = self.effectiveWavelength(name,redshift=None,verbose=self.verbose)
-        return effectiveWavelength    
+        effectiveWavelength = self.effectiveWavelength(name,redshift=redshift,verbose=self.verbose)
+        return effectiveWavelength
 
-   def setOpticalDepths(self,**kwargs):
+
+    def setOpticalDepths(self,**kwargs):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Reset attenuation information
         self.resetAttenuationInformation()
@@ -173,57 +175,61 @@ class CharlotFall2000(CharlotFallBase):
         result = ((luminosity-recentLuminosity) + recentLuminosity*attenuationClouds)*attenuationISM
         return result
 
-   def setAttenuatedLuminosity(self,datasetName,overwrite=False,z=None,**kwargs):
-       funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+    def setAttenuatedLuminosity(self,datasetName,overwrite=False,z=None,**kwargs):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
        # Check HDF5 snapshot specified
-       if z is not None:
-           self.setHDF5Output(z)
-       else:
-           if self.hdf5Output is None:
-               z = self.datasetName.group('redshift')
-               if z is None:
-                   errMsg = funcname+"(): no HDF5 output specified. Either specify the redshift "+\
-                       "of the output or include the redshift in the dataset name."
-                   raise RunTimeError(errMsg)
-               self.setHDF5Output(z)
-       # Set datasetName
-       self.setDatasetName(datasetName)
-       # Compute attenuated luminosity
-       if self.datasetName.group(0) in self.galHDF5Obj.availableDatasets(self.redshift) and not overwrite:
-           self.attenuatedLuminosity = np.array(out["nodeData/"+datasetName])
-           return
-       # Compute optical depths
-       self.setOpticalDepths(**kwargs)
-       # Extract dust free luminosities
-       dustExtension = fnmatch.filter(datasetName.split(":"),"dustCharlotFall*")
-       luminosityName = datasetName.replace(dustExtension,"")
-       if "LineLuminosity" in datasetName.group(0):
-           recentname = luminosityName
-       else:
-           recentName = datasetName.replace(dustExtension,"recent")           
-       luminosity = np.copy(np.array(self.hdf5Output["nodeData/"+luminosityName]))
-       recentLuminosity = np.copy(np.array(self.hdf5Output["nodeData/"+recentName]))
-       self.attenuatedLuminosity = self.applyAttenuation(luminosity,recentLuminosity)
-       return
+        if z is not None:
+            self.setHDF5Output(z)
+        else:
+            if self.hdf5Output is None:
+                z = self.datasetName.group('redshift')
+                if z is None:
+                    errMsg = funcname+"(): no HDF5 output specified. Either specify the redshift "+\
+                        "of the output or include the redshift in the dataset name."
+                    raise RunTimeError(errMsg)
+                self.setHDF5Output(z)
+        # Set datasetName
+        self.setDatasetName(datasetName)
+        # Compute attenuated luminosity
+        if self.datasetName.group(0) in self.galHDF5Obj.availableDatasets(self.redshift) and not overwrite:
+            self.attenuatedLuminosity = np.array(self.hdf5Output["nodeData/"+datasetName])
+            return
+        # Compute optical depths
+        self.setOpticalDepths(**kwargs)
+        # Extract dust free luminosities
+        luminosityName = datasetName.replace(self.datasetName.group('dust'),"")
+        if "LineLuminosity" in self.datasetName.group(0):
+            recentName = luminosityName
+        else:
+            recentName = datasetName.replace(self.datasetName.group('dust'),"recent")
+        luminosity = np.copy(np.array(self.hdf5Output["nodeData/"+luminosityName]))
+        recentLuminosity = np.copy(np.array(self.hdf5Output["nodeData/"+recentName]))
+        self.attenuatedLuminosity = self.applyAttenuation(luminosity,recentLuminosity)
+        return
 
-   def getAttenuatedLuminosity(self,datasetName,overwrite=False,z=None,**kwargs):
-       funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-       self.setAttenuatedLuminosity(datasetName,overwrite=overwrite,z=z,**kwargs)
-       return self.attenuatedLuminosity
+    def getAttenuatedLuminosity(self,datasetName,overwrite=False,z=None,**kwargs):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        if datasetName.startswith("total"):
+            luminosity = self.getAttenuatedLuminosity(datasetName.replace("total","disk"),overwrite=overwrite,z=z,**kwargs) + \
+                self.getAttenuatedLuminosity(datasetName.replace("total","spheroid"),overwrite=overwrite,z=z,**kwargs)
+        else:
+            self.setAttenuatedLuminosity(datasetName,overwrite=overwrite,z=z,**kwargs)
+            luminosity = self.attenuatedLuminosity
+        return luminosity
 
 
-   def writeLuminosityToFile(self,overwrite=False):
-       if not self.datasetName.group(0) in self.galHDF5Obj.availableDatasets(self.redshift) or overwrite:
-           out = self.galHDF5Obj.selectOutput(self.redshift)
-           # Add luminosity to file
-           self.galHDF5Obj.addDataset(out.name+"/nodeData/",self.datasetName.group(0),np.copy(self.attenuatedLuminosity))
-           # Add appropriate attributes to new dataset
-           if fnmatch.fnmatch(self.datasetName.group(0),"*LineLuminosity*"):
-               attr = {"unitsInSI":luminositySolar}
-           else:
-               attr = {"unitsInSI":luminosityAB}
-           self.galHDF5Obj.addAttributes(out.name+"/nodeData/"+self.datasetName.group(0),attr)
-       return
+    def writeLuminosityToFile(self,overwrite=False):
+        if not self.datasetName.group(0) in self.galHDF5Obj.availableDatasets(self.redshift) or overwrite:
+            out = self.galHDF5Obj.selectOutput(self.redshift)
+            # Add luminosity to file
+            self.galHDF5Obj.addDataset(out.name+"/nodeData/",self.datasetName.group(0),np.copy(self.attenuatedLuminosity))
+            # Add appropriate attributes to new dataset
+            if fnmatch.fnmatch(self.datasetName.group(0),"*LineLuminosity*"):
+                attr = {"unitsInSI":luminositySolar}
+            else:
+                attr = {"unitsInSI":luminosityAB}
+            self.galHDF5Obj.addAttributes(out.name+"/nodeData/"+self.datasetName.group(0),attr)
+        return
 
 
 

@@ -8,6 +8,7 @@ import copy
 import fnmatch
 from scipy.interpolate import interp1d
 from .utils import DustProperties
+from ..GalacticusErrors import ParseError
 from ..constants import angstrom,micron,luminosityAB,luminositySolar
 
 ########################################################################
@@ -78,20 +79,20 @@ class dustScreen(DustProperties):
 
     def setDatasetName(self,datasetName):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        if fnmatch.fnmatch("*LineLuminosity:*"):
-            searchString = "^(?P<component>disk|spheroid)LineLuminosity:(?P<lineName>[^:]+)(?P<frame>:[^:]+)"+\
+        if fnmatch.fnmatch(datasetName,"*LineLuminosity:*"):
+            searchString = "^(?P<component>disk|spheroid|total)LineLuminosity:(?P<lineName>[^:]+)(?P<frame>:[^:]+)"+\
                 "(?P<filterName>:[^:]+)?(?P<redshiftString>:z(?P<redshift>[\d\.]+))(?P<dust>:dustScreen_(?P<options>[^:]+))$"
         else:
-            searchString = "^(?P<component>disk|spheroid)LuminositiesStellar:(?P<filterName>[^:]+)(?P<frame>:[^:]+)"+\
+            searchString = "^(?P<component>disk|spheroid|total)LuminositiesStellar:(?P<filterName>[^:]+)(?P<frame>:[^:]+)"+\
                 "(?P<redshiftString>:z(?P<redshift>[\d\.]+))(?P<dust>:dustScreen_(?P<options>[^:]+)?)$"
         self.datasetName = re.search(searchString,datasetName)
         if not self.datasetName:
             raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
-        optionString = "^(?P<name>[^_]+)(?P<ageString>_age(?P<age>)[\d\.]+))?_Av(?P<av>)[\d\.]+)"
+        optionString = "^(?P<name>[^_]+)(?P<ageString>_age(?P<age>[\d\.]+))?_Av(?P<av>[\d\.]+)"
         self.screenOptions = re.search(optionString,self.datasetName.group('options'))
         return
 
-    def selectDustScreen(self):
+    def selectDustScreen(self,Rv=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         name = self.screenOptions.group('name').lower()
         if name not in self.screenObjs.keys():
@@ -120,6 +121,8 @@ class dustScreen(DustProperties):
         if self.screenOptions.group('ageString') is not None:
             age = float(self.screenOptions.group('age'))
         Av = float(self.screenOptions.group('av'))
+        # Get effective wavelength
+        effectiveWavelength = self.getEffectiveWavelength()
         # Apply attenuation
         attenuation = screenObj.attenuation(effectiveWavelength,Av)
         # Get optical depth
@@ -127,56 +130,68 @@ class dustScreen(DustProperties):
         opticalDepth = screenObj.attenuation(effectiveWavelength,Av)/(2.5*np.log10(e))
         attenuation = np.exp(-opticalDepth)        
         return luminosity*attenuation
-    
-   def setAttenuatedLuminosity(self,datasetName,overwrite=False,z=None,Rv=None):
-       funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-       # Check HDF5 snapshot specified
-       if z is not None:
-           self.setHDF5Output(z)
-       else:
-           if self.hdf5Output is None:
-               z = self.datasetName.group('redshift')
-               if z is None:
-                   errMsg = funcname+"(): no HDF5 output specified. Either specify the redshift "+\
-                       "of the output or include the redshift in the dataset name."
-                   raise RunTimeError(errMsg)
-               self.setHDF5Output(z)
-       # Set datasetName
-       self.setDatasetName(datasetName)
-       # Reset attenuation information
-       self.resetAttenuationInformation()
-       self.Rv = Rv
-       # Compute attenuated luminosity
-       if self.datasetName.group(0) in self.galHDF5Obj.availableDatasets(self.redshift) and not overwrite:
-           self.attenuatedLuminosity = np.array(out["nodeData/"+datasetName])
-           return
-       # Get dust free luminosity
-       luminosityName = datasetName.replace(self.datasetName.group('dust'),"")
-       luminosity = np.copy(np.array(self.hdf5Output["nodeData/"+luminosityName]))
-       # Set luminosity
-       self.attenuatedLuminosity = self.applyAttenuation(luminosity)
-       return
 
-   def getAttenuatedLuminosity(self,datasetName,overwrite=False,z=None,Rv=None):
-       funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-       self.setAttenuatedLuminosity(datasetName,overwrite=overwrite,z=z,Rv=Rv)
-       return self.attenuatedLuminosity
+    def getEffectiveWavelength(self):
+        redshift = None
+        if self.datasetName.group('frame').replace(":","") == "observed":
+            redshift = float(self.redshift)
+        if 'lineName' in self.datasetName.re.groupindex.keys():
+            name = self.datasetName.group('lineName')
+            redshift = None
+        else:
+            name = self.datasetName.group('filterName')
+        effectiveWavelength = self.effectiveWavelength(name,redshift=redshift,verbose=self.verbose)
+        return effectiveWavelength
+
+    def setAttenuatedLuminosity(self,datasetName,overwrite=False,z=None,Rv=None):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Check HDF5 snapshot specified
+        if z is not None:
+            self.setHDF5Output(z)
+        else:
+            if self.hdf5Output is None:
+                z = self.datasetName.group('redshift')
+                if z is None:
+                    errMsg = funcname+"(): no HDF5 output specified. Either specify the redshift "+\
+                        "of the output or include the redshift in the dataset name."
+                    raise RunTimeError(errMsg)
+                self.setHDF5Output(z)
+        # Set datasetName
+        self.setDatasetName(datasetName)
+        # Reset attenuation information
+        self.resetAttenuationInformation()
+        self.Rv = Rv
+       # Compute attenuated luminosity
+        if self.datasetName.group(0) in self.galHDF5Obj.availableDatasets(self.redshift) and not overwrite:
+            self.attenuatedLuminosity = np.array(out["nodeData/"+datasetName])
+            return
+        # Get dust free luminosity
+        luminosityName = datasetName.replace(self.datasetName.group('dust'),"")
+        luminosity = np.copy(np.array(self.hdf5Output["nodeData/"+luminosityName]))
+        # Set luminosity
+        self.attenuatedLuminosity = self.applyAttenuation(luminosity)
+        return
+
+    def getAttenuatedLuminosity(self,datasetName,overwrite=False,z=None,Rv=None):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        self.setAttenuatedLuminosity(datasetName,overwrite=overwrite,z=z,Rv=Rv)
+        return self.attenuatedLuminosity
    
    
-   def writeLuminosityToFile(self,overwrite=False):
-       if not self.datasetName.group(0) in self.galHDF5Obj.availableDatasets(self.redshift) or overwrite:
-           out = self.galHDF5Obj.selectOutput(self.redshift)
+    def writeLuminosityToFile(self,overwrite=False):
+        if not self.datasetName.group(0) in self.galHDF5Obj.availableDatasets(self.redshift) or overwrite:
+            out = self.galHDF5Obj.selectOutput(self.redshift)
            # Add luminosity to file
-           self.galHDF5Obj.addDataset(out.name+"/nodeData/",self.datasetName.group(0),np.copy(self.attenuatedLuminosity))
-           # Add appropriate attributes to new dataset               
-           if fnmatch.fnmatch(self.datasetName.group(0),"*LineLuminosity*"):
-               attr = {"unitsInSI":luminositySolar}
-           else:
-               attr = {"unitsInSI":luminosityAB}
-           if self.Rv is not None:
-               attr["Rv"] = self.Rv
-           self.galHDF5Obj.addAttributes(out.name+"/nodeData/"+self.datasetName.group(0),attr)
-       return
+            self.galHDF5Obj.addDataset(out.name+"/nodeData/",self.datasetName.group(0),np.copy(self.attenuatedLuminosity))
+            # Add appropriate attributes to new dataset               
+            if fnmatch.fnmatch(self.datasetName.group(0),"*LineLuminosity*"):
+                attr = {"unitsInSI":luminositySolar}
+            else:
+                attr = {"unitsInSI":luminosityAB}
+            if self.Rv is not None:
+                attr["Rv"] = self.Rv
+            self.galHDF5Obj.addAttributes(out.name+"/nodeData/"+self.datasetName.group(0),attr)
+        return
 
 
 

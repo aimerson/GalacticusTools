@@ -7,7 +7,9 @@ from .EmissionLines import GalacticusEmissionLine,ContaminateEmissionLine
 from .Luminosities import StellarLuminosities
 from .Inclination import getInclination
 from .Stars import GalacticusStellarMass,GalacticusStarFormationRate
-
+from .dust.Ferrara1999 import dustAtlas
+from .dust.CharlotFall2000 import CharlotFall2000
+from .dust.screens import dustScreen
 
 class processGalacticusHDF5(GalacticusHDF5):
         
@@ -25,6 +27,9 @@ class processGalacticusHDF5(GalacticusHDF5):
         self.stellarLuminosities = StellarLuminosities(self)
         self.stellarMass = GalacticusStellarMass(self)
         self.starFormationRate = GalacticusStarFormationRate(self)
+        self.DUSTATLAS = dustAtlas(self)
+        self.DUSTCF2000 = CharlotFall2000(self)
+        self.DUSTSCREEN = dustScreen(self)
         return
 
     def writeDatasetToFile(self,datasetName,z,dataset,attrs=None):        
@@ -88,15 +93,13 @@ class processGalacticusHDF5(GalacticusHDF5):
             self.writeDatasetToFile(datasetName,z,stellarMass,attrs={"unitsInSI":self.starFormationRate.unitsInSI})
         return
 
-    def processDustAttenuation(self,datasetName,z,attrs=None):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
-        # Store name of dataset for output
-        outputName = datasetName
-        return
-
     def processEmissionLine(self,datasetName,z):
         if self.datasetExists(datasetName,z) and not self.overwrite:
             return
+        # If total, process disk and spheroid components
+        if datasetName.startswith("total"):
+            self.processEmissionLine(datasetName.replace("total","disk"),z)
+            self.processEmissionLine(datasetName.replace("total","spheroid"),z)
         # Remove any contaminants and iteratively process line for each individual contaminant
         contaminants = []
         contaminatedName = datasetName
@@ -113,12 +116,9 @@ class processGalacticusHDF5(GalacticusHDF5):
             dust = fnmatch.filter(datasetName.split(":"),"dust*")
             if len(dust)>0:
                 dust = dust[0]                
-            self.processEmissionLine(datasetName.replace(dust,""),z)
+            self.processEmissionLine(datasetName.replace(":"+dust,""),z)
         # Process dust attenuation or write dust-free emission line to file
         if dust is not "":
-            # First check if need to process luminosity from recent star formation
-            if "CharlotFall" in dust:
-                self.processEmissionLine(datasetName.replace(dust,"")+":recent",z)
             # Process dust attenuation
             self.processDustAttenuation(datasetName,z)
         else:
@@ -156,7 +156,7 @@ class processGalacticusHDF5(GalacticusHDF5):
     def processBulgeToTotalRatio(self,datasetName,z):
         if self.datasetExists(datasetName,z) and not self.overwrite:
             return
-        # Cosntruct names of separate stellar luminosities to process
+        # Construct names of separate stellar luminosities to process
         spheroidName = datasetName.replace("bulgeToTotalLuminosities","spheroidLuminositiesStellar")
         totalName = datasetName.replace("bulgeToTotalLuminosities","totalLuminositiesStellar")
         # Process separate components        
@@ -167,3 +167,21 @@ class processGalacticusHDF5(GalacticusHDF5):
         self.writeDatasetToFile(datasetName,z,ratio)
         return
 
+    def processDustAttenuation(self,datasetName,z,attrs=None,**kwargs):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        if self.datasetExists(datasetName,z) and not self.overwrite:
+            return
+        # Get dust attenuated luminosity
+        if fnmatch.fnmatch(datasetName,"*dustAtlas*"):
+            self.processInclination("inclination",z)
+            luminosity = self.DUSTATLAS.getAttenuatedLuminosity(datasetName,z=z,**kwargs)
+        elif fnmatch.fnmatch(datasetName,"*dustCharlotFall*"):
+            luminosity = self.DUSTCF2000.getAttenuatedLuminosity(datasetName,z=z)
+        elif fnmatch.fnmatch(datasetName,"*dustScreen*"):
+            luminosity = self.DUSTSCREEN.getAttenuatedLuminosity(datasetName,z=z,Rv=None)
+        # Write to file
+        self.writeDatasetToFile(datasetName,z,luminosity)
+        return
+
+
+        
