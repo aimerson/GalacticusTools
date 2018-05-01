@@ -201,3 +201,37 @@ class HaloOccupationDistribution(object):
         hod = hod[mask]
         f = interp1d(bins,np.log10(hod),**kwargs)
         return 10.0**f(mass)
+
+
+
+
+class GeachHOD(object):
+
+    def __init__(self):
+        self.Fa = None
+        self.Fb = None
+        self.Mc = None
+        self.aSigma = None
+        self.bSigma = None
+        self.Fs = None
+        self.Mmin = None
+        self.deltaM = None
+        self.alpha = None
+        return
+
+    def centrals(self,M):
+        xSigma = np.ones_like(M)*self.aSigma
+        np.place(xSigma,M>self.Mc,self.bSigma)
+        expFactor = -np.log10(M/self.Mc)**2/(2.0*xSigma**2)
+        erfFactor = np.log10(M/self.Mc)/xSigma
+        hod = self.Fb*(1.0-self.Fa)*np.exp(expFactor) + \
+            self.Fa*(1.0+erf(erfFactor))
+        return hod
+
+    def satellites(self,M):
+        hod = 1.0 + erf(np.log10(M/self.Mmin)/self.deltaM)
+        hod *= self.Fs*((M/self.Mmin)**self.alpha)
+        return hod
+
+    def hod(self,M):
+        return self.centrals(M) + self.satellites(M)
