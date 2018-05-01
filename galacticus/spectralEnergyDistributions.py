@@ -318,7 +318,7 @@ class GalacticusSED(object):
             self.galaxySED += self.EmissionLines.profileSum
         # Convert units to microJanskys
         self.ergPerSecond()
-        comDistance = self.galHDF5Obj.cosmology.comoving_distance(self.galaxyRedshift)*megaParsec/centi
+        comDistance = self.galHDF5Obj.cosmology.comoving_distance(self.galaxyRedshift[self.galaxyMask])*megaParsec/centi
         comDistance = np.repeat(comDistance,self.galaxySED.shape[1]).reshape(self.galaxySED.shape)
         self.galaxySED /= 4.0*Pi*comDistance**2
         self.galaxySED /= jansky
