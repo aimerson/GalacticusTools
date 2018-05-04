@@ -202,6 +202,8 @@ class CharlotFall2000(CharlotFallBase):
             recentName = luminosityName
         else:
             recentName = datasetName.replace(self.datasetName.group('dust'),"recent")
+            if not self.galHDF5Obj.datasetExists(recentName,self.redshift):
+                raise KeyError(funcname+"(): 'recent' dataset "+recentName+" not found!")
         luminosity = np.copy(np.array(self.hdf5Output["nodeData/"+luminosityName]))
         recentLuminosity = np.copy(np.array(self.hdf5Output["nodeData/"+recentName]))
         self.attenuatedLuminosity = self.applyAttenuation(luminosity,recentLuminosity)
