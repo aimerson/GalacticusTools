@@ -128,6 +128,33 @@ class Simulation(object):
         return PK
 
 
+    def setCosmologyParameters(self,cosmologyFunctionsMethod="matterLambda",cosmologyParametersMethod="simple",\
+                               cosmologicalMassVarianceMethod="filteredPower"):
+        params = []
+        # Set cosmology parameters
+        params.append(("cosmologyFunctionsMethod",cosmologyFunctionsMethod))
+        params.append(("cosmologyParametersMethod",cosmologicalParametersMethod))
+        params.append(("HubbleConstant",self.h0*100,"cosmologyParametersMethod"))
+        params.append(("OmegaMatter",self.omega0,"cosmologyParametersMethod"))
+        params.append(("OmegaDarkEnergy",self.lambda0,"cosmologyParametersMethod"))
+        params.append(("OmegaBaryon",self.omegaB,"cosmologyParametersMethod"))
+        params.append(("temperatureCMB",self.temperatureCMB,"cosmologyParametersMethod"))
+        params.append(("cosmologicalMassVarianceMethod",cosmologicalMassVarianceMethod))
+        params.append(("sigma_8",self.sigma8,"cosmologicalMassVarianceMethod"))
+        return params
+
+
+    def setPowerSpectrumParameters(self,powerSpectrumPrimordialMethod="powerLaw",wavenumberReference="1",\
+                                   running="0",powerSpectrumPrimordialTransferredMethod="simple"):
+        params = []
+        params.append(("powerSpectrumPrimordialMethod",powerSpectrumPrimordialMethod))
+        params.append(("index",self.ns,"powerSpectrumPrimordialMethod"))
+        params.append(("wavenumberReference",wavenumberReference,"powerSpectrumPrimordialMethod"))
+        params.append(("running",running,"powerSpectrumPrimordialMethod"))
+        params.append(("powerSpectrumPrimordialTransferredMethod",powerSpectrumPrimordialTransferredMethod))
+        return params
+
+
         
     def set_parameters(self,cosmologicalParametersMethod="simple",\
                            powerSpectrumPrimordialMethod="powerLaw",wavenumberReference=1,running=0,\
