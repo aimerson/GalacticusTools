@@ -153,7 +153,7 @@ class GalacticusHDF5(HDF5):
 
     def getOutputRedshift(self,outputName):        
         """
-        getOutputRedshift(): Return redshift corresponding to speified output name.
+        getOutputRedshift(): Return redshift corresponding to specified output name.
 
         USAGE:  z = GalacticusHDF5.getOutputRedshift(outputName)
         
@@ -228,7 +228,14 @@ class GalacticusHDF5(HDF5):
         iselect = np.argmin(np.fabs(self.outputs.z-z))
         return self.outputs.z[iselect]
 
-
+    def nearestOutputName(self,z):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        if self.outputs is None:
+            return None
+        # Select epoch closest to specified redshift
+        iselect = np.argmin(np.fabs(self.outputs.z-z))
+        return self.outputs.name[iselect]
+        
     def readGalaxiesOLD(self,z,props=None,SIunits=False):                
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Select epoch closest to specified redshift

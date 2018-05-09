@@ -11,6 +11,7 @@ from .Filters import getFilterTransmission
 from .constants import luminosityAB,plancksConstant
 
 def getWavelengthLimits(filterFile):
+    funcname = sys._getframe().f_code.co_name
     transmission = getFilterTransmission(filterFile)
     mask = transmission.transmission > 0.0
     transmission = transmission[mask]
@@ -47,17 +48,35 @@ class IonizingContinuuaBase(object):
         conversion *= np.log(self.wavelengthRanges[continuumName][1]/self.wavelengthRanges[continuumName][0])
         return conversion
 
-    def getStellarLuminosityName(self,datasetName):
-        searchString = "^(?P<component>disk|spheroid|total)(?P<continuum>Lyman|Helium|Oxygen)ContinuumLuminosity"+\
-                       ":z(?P<redshift>[\d\.]+)(?P<recent>:recent)?(?P<dust>:dust[^:]+)?$"
-        MATCH = re.search(searchString,datasetName)
-        luminosityName = MATCH.group('component')+"LuminositiesStellar:"+self.filterNames[MATCH.group('continuum')]+\
-                         ":rest:z"+MATCH.group('redshift')
-        if MATCH.group('recent') is not None:
-            luminosityName = luminosityName + MATCH.group('recent')
-        if MATCH.group('dust') is not None:
-            luminosityName = luminosityName + MATCH.group('dust')            
-        return luminosityName
+
+class IonizingContinuuaClass(object):
+
+    def __init__(self,datasetName=None,luminosity=None,\
+                     redshift=None,outputName=None):
+        self.datasetName = datasetName
+        self.luminosity = luminosity
+        self.redshift = redshift
+        self.outputName = outputName
+        return
+
+    def reset(self):
+        self.datasetName = None
+        self.luminosity = None
+        self.redshift = None
+        self.outputName = None
+        return
+
+
+def parseConinuuaLuminosity(datasetName):
+    funcname = sys._getframe().f_code.co_name
+    # Extract information from dataset name                                                                                                                                 
+    searchString = "^(?P<component>disk|spheroid|total)(?P<continuum>Lyman|Helium|Oxygen)ContinuumLuminosity"+\
+        ":z(?P<redshift>[\d\.]+)(?P<recent>:recent)?(?P<dust>:dust[^:]+)?$"    
+    MATCH = re.search(searchString,datasetName)
+    if not MATCH:
+        raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
+    return MATCH
+
 
 class IonizingContinuua(IonizingContinuuaBase):
 
@@ -65,81 +84,57 @@ class IonizingContinuua(IonizingContinuuaBase):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         super(IonizingContinuua, self).__init__(verbose=verbose)
-        # Initialise variables to store Galacticus HDF5 objects
+        # Initialise variables to store Galacticus HDF5 object
         self.galHDF5Obj = galHDF5Obj
-        self.redshift = None
-        self.hdf5Output = None
-        # Initialise variables to store line information
-        self.datasetName = None
-        self.luminosity = None
         return
 
-    def resetHDF5Output(self):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        self.redshift = None
-        self.hdf5Output = None
-        return
+    def stellarLuminosityName(self,datasetName):
+        funcname = sys._getframe().f_code.co_name
+        MATCH = parseConinuuaLuminosity(datasetName)
+        luminosityName = MATCH.group('component')+"LuminositiesStellar:"+self.filterNames[MATCH.group('continuum')]+\
+            ":rest:z"+MATCH.group('redshift')
+        if MATCH.group('recent') is not None:
+            luminosityName = luminosityName + MATCH.group('recent')
+        if MATCH.group('dust') is not None:
+            luminosityName = luminosityName + MATCH.group('dust')
+        return luminosityName
 
-    def setHDF5Output(self,z):
+    def setIonizingLuminosity(self,datasetName,overwrite=False):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        self.resetHDF5Output()
-        self.redshift = self.galHDF5Obj.nearestRedshift(z)
-        self.hdf5Output = self.galHDF5Obj.selectOutput(self.redshift)
-        return
-
-    def resetLuminosityInformation(self):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        self.datasetName = None
-        self.luminosity = None
-        return
-
-    def setDatasetName(self,datasetName):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        # Extract information from dataset name
-        searchString = "^(?P<component>disk|spheroid|total)(?P<continuum>Lyman|Helium|Oxygen)ContinuumLuminosity"+\
-                       ":z(?P<redshift>[\d\.]+)(?P<recent>:recent)?(?P<dust>:dust[^:]+)?$"
-        self.datasetName = re.search(searchString,datasetName)
-        if not self.datasetName:
-            raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
-        return 
-
-    def setIonizingLuminosity(self,datasetName,overwrite=False,z=None):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        # Reset luminosity information
-        self.resetLuminosityInformation()
-        # Set datasetName
-        self.setDatasetName(datasetName)
-        # Check HDF5 snapshot specified
-        if z is not None:
-            self.setHDF5Output(z)
+        # Create class to store ionising continuua information
+        IONCON = IonizingContinuuaClass()
+        IONCON.datasetName = parseConinuuaLuminosity(datasetName)
+        # Identify HDF5 output
+        IONCON.outputName = self.galHDF5Obj.nearestOutputName(float(IONCON.datasetName.group('redshift')))
+        HDF5OUT = self.galHDF5Obj.selectOutput(float(IONCON.datasetName.group('redshift')))
+        # Check if luminosity already available
+        if datasetName in self.galHDF5Obj.availableDatasets(float(IONCON.datasetName.group('redshift'))) and not overwrite:
+            IONCON.luminosity = np.array(HDF5OUT["nodeData/"+datasetName])
+            return IONCON
+        # Set line redshift
+        if "lightconeRedshift" in HDF5OUT.keys():
+            IONCON.redshift = np.array(HDF5OUT["nodeData/lightconeRedshift"])
         else:
-            if self.hdf5Output is None:
-                z = self.datasetName.group('redshift')
-                if z is None:
-                    errMsg = funcname+"(): no HDF5 output specified. Either specify the redshift "+\
-                             "of the output or include the redshift in the dataset name."
-                    raise RunTimeError(errMsg)
-                self.setHDF5Output(z)                
-        # Check if luminosity already calculated
-        if self.datasetName.group(0) in self.galHDF5Obj.availableDatasets(self.redshift) and not overwrite:
-            self.luminosity = np.array(out["nodeData/"+datasetName])
-            return
+            z = self.galHDF5Obj.nearestRedshift(float(IONCON.datasetName.group('redshift')))
+            ngals = self.galHDF5Obj.countGalaxiesAtRedshift(z)
+            IONCON.redshift = np.ones(ngals,dtype=float)*z
         # Extract luminosity        
-        luminosityName = self.getStellarLuminosityName(self.datasetName.group(0))
-        if self.datasetName.group('component') == "total":
-            luminosity = self.getIonizingLuminosity(self.datasetName.group(0).replace("total","disk")) + \
-                self.getIonizingLuminosity(self.datasetName.group(0).replace("total","spheroid"))
+        luminosityName = self.stellarLuminosityName(datasetName)
+        if datasetName.startswith("total"):
+            IONDISK = self.setIonizingLuminosity(datasetName.replace("total","disk"),overwrite=overwrite)
+            IONSPHERE = self.setIonizingLuminosity(datasetName.replace("total","spheroid"),overwrite=overwrite)
+            IONCON.luminosity = np.copy(IONDISK.luminosity) + np.copy(IONSPHERE.luminosity)
+            del IONDISK, IONSPHERE
         else:
-            if not self.galHDF5Obj.datasetExists(luminosityName,self.redshift):
+            if not self.galHDF5Obj.datasetExists(luminosityName,float(IONCON.datasetName.group('redshift'))):
                 raise IndexError(funcname+"(): dataset '"+luminosityName+"' not found!")
-            continuumName = self.datasetName.group('continuum')
-            luminosity = np.copy(self.hdf5Output["nodeData/"+luminosityName])*self.getLuminosityConversionFactor(continuumName)
-        self.luminosity = luminosity
-        return
+            continuumName = IONCON.datasetName.group('continuum')
+            IONCON.luminosity = np.copy(HDF5OUT["nodeData/"+luminosityName])*self.getLuminosityConversionFactor(continuumName)
+        return IONCON
 
     def getIonizingLuminosity(self,datasetName,overwrite=False,z=None,progressObj=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        self.setIonizingLuminosity(datasetName,overwrite=overwrite,z=z)
-        return self.luminosity
+        IONCON = self.setIonizingLuminosity(datasetName,overwrite=overwrite)
+        return IONCON.luminosity
 
 

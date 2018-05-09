@@ -10,17 +10,14 @@ hdf5File = sys.argv[1]
 # Initialise class to post-process Galacticus file
 GH5PP = processGalacticusHDF5(hdf5File,verbose=True)
 
-# Get names of emission lines that can be calculated
-emissionLines = GH5PP.emissionLines.getLineNames()
-print("Available emission lines:")
-for line in emissionLines:
-    print("     -- "+line)
-    
 # Get redshifts in file
 redshifts = GH5PP.outputs.z
 print("Reshift outputs in file:")
 for z in redshifts:
     print("    -- "+str(z))
+
+# List of continuua
+continuua = ["Lyman","Helium","Oxygen"]
 
 # Loop over outputs
 for i,z in enumerate(redshifts):
@@ -31,11 +28,12 @@ for i,z in enumerate(redshifts):
         # Get redshift string for this output. The redshift string appears in various galaxy 
         # dataset names, e.g. totalLineLuminosity:balmerAlpha6563:rest:z1.500.
         zStr = GH5PP.getRedshiftString(z)
-        # Construct names of emission line datasets to write to file
-        emLines = ["totalLineLuminosity:"+name+":rest:"+zStr for name in emissionLines] + \
-                  ["totalLineLuminosity:"+name+":observed:"+zStr for name in emissionLines]
+        # Construct names of luminosities datasets to write to file
+        datasets = ["disk"+name+"ContinuumLuminosity:"+zStr for name in continuua] + \
+            ["spheroid"+name+"ContinuumLuminosity:"+zStr for name in continuua] + \
+            ["total"+name+"ContinuumLuminosity:"+zStr for name in continuua]
         # Pass dataset for processing (calculation and writing to file)
-        dummy = [GH5PP.processDataset(dset,z) for dset in emLines]
+        dummy = [GH5PP.processDataset(dset,z) for dset in datasets]
 
 # Close file    
 GH5PP.fileObj.close()

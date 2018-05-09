@@ -139,7 +139,7 @@ class processGalacticusHDF5(GalacticusHDF5):
             # Process dust attenuation
             self.processDustAttenuation(datasetName,z)
         else:
-            self.emissionLines.resetLineInformation()
+            #self.emissionLines.resetLineInformation()
             luminosity = self.emissionLines.getLineLuminosity(datasetName,z=z)
             self.writeDatasetToFile(datasetName,z,luminosity,attrs={"unitsInSI":self.emissionLines.unitsInSI})
         # Process contamination
