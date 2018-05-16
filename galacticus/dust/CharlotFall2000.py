@@ -1,25 +1,19 @@
 #! /usr/bin/env python
 
 
-import sys,os,re,fnmatch
+import sys,os,re,fnmatch,copy
 import numpy as np
 from ..config import *
 from ..GalacticusErrors import ParseError
 from ..constants import luminosityAB,luminositySolar
 from ..utils.progress import Progress
-from .utils import DustProperties
+from .utils import DustProperties,DustClass
 
 
+class CharlotFall2000Parameters(object):
 
-class CharlotFallBase(DustProperties):
-    
-    def __init__(self,opticalDepthISMFactor=1.0,opticalDepthCloudsFactor=1.0,\
-                     wavelengthZeroPoint=5500,wavelengthExponent=0.7,\
-                     verbose=False):
-        classname = self.__class__.__name__
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
-        super(CharlotFallBase,self).__init__()
-        self.verbose = verbose        
+    def __init__(self,opticalDepthISMFactor=None,opticalDepthCloudsFactor=None,\
+                     wavelengthZeroPoint=None,wavelengthExponent=None):
         # Specify constants in extinction model 
         # -- "wavelengthExponent" is set to the value of 0.7 found by Charlot & Fall (2000). 
         # -- "opticalDepthCloudsFactor" is set to unity, such that in gas with Solar metallicity the cloud optical depth will be 1.
@@ -30,27 +24,40 @@ class CharlotFallBase(DustProperties):
         self.wavelengthZeroPoint = wavelengthZeroPoint
         self.wavelengthExponent = wavelengthExponent
         return
+    
+    def reset(self,opticalDepthISMFactor=None,opticalDepthCloudsFactor=None,\
+                     wavelengthZeroPoint=None,wavelengthExponent=None):
+        self.opticalDepthISMFactor = opticalDepthISMFactor
+        self.opticalDepthCloudsFactor = opticalDepthCloudsFactor
+        self.wavelengthZeroPoint = wavelengthZeroPoint
+        self.wavelengthExponent = wavelengthExponent
+        return        
 
-    def resetParameters(self,opticalDepthISMFactor=None,opticalDepthCloudsFactor=None,\
-                     wavelengthZeroPoint=None,wavelengthExponent=0.7):
-        if opticalDepthISMFactor is not None:
-            self.opticalDepthISMFactor = opticalDepthISMFactor
-        if opticalDepthCloudsFactor is not None:
-            self.opticalDepthCloudsFactor = opticalDepthCloudsFactor
-        if wavelengthZeroPoint is not None:
-            self.wavelengthZeroPoint = wavelengthZeroPoint
-        if wavelengthExponent is not None:
-            self.wavelengthExponent = wavelengthExponent
+    def default(self):
+        self.reset(opticalDepthISMFactor=1.0,opticalDepthCloudsFactor=1.0,\
+                     wavelengthZeroPoint=5500,wavelengthExponent=0.7)
+        return
+
+
+
+class CharlotFallBase(DustProperties):
+    
+    def __init__(self,params,verbose=False):
+        classname = self.__class__.__name__
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        super(CharlotFallBase,self).__init__()
+        self.PARAMS = params
+        self.verbose = verbose        
         return
 
     def computeOpticalDepthISM(self,gasMetalMass,scaleLength,effectiveWavelength,opticalDepthISMFactor=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         if opticalDepthISMFactor is None:
-            opticalDepthISMFactor = self.opticalDepthISMFactor
+            opticalDepthISMFactor = self.PARAMS.opticalDepthISMFactor
         # Compute gas metals central surface density in M_Solar/pc^2
         gasMetalsSurfaceDensityCentral = self.computeCentralGasMetalsSurfaceDensity(np.copy(gasMetalMass),np.copy(scaleLength))
         # Compute central optical depth
-        wavelengthFactor = (effectiveWavelength/self.wavelengthZeroPoint)**self.wavelengthExponent
+        wavelengthFactor = (effectiveWavelength/self.PARAMS.wavelengthZeroPoint)**self.PARAMS.wavelengthExponent
         opticalDepth = self.opticalDepthNormalization*np.copy(gasMetalsSurfaceDensityCentral)/wavelengthFactor
         opticalDepthISM = opticalDepthISMFactor*opticalDepth
         return opticalDepthISM
@@ -58,173 +65,153 @@ class CharlotFallBase(DustProperties):
     def computeOpticalDepthClouds(self,gasMass,gasMetalMass,effectiveWavelength,opticalDepthCloudsFactor=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         if opticalDepthCloudsFactor is None:
-            opticalDepthCloudsFactor = self.opticalDepthCloudsFactor
+            opticalDepthCloudsFactor = self.PARAMS.opticalDepthCloudsFactor
         # Compute gas metallicity
         gasMetallicity = self.computeGasMetallicity(np.copy(gasMass),np.copy(gasMetalMass))
         # Compute central optical depth
-        wavelengthFactor = (effectiveWavelength/self.wavelengthZeroPoint)**self.wavelengthExponent
+        wavelengthFactor = (effectiveWavelength/self.PARAMS.wavelengthZeroPoint)**self.PARAMS.wavelengthExponent
         opticalDepthClouds = opticalDepthCloudsFactor*np.copy(gasMetallicity)/self.localISMMetallicity/wavelengthFactor
         return opticalDepthClouds
     
 
+def parseDustAttenuatedLuminosity(datasetName):
+    funcname = sys._getframe().f_code.co_name
+    # Extract dataset name information
+    if fnmatch.fnmatch(datasetName,"*LineLuminosity:*"):
+        searchString = "^(?P<component>disk|spheroid)LineLuminosity:(?P<lineName>[^:]+)(?P<frame>:[^:]+)"+\
+            "(?P<filterName>:[^:]+)?(?P<redshiftString>:z(?P<redshift>[\d\.]+))(?P<dust>:dustCharlotFall2000(?P<options>[^:]+)?)$"
+    else:
+        searchString = "^(?P<component>disk|spheroid)LuminositiesStellar:(?P<filterName>[^:]+)(?P<frame>:[^:]+)"+\
+            "(?P<redshiftString>:z(?P<redshift>[\d\.]+))(?P<dust>:dustCharlotFall2000(?P<options>[^:]+)?)$"
+    MATCH = re.search(searchString,datasetName)
+    if not MATCH:
+        raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
+    return MATCH
+
+
 
 class CharlotFall2000(CharlotFallBase):
     
-    def __init__(self,galHDF5Obj,opticalDepthISMFactor=1.0,opticalDepthCloudsFactor=1.0,\
-                     wavelengthZeroPoint=5500,wavelengthExponent=0.7,\
-                     verbose=False):
+    def __init__(self,galHDF5Obj,params,verbose=False):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
-        super(CharlotFall2000,self).__init__(opticalDepthISMFactor=opticalDepthISMFactor,opticalDepthCloudsFactor=opticalDepthCloudsFactor,\
-                                                 wavelengthZeroPoint=wavelengthZeroPoint,wavelengthExponent=wavelengthExponent,\
-                                                 verbose=verbose)
-        self.datasetName = None
-        # Initialise variables to store Galacticus HDF5 objects
+        super(CharlotFall2000,self).__init__(params,verbose=verbose)
         self.galHDF5Obj = galHDF5Obj
-        self.redshift = None
-        self.hdf5Output = None
-        self.redshiftString = None
-        # Set variables to store optical depths
-        self.opticalDepthISM = None
-        self.opticalDepthClouds = None
-        self.attenuatedLuminosiy = None
         return
 
-    def resetHDF5Output(self):
-        self.redshift = None
-        self.hdf5Output = None
-        self.redshiftString = None
-        return
-
-    def reset(self):
-        self.resetAttenuationInformation()
-        return
-
-    def resetAttenuationInformation(self):
-        self.opticalDepthISM = None
-        self.opticalDepthClouds = None
-        self.attenuatedLuminosity = None
-        return
-
-    def setHDF5Output(self,z):
-        self.resetHDF5Output()
-        self.redshift = self.galHDF5Obj.nearestRedshift(z)
-        self.hdf5Output = self.galHDF5Obj.selectOutput(self.redshift)
-        return
-
-    def setDatasetName(self,datasetName):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        if fnmatch.fnmatch(datasetName,"*LineLuminosity:*"):
-            searchString = "^(?P<component>disk|spheroid)LineLuminosity:(?P<lineName>[^:]+)(?P<frame>:[^:]+)"+\
-                "(?P<filterName>:[^:]+)?(?P<redshiftString>:z(?P<redshift>[\d\.]+))(?P<dust>:dustCharlotFall2000(?P<options>[^:]+)?)$"
-        else:
-            searchString = "^(?P<component>disk|spheroid)LuminositiesStellar:(?P<filterName>[^:]+)(?P<frame>:[^:]+)"+\
-                "(?P<redshiftString>:z(?P<redshift>[\d\.]+))(?P<dust>:dustCharlotFall2000(?P<options>[^:]+)?)$"
-        self.datasetName = re.search(searchString,datasetName)
-        if not self.datasetName:
-            raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
-        return
-
-    def getEffectiveWavelength(self):
+    def getEffectiveWavelength(self,DUST):
         redshift = None
-        if self.datasetName.group('frame').replace(":","") == "observed":
-            redshift = float(self.redshift)
-        if 'lineName' in self.datasetName.re.groupindex.keys():
-            name = self.datasetName.group('lineName')
+        if DUST.datasetName.group('frame').replace(":","") == "observed":
+            redshift = DUST.redshift
+        if 'lineName' in DUST.datasetName.re.groupindex.keys():
+            name = DUST.datasetName.group('lineName')
             redshift = None
         else:
-            name = self.datasetName.group('filterName')
+            name = DUST.datasetName.group('filterName')
         effectiveWavelength = self.effectiveWavelength(name,redshift=redshift,verbose=self.verbose)
         return effectiveWavelength
 
-
-    def setOpticalDepths(self,**kwargs):
+    def setOpticalDepths(self,DUST,**kwargs):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        # Reset attenuation information
-        self.resetAttenuationInformation()
+        # Select HDF5 output
+        HDF5OUT = self.galHDF5Obj.selectOutput(float(DUST.datasetName.group('redshift')))
         # Set component
-        component = self.datasetName.group('component')
+        component = DUST.datasetName.group('component')
         if component not in ["disk","spheroid"]:
             raise ParseError(funcname+"(): Cannot identify if '"+datasetName+"' corresponds to disk or spheroid!")
         # Set effective wavelength
-        effectiveWavelength = self.getEffectiveWavelength()
+        effectiveWavelength = self.getEffectiveWavelength(DUST)
         #  Set inclination
-        if "options" in list(self.datasetName.groups()):
-            if fnmatch.fnmatch(self.datasetName.group('options').lower(),"faceon"):
-                inclination = np.zeros_like(np.array(self.hdf5Output["nodeData/diskRadius"]))
+        if "options" in list(DUST.datasetName.groups()):
+            if fnmatch.fnmatch(DUST.datasetName.group('options').lower(),"faceon"):
+                inclination = np.zeros_like(np.array(HDF5OUT["nodeData/diskRadius"]))
             else:
-                inclination = np.copy(np.array(self.hdf5Output["nodeData/inclination"]))
+                inclination = np.copy(np.array(HDF5OUT["nodeData/inclination"]))
        # Get radii and set scalelengths                                                                                                                                        
         spheroidMassDistribution = self.galHDF5Obj.parameters["spheroidMassDistribution"].lower()
-        spheroidRadius = np.copy(np.array(self.hdf5Output["nodeData/spheroidRadius"]))
-        diskRadius = np.copy(np.array(self.hdf5Output["nodeData/diskRadius"]))
-        scaleLength = np.copy(np.array(self.hdf5Output["nodeData/"+component+"Radius"]))
+        spheroidRadius = np.copy(np.array(HDF5OUT["nodeData/spheroidRadius"]))
+        diskRadius = np.copy(np.array(HDF5OUT["nodeData/diskRadius"]))
+        scaleLength = np.copy(np.array(HDF5OUT["nodeData/"+component+"Radius"]))
         # Get gas and metal masses
-        gasMass = np.copy(np.array(self.hdf5Output["nodeData/"+component+"MassGas"]))
-        gasMetalMass = np.copy(np.array(self.hdf5Output["nodeData/"+component+"AbundancesGasMetals"]))
+        gasMass = np.copy(np.array(HDF5OUT["nodeData/"+component+"MassGas"]))
+        gasMetalMass = np.copy(np.array(HDF5OUT["nodeData/"+component+"AbundancesGasMetals"]))
         # Compute attenuation for ISM
-        self.opticalDepthISM = self.computeOpticalDepthISM(gasMetalMass,scaleLength,effectiveWavelength,opticalDepthISMFactor=None)
+        DUST.opticalDepthISM = self.computeOpticalDepthISM(gasMetalMass,scaleLength,effectiveWavelength,opticalDepthISMFactor=None)
         # Compute attenuation for molecular clouds
-        self.opticalDepthClouds = self.computeOpticalDepthClouds(np.copy(gasMass),np.copy(gasMetalMass),effectiveWavelength)
-        return
+        DUST.opticalDepthClouds = self.computeOpticalDepthClouds(np.copy(gasMass),np.copy(gasMetalMass),effectiveWavelength)
+        return DUST
 
-    def applyAttenuation(self,luminosity,recentLuminosity):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
-        attenuationISM = np.exp(-self.opticalDepthISM)
-        attenuationClouds = np.exp(-self.opticalDepthClouds)
-        result = ((luminosity-recentLuminosity) + recentLuminosity*attenuationClouds)*attenuationISM
-        return result
+    def getDustFreeLuminosities(self,DUST):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        HDF5OUT = self.galHDF5Obj.selectOutput(float(DUST.datasetName.group('redshift')))        
+        # Extract dust free luminosities
+        luminosityName = DUST.datasetName.group(0).replace(DUST.datasetName.group('dust'),"")
+        if "LineLuminosity" in DUST.datasetName.group(0):
+            recentName = luminosityName
+        else:
+            recentName = DUST.datasetName.group(0).replace(DUST.datasetName.group('dust'),"recent")
+            if not self.galHDF5Obj.datasetExists(recentName,float(DUST.datasetName.group('redshift'))):
+                raise KeyError(funcname+"(): 'recent' dataset "+recentName+" not found!")
+        luminosity = np.copy(np.array(HDF5OUT["nodeData/"+luminosityName]))
+        recentLuminosity = np.copy(np.array(HDF5OUT["nodeData/"+recentName]))
+        return (luminosity,recentLuminosity)
+
+    def createDustClass(self,datasetName):
+        # Create class to store dust optical depths information
+        DUST = DustClass()
+        DUST.datasetName = parseDustAttenuatedLuminosity(datasetName)        
+        # Identify HDF5 output
+        DUST.outputName = self.galHDF5Obj.nearestOutputName(float(DUST.datasetName.group('redshift')))
+        # Set redshift
+        HDF5OUT = self.galHDF5Obj.selectOutput(float(DUST.datasetName.group('redshift')))
+        if "lightconeRedshift" in HDF5OUT.keys():
+            DUST.redshift = np.array(HDF5OUT["nodeData/lightconeRedshift"])
+        else:
+            z = self.galHDF5Obj.nearestRedshift(float(DUST.datasetName.group('redshift')))
+            ngals = self.galHDF5Obj.countGalaxiesAtRedshift(z)
+            DUST.redshift = np.ones(ngals,dtype=float)*z        
+        return DUST
 
     def setAttenuatedLuminosity(self,datasetName,overwrite=False,z=None,**kwargs):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-       # Check HDF5 snapshot specified
-        if z is not None:
-            self.setHDF5Output(z)
-        else:
-            if self.hdf5Output is None:
-                z = self.datasetName.group('redshift')
-                if z is None:
-                    errMsg = funcname+"(): no HDF5 output specified. Either specify the redshift "+\
-                        "of the output or include the redshift in the dataset name."
-                    raise RunTimeError(errMsg)
-                self.setHDF5Output(z)
-        # Set datasetName
-        self.setDatasetName(datasetName)
-        # Compute attenuated luminosity
-        if self.datasetName.group(0) in self.galHDF5Obj.availableDatasets(self.redshift) and not overwrite:
-            self.attenuatedLuminosity = np.array(self.hdf5Output["nodeData/"+datasetName])
-            return
+        # Create dust class
+        DUST = self.createDustClass(datasetName)
+        # Identify HDF5 output
+        HDF5OUT = self.galHDF5Obj.selectOutput(float(DUST.datasetName.group('redshift')))
+        # Check if luminosity already available
+        if datasetName in self.galHDF5Obj.availableDatasets(float(DUST.datasetName.group('redshift'))) and not overwrite:
+            DUST.attenuatedLuminosity = np.array(HDF5OUT["nodeData/"+datasetName])
+            return DUST
         # Compute optical depths
-        self.setOpticalDepths(**kwargs)
-        # Extract dust free luminosities
-        luminosityName = datasetName.replace(self.datasetName.group('dust'),"")
-        if "LineLuminosity" in self.datasetName.group(0):
-            recentName = luminosityName
-        else:
-            recentName = datasetName.replace(self.datasetName.group('dust'),"recent")
-            if not self.galHDF5Obj.datasetExists(recentName,self.redshift):
-                raise KeyError(funcname+"(): 'recent' dataset "+recentName+" not found!")
-        luminosity = np.copy(np.array(self.hdf5Output["nodeData/"+luminosityName]))
-        recentLuminosity = np.copy(np.array(self.hdf5Output["nodeData/"+recentName]))
-        self.attenuatedLuminosity = self.applyAttenuation(luminosity,recentLuminosity)
-        return
+        DUST = self.setOpticalDepths(DUST,**kwargs)
+        # Get dust free luminosities
+        luminosity,recentLuminosity = self.getDustFreeLuminosities(DUST)
+        # Store luminosity
+        DUST.attenuatedLuminosity = DUST.attenuate(luminosity,recentLuminosity)
+        return DUST
 
     def getAttenuatedLuminosity(self,datasetName,overwrite=False,z=None,**kwargs):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         if datasetName.startswith("total"):
-            luminosity = self.getAttenuatedLuminosity(datasetName.replace("total","disk"),overwrite=overwrite,z=z,**kwargs) + \
-                self.getAttenuatedLuminosity(datasetName.replace("total","spheroid"),overwrite=overwrite,z=z,**kwargs)
+            DUST = self.createDustClass(datasetName)
+            DISKDUST = self.getAttenuatedLuminosity(datasetName.replace("total","disk"),overwrite=overwrite,z=z,**kwargs)
+            SPHEREDUST = self.getAttenuatedLuminosity(datasetName.replace("total","spheroid"),overwrite=overwrite,z=z,**kwargs)
+            DUST.opticalDepthISM = copy.copy(SPHEREDUST.opticalDepthISM)
+            DUST.opticalDepthClouds = copy.copy(SPHEREDUST.opticalDepthClouds)
+            DUST.attenuatedLuminosity = np.copy(DISKDUST.attenuatedLuminosity) + np.copy(SPHEREDUST.attenuatedLuminosity)
+            del DISKDUST,SPHEREDUST
         else:
-            self.setAttenuatedLuminosity(datasetName,overwrite=overwrite,z=z,**kwargs)
-            luminosity = self.attenuatedLuminosity
-        return luminosity
+            DUST = self.setAttenuatedLuminosity(datasetName,overwrite=overwrite,z=z,**kwargs)
+        return DUST
 
-
-    def writeLuminosityToFile(self,overwrite=False):
-        if not self.datasetName.group(0) in self.galHDF5Obj.availableDatasets(self.redshift) or overwrite:
-            out = self.galHDF5Obj.selectOutput(self.redshift)
+    def writeLuminosityToFile(self,datasetName,z=None,overwrite=False,**kwargs):
+        DUST = self.getAttenuatedLuminosity(datasetName,overwrite=overwrite,z=z,**kwargs)
+        redshift = float(DUST.datasetName.group('redshift'))
+        if not DUST.datasetName.group(0) in self.galHDF5Obj.availableDatasets(redshift) or overwrite:            
+            # Select HDF5 output
+            HDF5OUT = self.galHDF5Obj.selectOutput(redshift)
             # Add luminosity to file
-            self.galHDF5Obj.addDataset(out.name+"/nodeData/",self.datasetName.group(0),np.copy(self.attenuatedLuminosity))
+            self.galHDF5Obj.addDataset(HDF5OUT.name+"/nodeData/",DUST.datasetName.group(0),np.copy(DUST.attenuatedLuminosity))
             # Add appropriate attributes to new dataset
             if fnmatch.fnmatch(self.datasetName.group(0),"*LineLuminosity*"):
                 attr = {"unitsInSI":luminositySolar}

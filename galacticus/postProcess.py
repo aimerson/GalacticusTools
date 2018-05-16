@@ -140,8 +140,8 @@ class processGalacticusHDF5(GalacticusHDF5):
             self.processDustAttenuation(datasetName,z)
         else:
             #self.emissionLines.resetLineInformation()
-            luminosity = self.emissionLines.getLineLuminosity(datasetName,z=z)
-            self.writeDatasetToFile(datasetName,z,luminosity,attrs={"unitsInSI":self.emissionLines.unitsInSI})
+            EMLINE = self.emissionLines.getLineLuminosity(datasetName,z=z)            
+            self.writeDatasetToFile(datasetName,z,EMLINE.luminosity,attrs={"unitsInSI":self.emissionLines.unitsInSI})
         # Process contamination
         if len(contaminants)>0:
             luminosity = self.contaminateLines.getLineLuminosity(contaminatedName,z=z)
