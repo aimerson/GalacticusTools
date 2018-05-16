@@ -192,13 +192,13 @@ class processGalacticusHDF5(GalacticusHDF5):
         # Get dust attenuated luminosity
         if fnmatch.fnmatch(datasetName,"*dustAtlas*"):
             self.processInclination("inclination",z)
-            luminosity = self.DUSTATLAS.getAttenuatedLuminosity(datasetName,z=z,**kwargs)
+            DUST = self.DUSTATLAS.getAttenuatedLuminosity(datasetName,z=z,**kwargs)
         elif fnmatch.fnmatch(datasetName,"*dustCharlotFall*"):
-            luminosity = self.DUSTCF2000.getAttenuatedLuminosity(datasetName,z=z)
+            DUST = self.DUSTCF2000.getAttenuatedLuminosity(datasetName,z=z)
         elif fnmatch.fnmatch(datasetName,"*dustScreen*"):
-            luminosity = self.DUSTSCREEN.getAttenuatedLuminosity(datasetName,z=z,Rv=None)
+            DUST = self.DUSTSCREEN.getAttenuatedLuminosity(datasetName,z=z,Rv=None)
         # Write to file
-        self.writeDatasetToFile(datasetName,z,luminosity)
+        self.writeDatasetToFile(DUST.datasetName.group(0),z,DUST.attenuatedLuminosity)
         return
         
     def processIonizingContinuum(self,datasetName,z):
