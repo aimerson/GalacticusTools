@@ -3,6 +3,7 @@
 import sys,os,re,fnmatch
 import numpy as np
 from ..io import GalacticusHDF5
+from ..Luminosities import LuminosityClass
 from ..constants import Pi,Parsec,massAtomic,massSolar,massFractionHydrogen,mega
 from ..EmissionLines import getLineNames,emissionLineBase
 from ..Filters import GalacticusFilters
@@ -82,15 +83,14 @@ class DustProperties(object):
         return gasMetalsSurfaceDensityCentral
 
 
-class DustClass(object):
+class DustClass(LuminosityClass):
 
-    def __init__(self,datasetName=None,redshift=None,outputName=None,\
+    def __init__(self,datasetName=None,redshift=None,outputName=None,luminosity=None,\
                      opticalDepthISM=None,opticalDepthClouds=None):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        self.datasetName = datasetName
-        self.redshift = redshift
-        self.outputName = outputName
+        super(DustClass,self).__init__(datasetName=datasetName,luminosity=luminosity,\
+                                           redshift=redshift,outputName=outputName)
         self.opticalDepthISM = opticalDepthISM
         self.opticalDepthClouds = opticalDepthClouds
         return
@@ -100,6 +100,7 @@ class DustClass(object):
         self.datasetName = None
         self.redshift = None
         self.outputName = None
+        self.luminosity = None
         self.opticalDepthISM = None
         self.opticalDepthClouds = None
         return
@@ -115,7 +116,7 @@ class DustClass(object):
 
     def attenuate(self,continuumLuminosity,cloudsLuminosity=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        # If no clouds luminosity has been provided, simply assume not considering molecular cloud attenuation.                                                                 
+        # If no clouds luminosity has been provided, simply assume not considering molecular cloud attenuation.
         if cloudsLuminosity is None:
             cloudsLuminosity = np.zeros_like(continuumLuminosity)
             if self.opticalDepthClouds is None:

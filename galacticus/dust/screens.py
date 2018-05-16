@@ -171,7 +171,7 @@ class dustScreen(DustProperties):
         HDF5OUT = self.galHDF5Obj.selectOutput(float(DUST.datasetName.group('redshift')))
         # Check if luminosity already available
         if datasetName in self.galHDF5Obj.availableDatasets(float(DUST.datasetName.group('redshift'))) and not overwrite:
-            DUST.attenuatedLuminosity = np.array(HDF5OUT["nodeData/"+datasetName])
+            DUST.luminosity = np.array(HDF5OUT["nodeData/"+datasetName])
             return DUST
         # Compute optical depth
         DUST = self.setOpticalDepths(DUST,Rv)
@@ -179,7 +179,7 @@ class dustScreen(DustProperties):
         # Get dust free luminosities
         luminosity,recentLuminosity = self.getDustFreeLuminosities(DUST)
         # Store luminosity
-        DUST.attenuatedLuminosity = DUST.attenuate(luminosity,recentLuminosity)
+        DUST.luminosity = DUST.attenuate(luminosity,recentLuminosity)
         return DUST
 
     def getAttenuatedLuminosity(self,datasetName,overwrite=False,z=None,Rv=None):
@@ -194,7 +194,7 @@ class dustScreen(DustProperties):
             # Select HDF5 output
             HDF5OUT = self.galHDF5Obj.selectOutput(redshift)
             # Add luminosity to file
-            self.galHDF5Obj.addDataset(HDF5OUT.name+"/nodeData/",DUST.datasetName.group(0),np.copy(DUST.attenuatedLuminosity))
+            self.galHDF5Obj.addDataset(HDF5OUT.name+"/nodeData/",DUST.datasetName.group(0),np.copy(DUST.luminosity))
             # Add appropriate attributes to new dataset
             if fnmatch.fnmatch(self.datasetName.group(0),"*LineLuminosity*"):
                 attr = {"unitsInSI":luminositySolar}

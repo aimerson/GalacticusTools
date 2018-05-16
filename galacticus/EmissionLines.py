@@ -11,7 +11,8 @@ from .io import GalacticusHDF5
 from .GalacticusErrors import ParseError
 from .IonizingContinuua import IonizingContinuua
 from .Filters import GalacticusFilters
-from .Luminosities import getLuminosity
+from .Luminosities import getLuminosity,LuminosityClass
+from .StellarLuminosities import StellarLuminosities 
 from .constants import massSolar,luminositySolar,luminosityAB,metallicitySolar
 from .constants import megaParsec,centi,Pi,erg,angstrom,speedOfLight
 from .constants import massAtomic,atomicMassHydrogen,massFractionHydrogen
@@ -49,16 +50,14 @@ class emissionLineBase(object):
             raise IndexError(funcname+"(): Line '"+lineName+"' not found!")
         return float(self.CLOUDY.wavelengths[lineName])        
 
-class EmissionLineClass(object):
+class EmissionLineClass(LuminosityClass):
 
     def __init__(self,datasetName=None,luminosity=None,equivalentWidth=None,\
                      redshift=None,outputName=None,\
                      massHIIRegion=None,lifetimeHIIRegion=None):
-        self.datasetName = datasetName
-        self.luminosity = luminosity
+        super(EmissionLineClass,self).__init__(datasetName=datasetName,luminosity=luminosity,\
+                                                   redshift=redshift,outputName=outputName)
         self.equivalentWidth = equivalentWidth
-        self.redshift = redshift
-        self.outputName = outputName
         self.massHIIRegion = massHIIRegion
         self.lifetimeHIIRegion = lifetimeHIIRegion
         return
@@ -459,6 +458,7 @@ def getLatexName(line):
 
 def Get_Equivalent_Width(galHDF5Obj,z,datasetName,overwrite=False):
     funcname = sys._getframe().f_code.co_name
+    STELLAR = StellarLuminosities(galHDF5Obj)
     # Get nearest redshift output
     out = galHDF5Obj.selectOutput(z)
     # Check if already calculated -- return if not wanting to recalculate 
@@ -484,7 +484,7 @@ def Get_Equivalent_Width(galHDF5Obj,z,datasetName,overwrite=False):
     if len(allFilters) < 3 and datasetName.startswith("total"):
         allFilters = fnmatch.filter(galHDF5Obj.availableDatasets(z),filterSearch.replace("total","disk"))
         for filter in allFilters:
-            luminosity = getLuminosity(galHDF5Obj,z,filter.replace("disk","total"))
+            luminosity = STELLAR.getLuminosity(galHDF5Obj,z,filter.replace("disk","total"))
             del luminosity
         allFilters = fnmatch.filter(galHDF5Obj.availableDatasets(z),filterSearch)
 
