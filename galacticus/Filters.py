@@ -111,7 +111,19 @@ def getFilterTransmission(filterFile):
     return transmission.view(np.recarray)
         
 class Filter(object):    
-    def __init__(self,filterFile,verbose=False,VegaObj=None,VbandFilterFile=None,kRomberg=8,**kwargs):
+    
+    def __init__(self):
+        self.file = None
+        self.transmission = None
+        self.description = None
+        self.effectiveWavelength = None
+        self.vegaoffset = None
+        self.name = None
+        self.origin = None
+        self.url = None
+        return
+        
+    def __call__(self,filterFile,verbose=False,VegaObj=None,VbandFilterFile=None,kRomberg=8,**kwargs):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         self.file = filterFile        
@@ -163,7 +175,7 @@ class Filter(object):
             infoLine = ["                   {0:f}                      {1:f}\n".format(w,t) \
                             for w,t in zip(self.transmission.wavelength,self.transmission.transmission)]
             print("".join(infoLine))
-        return
+        return self
 
 
 ###############################################################################
@@ -318,7 +330,8 @@ class GalacticusFilters(object):
                 if not os.path.exists(path):
                     error = funcname+"(): Path to filter '"+filterName+"' does not exist!\n  Specified path = "+path
                     raise IOError(error)
-                FILTER = Filter(path,**kwargs)
+                F = Filter()
+                FILTER = F(path,**kwargs)
             self.effectiveWavelengths[filterName] = FILTER.effectiveWavelength
             self.vegaOffset[filterName] = FILTER.vegaOffset
             if store:
