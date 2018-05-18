@@ -11,7 +11,7 @@ from .io import GalacticusHDF5
 from .GalacticusErrors import ParseError
 from .IonizingContinuua import IonizingContinuua
 from .Filters import GalacticusFilters
-from .Luminosities import getLuminosity,LuminosityClass
+from .Luminosities import LuminosityClass
 from .StellarLuminosities import StellarLuminosities 
 from .constants import massSolar,luminositySolar,luminosityAB,metallicitySolar
 from .constants import megaParsec,centi,Pi,erg,angstrom,speedOfLight

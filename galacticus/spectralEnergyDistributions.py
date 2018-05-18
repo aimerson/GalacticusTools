@@ -5,7 +5,7 @@ import numpy as np
 from scipy.interpolate import interp1d
 from scipy.stats import norm
 from .io import GalacticusHDF5
-from .EmissionLines import GalacticusEmissionLine,GalacticusEmissionLines
+from .EmissionLines import GalacticusEmissionLine
 from .Luminosities import ergPerSecond
 from .constants import erg,luminosityAB,luminositySolar,jansky,kilo
 from .constants import angstrom,megaParsec,Pi,speedOfLight,centi

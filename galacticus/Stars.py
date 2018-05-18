@@ -101,7 +101,6 @@ class GalacticusStellarMass(object):
             return STARS
         # Compute stellar mass
         if datasetName.startswith("total"):
-        if fnmatch.fnmatch(ST.datasetName.group('component'),"total"):
             STARS.mass = self.getStellarMass(datasetName.replace("total","disk")) +\
                 self.getStellarMass(datasetName.replace("total","spheroid"))
         else:
@@ -158,7 +157,6 @@ class GalacticusStarFormationRate(object):
             return STARS
         # Compute stellar mass
         if datasetName.startswith("total"):
-        if fnmatch.fnmatch(ST.datasetName.group('component'),"total"):
             STARS.mass = self.getStarFormationRate(datasetName.replace("total","disk")) +\
                 self.getStarFormationRate(datasetName.replace("total","spheroid"))
         else:
