@@ -88,8 +88,32 @@ class IonizingContinuua(IonizingContinuuaBase):
         self.galHDF5Obj = galHDF5Obj
         return
 
+    def ionizingLuminosityAvailable(self,datasetName):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        # Get redshift of appropriate HDF5 output
+        MATCH = parseConinuuaLuminosity(datasetName)
+        z = float(MATCH.group('redshift'))
+        # Get list of all available datasets
+        allProps = self.galHDF5Obj.availableDatasets(z)        
+        # Check that any galaxy properties exist
+        if len(allProps) == 0:
+            return False
+        # Check if dataset already in list of available properties
+        if datasetName in allProps:
+            return True
+        # Check if can compute ionizing continuum luminosity from appropriate
+        # stellar luminosities
+        allLums = fnmatch.filter(allProps,"*LuminositiesStellar:*")
+        if len(allLums) == 0:
+            return False
+        stellarLuminosityName = self.stellarLuminosityName(datasetName)
+        if stellarLuminosityName in allLums:
+            return True
+        return False
+        
+
     def stellarLuminosityName(self,datasetName):
-        funcname = sys._getframe().f_code.co_name
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         MATCH = parseConinuuaLuminosity(datasetName)
         luminosityName = MATCH.group('component')+"LuminositiesStellar:"+self.filterNames[MATCH.group('continuum')]+\
             ":rest:z"+MATCH.group('redshift')
