@@ -91,9 +91,7 @@ class GalacticusMagnitudes(object):
             luminosityDataset = luminosityDataset + MAG.datasetName.group('recent')
         if MAG.datasetName.group('dust') is not None:
             luminosityDataset = luminosityDataset + MAG.datasetName.group('dust')
-        LUM = self.STELLAR.getLuminosity(luminosityDataset,z=z,overwrite=overwrite)
-        MAG.luminosity = np.copy(LUM.luminosity)
-        del LUM
+        MAG.luminosity = self.STELLAR.getLuminosity(luminosityDataset,z=z,overwrite=overwrite)
         # Compute absolute magnitude
         MAG.magnitude = -2.5*np.log10(MAG.luminosity+1.0e-40)
         # Convert to Vega magnitude if required (assume AB if nothing specified)
@@ -109,5 +107,5 @@ class GalacticusMagnitudes(object):
     def getMagnitude(self,datasetName,z=None,overwrite=False):                
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name            
         MAG = self.setMagnitude(datasetName,z=z,overwrite=overwrite)
-        return MAG
+        return MAG.magnitude
 
