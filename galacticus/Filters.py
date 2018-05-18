@@ -54,6 +54,9 @@ class VegaOffset(object):
         self.fluxABV = None
         return
 
+    def __call__(self,wavelength,transmission,kRomberg=8,**kwargs):
+        return self.computeOffset(self,wavelength,transmission,kRomberg=kRomberg,**kwargs)
+    
     def computeFluxes(self,wavelength,transmission,kRomberg=8,**kwargs):        
         # Interpolate spectrum and transmission data
         wavelengthJoint = np.linspace(wavelength.min(),wavelength.max(),2**kRomberg+1)
@@ -161,47 +164,6 @@ class Filter(object):
                             for w,t in zip(self.transmission.wavelength,self.transmission.transmission)]
             print("".join(infoLine))
         return
-
-def createFilter(filePath,name,response,description=None,origin=None,url=None,\
-                     effectiveWavelength=None,vegaOffset=None,vBandFilter=None):    
-    # Create tree root
-    root = ET.Element("filter")
-    # Add name and other descriptions
-    ET.SubElement(root,"name").text = name
-    if description is None:
-        description = name
-    ET.SubElement(root,"description").text = description
-    if origin is None:
-        origin = "unknown"
-    ET.SubElement(root,"origin").text = origin
-    if url is None:
-        url = "unknown"
-    ET.SubElement(root,"url").text = url
-    # Add in response data
-    RES = ET.SubElement(root,"response")
-    dataSize = len(response["wavelength"])
-    for i in range(dataSize):
-        wavelength = response["wavelength"][i]
-        transmission = response["response"][i]
-        datum = "{0:7.3f} {1:9.7f}".format(wavelength,transmission)
-        ET.SubElement(RES,"datum").text = datum
-    # Compute effective wavlength and Vega offset if needed
-    if effectiveWavelength is None:
-        wavelength = response["wavelength"]
-        transmission = response["response"]
-        effectiveWavelength = computeEffectiveWavelength(wavelength,transmission)
-    ET.SubElement(root,"effectiveWavelength").text = str(effectiveWavelength)
-    if vegaOffset is None:
-        wavelength = response["wavelength"]
-        transmission = response["response"]
-        VO = VegaOffset(VbandFilterFile=vBandFilter)
-        vegaOffset = VO.computeOffset(wavelength,transmission)
-    ET.SubElement(root,"vegaOffset").text = str(vegaOffset)
-    # Finalise tree and save to file
-    tree = ET.ElementTree(root)
-    tree.write(filePath)
-    formatFile(filePath)
-    return
 
 
 ###############################################################################
@@ -333,13 +295,13 @@ class GalacticusFilters(object):
         classname = self.__class__.__name__
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         if filtersDirectory is None:
-            self.filtersDirectory = galacticusPath+"/data/filters/"
-        else:
-            self.filtersDirectory = filtersDirectory
+            filtersDirectory = pkg_resources.resource_filename(__name__,"/data/filters")+"/"
+        self.filtersDirectory = filtersDirectory
         self.effectiveWavelengths = {}
         self.vegaOffset = {}
         self.filters = {}
         self.cloudyTableClass = cloudyTable()
+        print 
         return
 
     def load(self,filterName,path=None,store=False,**kwargs):                
@@ -349,7 +311,10 @@ class GalacticusFilters(object):
                 FILTER = TopHat(filterName,**kwargs)
             else:
                 if path is None:
-                    path = self.filtersDirectory+"/"+filterName+".xml"
+                    filterFile = filterName+".xml"                    
+                    path = pkg_resources.resource_filename(__name__,"data/filters/"+filterFile)
+                else:
+                    path = path + "/" + filterName + ".xml"
                 if not os.path.exists(path):
                     error = funcname+"(): Path to filter '"+filterName+"' does not exist!\n  Specified path = "+path
                     raise IOError(error)
@@ -376,4 +341,53 @@ class GalacticusFilters(object):
         return effectiveWavelength
 
 
+    def create(self,name,response,description=None,effectiveWavelength=None,origin=None,path=None,\
+                   url=None,vBandFilter=None,vegaOffset=None,verbose=False):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Create tree root
+        root = ET.Element("filter")
+        # Add name and other descriptions
+        ET.SubElement(root,"name").text = name
+        if description is None:
+            description = name
+        ET.SubElement(root,"description").text = description
+        if origin is None:
+            origin = "unknown"
+        ET.SubElement(root,"origin").text = origin
+        if url is None:
+            url = "unknown"
+        ET.SubElement(root,"url").text = url
+        # Add in response data
+        RES = ET.SubElement(root,"response")
+        dataSize = len(response["wavelength"])
+        for i in range(dataSize):
+            wavelength = response["wavelength"][i]
+            transmission = response["response"][i]
+            datum = "{0:7.3f} {1:9.7f}".format(wavelength,transmission)
+            ET.SubElement(RES,"datum").text = datum
+        # Compute effective wavlength and Vega offset if needed
+        if effectiveWavelength is None:
+            wavelength = response["wavelength"]
+            transmission = response["response"]
+            effectiveWavelength = computeEffectiveWavelength(wavelength,transmission)
+        ET.SubElement(root,"effectiveWavelength").text = str(effectiveWavelength)
+        if vegaOffset is None:
+            wavelength = response["wavelength"]
+            transmission = response["response"]
+            if vBandFilter is None:
+                vBandFilter = pkg_resources.resource_filename(__name__,"data/filters/Buser_V.xml")
+            VO = VegaOffset(VbandFilterFile=vBandFilter)
+            vegaOffset = VO.computeOffset(wavelength,transmission)
+        ET.SubElement(root,"vegaOffset").text = str(vegaOffset)
+        # Finalise tree and save to file
+        tree = ET.ElementTree(root)
+        if path is None:
+            path = self.filtersDirectory
+        path = path + "/"+name+".xml"
+        if verbose:
+            print(funcname+"(): writing filter to file: "+path)
+        tree.write(path)
+        formatFile(path)
+        
+        return
 
