@@ -2,6 +2,7 @@
 
 import sys,fnmatch,re
 import numpy as np
+from .galaxyProperties import DatasetClass
 from .constants import luminositySolar,erg
 
 def ergPerSecond(luminosity):    
@@ -11,9 +12,11 @@ def ergPerSecond(luminosity):
     luminosity = 10.0**luminosity
     return luminosity
 
-class LuminosityClass(object):
+class LuminosityClass(DatasetClass):
     
     def __init__(self,datasetName=None,luminosity=None,\
                      redshift=None,outputName=None):
-        self.datasetName = datasetName
-        self.redshift = redshift
+        super(LuminosityClass,self).__init__(datasetName=datasetName,redshift=redshift,\
+                                                 outputName=outputName)
+        self.luminosity = luminosity
+        return

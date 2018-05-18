@@ -185,10 +185,10 @@ class dustScreen(DustProperties):
     def getAttenuatedLuminosity(self,datasetName,overwrite=False,z=None,Rv=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         DUST = self.setAttenuatedLuminosity(datasetName,overwrite=overwrite,z=z,Rv=Rv)
-        return DUST
+        return DUST.luminosity
 
     def writeLuminosityToFile(self,datasetName,z=None,overwrite=False,Rv=None):
-        DUST = self.getAttenuatedLuminosity(datasetName,overwrite=overwrite,z=z,Rv=Rv)
+        DUST = self.setAttenuatedLuminosity(datasetName,overwrite=overwrite,z=z,Rv=Rv)
         redshift = float(DUST.datasetName.group('redshift'))
         if not DUST.datasetName.group(0) in self.galHDF5Obj.availableDatasets(redshift) or overwrite:
             # Select HDF5 output
@@ -196,11 +196,11 @@ class dustScreen(DustProperties):
             # Add luminosity to file
             self.galHDF5Obj.addDataset(HDF5OUT.name+"/nodeData/",DUST.datasetName.group(0),np.copy(DUST.luminosity))
             # Add appropriate attributes to new dataset
-            if fnmatch.fnmatch(self.datasetName.group(0),"*LineLuminosity*"):
+            if fnmatch.fnmatch(DUST.datasetName.group(0),"*LineLuminosity*"):
                 attr = {"unitsInSI":luminositySolar}
             else:
                 attr = {"unitsInSI":luminosityAB}
-            self.galHDF5Obj.addAttributes(out.name+"/nodeData/"+self.datasetName.group(0),attr)
+            self.galHDF5Obj.addAttributes(out.name+"/nodeData/"+DUST.datasetName.group(0),attr)
         return
 
 

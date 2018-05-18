@@ -182,30 +182,30 @@ class CharlotFall2000(CharlotFallBase):
         if datasetName in self.galHDF5Obj.availableDatasets(float(DUST.datasetName.group('redshift'))) and not overwrite:
             DUST.luminosity = np.array(HDF5OUT["nodeData/"+datasetName])
             return DUST
-        # Compute optical depths
-        DUST = self.setOpticalDepths(DUST,**kwargs)
-        # Get dust free luminosities
-        luminosity,recentLuminosity = self.getDustFreeLuminosities(DUST)
-        # Store luminosity
-        DUST.luminosity = DUST.attenuate(luminosity,recentLuminosity)
+        # Compute attenuated luminosity
+        if not datasetName.startswith("total"):
+            # Compute optical depths
+            DUST = self.setOpticalDepths(DUST,**kwargs)
+            # Get dust free luminosities
+            luminosity,recentLuminosity = self.getDustFreeLuminosities(DUST)
+            # Store luminosity
+            DUST.luminosity = DUST.attenuate(luminosity,recentLuminosity)
+        else:
+            diskLum = self.getAttenuatedLuminosity(datasetName.replace("total","disk"),overwrite=overwrite,\
+                                                       z=z,**kwargs)
+            sphereLum = self.getAttenuatedLuminosity(datasetName.replace("total","spheroid"),overwrite=overwrite,\
+                                                         z=z,**kwargs)            
+            DUST.luminosity = np.copy(diskLum) + np.copy(sphereLum)
+            del sphereLum,diskLum
         return DUST
 
     def getAttenuatedLuminosity(self,datasetName,overwrite=False,z=None,**kwargs):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        if datasetName.startswith("total"):
-            DUST = self.createDustClass(datasetName)
-            DISKDUST = self.getAttenuatedLuminosity(datasetName.replace("total","disk"),overwrite=overwrite,z=z,**kwargs)
-            SPHEREDUST = self.getAttenuatedLuminosity(datasetName.replace("total","spheroid"),overwrite=overwrite,z=z,**kwargs)
-            DUST.opticalDepthISM = copy.copy(SPHEREDUST.opticalDepthISM)
-            DUST.opticalDepthClouds = copy.copy(SPHEREDUST.opticalDepthClouds)
-            DUST.luminosity = np.copy(DISKDUST.luminosity) + np.copy(SPHEREDUST.luminosity)
-            del DISKDUST,SPHEREDUST
-        else:
-            DUST = self.setAttenuatedLuminosity(datasetName,overwrite=overwrite,z=z,**kwargs)
-        return DUST
+        DUST = self.setAttenuatedLuminosity(datasetName,overwrite=overwrite,z=z,**kwargs)
+        return DUST.luminosity
 
     def writeLuminosityToFile(self,datasetName,z=None,overwrite=False,**kwargs):
-        DUST = self.getAttenuatedLuminosity(datasetName,overwrite=overwrite,z=z,**kwargs)
+        DUST = self.setAttenuatedLuminosity(datasetName,overwrite=overwrite,z=z,**kwargs)
         redshift = float(DUST.datasetName.group('redshift'))
         if not DUST.datasetName.group(0) in self.galHDF5Obj.availableDatasets(redshift) or overwrite:            
             # Select HDF5 output
@@ -213,11 +213,11 @@ class CharlotFall2000(CharlotFallBase):
             # Add luminosity to file
             self.galHDF5Obj.addDataset(HDF5OUT.name+"/nodeData/",DUST.datasetName.group(0),np.copy(DUST.luminosity))
             # Add appropriate attributes to new dataset
-            if fnmatch.fnmatch(self.datasetName.group(0),"*LineLuminosity*"):
+            if fnmatch.fnmatch(DUST.datasetName.group(0),"*LineLuminosity*"):
                 attr = {"unitsInSI":luminositySolar}
             else:
                 attr = {"unitsInSI":luminosityAB}
-            self.galHDF5Obj.addAttributes(out.name+"/nodeData/"+self.datasetName.group(0),attr)
+            self.galHDF5Obj.addAttributes(out.name+"/nodeData/"+DUST.datasetName.group(0),attr)
         return
 
 

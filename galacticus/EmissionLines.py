@@ -188,7 +188,6 @@ class GalacticusEmissionLine(emissionLineBase):
         np.place(ionizingFluxXToHydrogen,hasFlux,np.log10(XContinuum[hasFlux]/LyContinuum[hasFlux]))
         return ionizingFluxXToHydrogen
 
-
     def calculateLineLuminosity(self,EMLINE,**kwargs):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         # Extract dataset components
@@ -250,7 +249,7 @@ class GalacticusEmissionLine(emissionLineBase):
         EMLINE.luminosity = lineLuminosity
         return EMLINE
                 
-    def setLineInformation(self,datasetName,overwrite=False,**kwargs):
+    def setLineLuminosity(self,datasetName,overwrite=False,**kwargs):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Create class to store emission line information
         EMLINE = EmissionLineClass()
@@ -271,8 +270,8 @@ class GalacticusEmissionLine(emissionLineBase):
             EMLINE.redshift = np.ones(ngals,dtype=float)*z        
         # Check if computing a total line luminosity or a disk/spheroid luminosity        
         if datasetName.startswith("total"):
-            EMDISK = self.setLineInformation(datasetName.replace("total","disk"),overwrite=overwrite,**kwargs)
-            EMSPHERE = self.setLineInformation(datasetName.replace("total","spheroid"),overwrite=overwrite,**kwargs)
+            EMDISK = self.setLineLuminosity(datasetName.replace("total","disk"),overwrite=overwrite,**kwargs)
+            EMSPHERE = self.setLineLuminosity(datasetName.replace("total","spheroid"),overwrite=overwrite,**kwargs)
             EMLINE.luminosity = np.copy(EMDISK.luminosity) + np.copy(EMSPHERE.luminosity)
             del EMDISK,EMSPHERE
         else:
@@ -286,8 +285,8 @@ class GalacticusEmissionLine(emissionLineBase):
     def getLineLuminosity(self,datasetName,overwrite=False,z=None,progressObj=None,\
                           **kwargs):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        EMLINE = self.setLineInformation(datasetName,overwrite=overwrite,**kwargs)
-        return EMLINE
+        EMLINE = self.setLineLuminosity(datasetName,overwrite=overwrite,**kwargs)
+        return EMLINE.luminosity
 
     def writeLineLuminosityToFile(self,overwrite=False):
         if not self.datasetName.group(0) in self.galHDF5Obj.availableDatasets(self.redshift) or overwrite:

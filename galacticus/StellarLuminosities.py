@@ -90,29 +90,31 @@ class StellarLuminosities(object):
 
     def setLuminosity(self,datasetName,z=None,overwrite=False):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
-        # Create dust class
+        # Create luminosity class
         LUM = self.createStellarLuminosityClass(datasetName)
         # Identify HDF5 output
         HDF5OUT = self.galHDF5Obj.selectOutput(float(LUM.datasetName.group('redshift')))
         # Check if luminosity already available
         if datasetName in self.galHDF5Obj.availableDatasets(float(LUM.datasetName.group('redshift'))) and not overwrite:
             LUM.luminosity = np.array(HDF5OUT["nodeData/"+datasetName])
-        else:
-            if LUM.dataset.group('dust') is not None:
-                raise RuntimeError(funcname+"(): cannot load dataset as dust attenuation has not yet been carried out.")
+            return LUM
+        # Check whether dust attenuation is required
+        if LUM.dataset.group('dust') is not None:
+            raise RuntimeError(funcname+"(): cannot load dataset as dust attenuation has not yet been carried out.")
+        # Compute luminosity
+        if datasetName.startswith("total"):
+            DISKLUM = self.setLuminosity(datasetName.replace("total","disk"),z=z,overwrite=overwrite)
+            SPHERELUM = self.setLuminosity(datasetName.replace("total","spheroid"),z=z,overwrite=overwrite)
+            LUM.luminosity = np.copy(DISKLUM.luminosity) + np.copy(SPHERELUM.luminosity)
+            del DISKLUM,SPHERELUM
+        else:            
+            LUM.luminosity = np.copy(np.array(HDF5OUT["nodeData/"+LUM.datasetName.group(0)]))
         return LUM
 
     def getLuminosity(self,datasetName,z=None,overwrite=False):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
-        if datasetName.startswith("total"):
-            LUM = self.createStellarLuminosityClass(datasetName)
-            DISKLUM = self.getLuminosity(datasetName.replace("total","disk"),z=z,overwrite=overwrite)
-            SPHERELUM = self.getLuminosity(datasetName.replace("total","spheroid"),z=z,overwrite=overwrite)
-            LUM.luminosity = np.copy(DISKLUM.luminosity) + np.copy(SPHERELUM.luminosity)
-            del DISKLUM,SPHERELUM
-        else:
-            LUM = self.setLuminosity(datasetName,z=z,overwrite=overwrite)
-        return LUM
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name    
+        LUM = self.setLuminosity(datasetName,z=z,overwrite=overwrite)                
+        return LUM.luminosity
         
 
     def createBulgeToTotalClass(self,datasetName):
@@ -150,15 +152,15 @@ class StellarLuminosities(object):
         if RATIO.datasetName.group('dust') is not None:
             spheroidName = spheroidName + RATIO.datasetName.group('dust')
         # Extract luminosities
-        SPHERELUM = self.getLuminosity(spheroidName,z=z,overwrite=overwrite)
-        TOTALLUM = self.getLuminosity(spheroidName.replace("spheroid","total"),z=z,overwrite=overwrite)
+        bulgeLum = self.getLuminosity(spheroidName,z=z,overwrite=overwrite)
+        totalLum = self.getLuminosity(spheroidName.replace("spheroid","total"),z=z,overwrite=overwrite)
         # Compute ratio
-        RATIO.BTratio = np.copy(SPHERELUM.luminosity)/np.copy(TOTALLUM.luminosity)
-        del SPHERELUM,TOTALLUM
+        RATIO.BTratio = np.copy(buldgeLum)/np.copy(totalLum)
+        del bulgeLum,totalLum
         return RATIO
 
     def getBulgeToTotal(self,datasetName,z,overwrite=False):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         RATIO = self.setBulgeToTotal(datasetName,z=z,overwrite=overwrite)
-        return RATIO
+        return RATIO.BTratio
 
