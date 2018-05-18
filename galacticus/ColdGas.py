@@ -129,7 +129,7 @@ class ColdGas(object):
         return GAS
 
     def getColdGasMass(self,datasetName,z,overwrite=False):
-        GAS = self.setGasMass(datasetName,z,overwrite=overwrite)
+        GAS = self.setColdGasMass(datasetName,z,overwrite=overwrite)
         return GAS.mass
 
     def setColdGasMetalsAbundance(self,datasetName,z,overwrite=False):
@@ -177,7 +177,7 @@ class ColdGas(object):
 
     def getColdGasMetallicity(datasetName,z,overwrite=False,solarUnits=True):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        GAS = self.setGasMetallicity(datasetName,z,overwrite=overwrite,solarUnits=solarUnits):
+        GAS = self.setColdGasMetallicity(datasetName,z,overwrite=overwrite,solarUnits=solarUnits)
         return GAS.metallicity
     
     
