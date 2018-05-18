@@ -191,26 +191,31 @@ class GalacticusEmissionLine(emissionLineBase):
     
     def ionizingContinuuaAvailable(self,datasetName):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
-        # Extract dataset components
-        EMLINE = EmissionLineClass()
-        EMLINE.datasetName = parseEmissionLineLuminosity(datasetName)
-        lineName = EMLINE.datasetName.group('lineName')
-        component = EMLINE.datasetName.group('component')
-        redshiftString = EMLINE.datasetName.group('redshiftString')
-        frame = EMLINE.datasetName.group('frame').replace(":","")
-        recent = EMLINE.datasetName.group('recent')
-        if recent is None:
-            recent = ""        
-        # Build continuum dataset names
-        LyDatasetName = component+"LymanContinuumLuminosity"+redshiftString+recent
-        HeDatasetName = component+"HeliumContinuumLuminosity"+redshiftString+recent
-        OxDatasetName = component+"OxygenContinuumLuminosity"+redshiftString+recent
-        # Check that ALL of these datasets are available
-        check = self.IONISATION.ionizingLuminosityAvailable(LyDatasetName) and \
-            self.IONISATION.ionizingLuminosityAvailable(HeDatasetName) and \
-            self.IONISATION.ionizingLuminosityAvailable(OxDatasetName)
-        if not check:
-            raise ValueError(funcname+"(): cannot compute emission line '"+datasetName+"'. No ionizing continuua avaialble.")
+        if datasetName.startswith("total"):
+            check = self.ionizingContinuuaAvailable(datasetName.replace("total","disk")) and \
+                self.ionizingContinuuaAvailable(datasetName.replace("total","spheroid"))
+        else:
+            # Extract dataset components
+            EMLINE = EmissionLineClass()
+            EMLINE.datasetName = parseEmissionLineLuminosity(datasetName)
+            lineName = EMLINE.datasetName.group('lineName')
+            component = EMLINE.datasetName.group('component')
+            redshiftString = EMLINE.datasetName.group('redshiftString')
+            frame = EMLINE.datasetName.group('frame').replace(":","")
+            recent = EMLINE.datasetName.group('recent')
+            if recent is None:
+                recent = ""        
+            # Build continuum dataset names
+            LyDatasetName = component+"LymanContinuumLuminosity"+redshiftString+recent
+            HeDatasetName = component+"HeliumContinuumLuminosity"+redshiftString+recent
+            OxDatasetName = component+"OxygenContinuumLuminosity"+redshiftString+recent
+            # Check that ALL of these datasets are available
+            check = self.IONISATION.ionizingLuminosityAvailable(LyDatasetName) and \
+                self.IONISATION.ionizingLuminosityAvailable(HeDatasetName) and \
+                self.IONISATION.ionizingLuminosityAvailable(OxDatasetName)
+            if not check:
+                raise ValueError(funcname+"(): cannot compute emission line '"+datasetName+\
+                                     "'. No ionizing continuua avaialble.")
         return check
 
 
@@ -301,6 +306,8 @@ class GalacticusEmissionLine(emissionLineBase):
             EMLINE.luminosity = np.copy(diskLum) + np.copy(sphereLum)
             del diskLum,sphereLum
         else:
+            # Check can compute line luminosity
+            assert(self.ionizingContinuuaAvailable(datasetName))
             # Compute line luminosity
             EMLINE = self.calculateLineLuminosity(EMLINE,**kwargs)
         # Store HII region information
@@ -311,7 +318,6 @@ class GalacticusEmissionLine(emissionLineBase):
     def getLineLuminosity(self,datasetName,overwrite=False,z=None,progressObj=None,\
                           **kwargs):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        self.checkIonizingContinuuaAvailable(datasetName)
         EMLINE = self.setLineLuminosity(datasetName,overwrite=overwrite,**kwargs)
         return EMLINE.luminosity
 
