@@ -104,7 +104,7 @@ class StellarLuminosities(object):
             LUM.luminosity = np.array(HDF5OUT["nodeData/"+datasetName])
             return LUM
         # Check whether dust attenuation is required
-        if LUM.dataset.group('dust') is not None:
+        if LUM.datasetName.group('dust') is not None:
             raise RuntimeError(funcname+"(): cannot load dataset as dust attenuation has not yet been carried out.")
         # Compute luminosity
         if datasetName.startswith("total"):
