@@ -319,7 +319,7 @@ class HIGas(ColdGas):
         restWavelength = 21.0e-2 # 21cm in m
         restFrequency21cm = (speedOfLight/restWavelength)/1.0e6 # MHz
         # Compute disk velocity line width
-        velocity = np.copy(np.array(HDF5OUT["nodeData/"MATCH.group('component')+"Velocity"]))
+        velocity = np.copy(np.array(HDF5OUT["nodeData/"+MATCH.group('component')+"Velocity"]))
         HDF5OUT = self.galHDF5Obj.selectOutput(z)
         if MATCH.group('averaged') is not None:
             velocityLineWidth = 1.57*velocity
