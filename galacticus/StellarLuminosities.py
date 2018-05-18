@@ -71,6 +71,11 @@ class StellarLuminosities(object):
         self.unitsInSI = luminosityAB
         return
 
+    def availableLuminosities(self,z):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        properties = self.galHDF5Obj.availableDatasets(z)
+        return fnmatch.filter(properties,"*LuminositiesStellar:*")
+
     def createStellarLuminosityClass(self,datasetName):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         # Create class to store dust optical depths information
