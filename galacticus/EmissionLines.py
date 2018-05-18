@@ -270,10 +270,10 @@ class GalacticusEmissionLine(emissionLineBase):
             EMLINE.redshift = np.ones(ngals,dtype=float)*z        
         # Check if computing a total line luminosity or a disk/spheroid luminosity        
         if datasetName.startswith("total"):
-            EMDISK = self.setLineLuminosity(datasetName.replace("total","disk"),overwrite=overwrite,**kwargs)
-            EMSPHERE = self.setLineLuminosity(datasetName.replace("total","spheroid"),overwrite=overwrite,**kwargs)
-            EMLINE.luminosity = np.copy(EMDISK.luminosity) + np.copy(EMSPHERE.luminosity)
-            del EMDISK,EMSPHERE
+            diskLum = self.getLineLuminosity(datasetName.replace("total","disk"),overwrite=overwrite,**kwargs)
+            sphereLum = self.getLineLuminosity(datasetName.replace("total","spheroid"),overwrite=overwrite,**kwargs)
+            EMLINE.luminosity = np.copy(diskLum) + np.copy(sphereLum)
+            del diskLum,sphereLum
         else:
             # Compute line luminosity
             EMLINE = self.calculateLineLuminosity(EMLINE,**kwargs)
