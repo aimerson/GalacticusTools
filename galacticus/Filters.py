@@ -151,6 +151,20 @@ class VegaOffset(object):
 ###############################################################################
 # FILTER FILES
 ###############################################################################
+
+def getFilterTransmission(filterFile):
+    # Open xml file and load structure
+    xmlStruct = ET.parse(filterFile)
+    xmlRoot = xmlStruct.getroot()
+    xmlMap = {c.tag:p for p in xmlRoot.iter() for c in p}
+    # Read filter transmission
+    response = xmlRoot.find("response")
+    data = response.findall("datum")
+    transmission = np.zeros(len(data),dtype=[("wavelength",float),("transmission",float)])
+    for i,datum in enumerate(data):
+        transmission["wavelength"][i] = float(datum.text.split()[0])
+        transmission["transmission"][i] = float(datum.text.split()[1])
+    return transmission.view(np.recarray)
         
 class FilterBaseClass(object):
 
