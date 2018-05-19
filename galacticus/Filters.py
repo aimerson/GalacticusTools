@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-import sys,fnmatch
+import sys,fnmatch,re
 import numpy as np
 from scipy.interpolate import interp1d
 from scipy.integrate import romb
@@ -178,7 +178,7 @@ class FilterBaseClass(object):
         self.url = None
         return
 
-    def setEffectiveWavelngth(self):
+    def setEffectiveWavelength(self):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         if self.transmission is None:
             raise ValueError(funcname+"(): no filter transmission has been set.")
@@ -194,7 +194,7 @@ class FilterBaseClass(object):
         self.transmission = np.zeros(len(wavelength),dtype=[("wavelength",float),("transmission",float)]).view(np.recarray)        
         self.transmission.wavelength = wavelength
         self.transmission.transmission = response
-        self.setEffectiveWavelngth()
+        self.setEffectiveWavelength()
         return
 
     def setVegaOffset(self,vBandFile=None,kRomberg=8,**kwargs):
@@ -348,6 +348,64 @@ def getTopHatLimits(wavelengthCentral,resolution,verbose=False):
 
 class TopHat(FilterBaseClass):
     
+    def __init__(self):
+        classname = self.__class__.__name__
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        super(TopHat,self).__init__()
+        self.wavelengthCentral = None
+        self.wavelengthWidth = None
+        return
+
+    
+    def __call__(self,filterName,vBandFile=None,kRomberg=8,transmissionSize=1000,edgesFraction=0.1,**kwargs):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        if re.search("sedTopHat_(?P<center>[\d\.]+)_(?P<width>[\d\.]+)",filterName) is not None:
+            self.setSEDTopHatFilter(filterName,vBandFile=vBandFile,kRomberg=kRomberg,transmissionSize=transmissionSize,\
+                                        edgesFraction=edgesFraction,**kwargs)
+        else:
+            raise ValueError(funcname+"(): type of top hat filter not recognized!")
+        return self
+            
+
+    def buildTransmissionCurve(self,centralWavelength,wavelengthWidth,transmissionSize=1000,\
+                                   edgesFraction=0.1):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        self.wavelengthCentral = centralWavelength
+        self.wavelengthWidth = wavelengthWidth
+        fraction = 0.5 + edgesFraction
+        lowerLimit = self.wavelengthCentral - self.wavelengthWidth*fraction
+        upperLimit = self.wavelengthCentral + self.wavelengthWidth*fraction
+        self.transmission = np.zeros(transmissionSize,dtype=[("wavelength",float),("transmission",float)])
+        self.transmission = self.transmission.view(np.recarray)
+        self.transmission.wavelength = np.linspace(lowerLimit,upperLimit,transmissionSize)
+        lowerEdge = self.wavelengthCentral - self.wavelengthWidth/2.0
+        upperEdge = self.wavelengthCentral + self.wavelengthWidth/2.0
+        inside = np.logical_and(self.transmission.wavelength>=lowerEdge,self.transmission.wavelength<=upperEdge)
+        np.place(self.transmission.transmission,inside,1.0)
+        del inside
+        self.setEffectiveWavelength()
+        return
+            
+    def setSEDTopHatFilter(self,filterName,vBandFile=None,kRomberg=8,transmissionSize=1000,edgesFraction=0.1,**kwargs):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        
+        searchString = "sedTopHat_(?P<center>[\d\.]+)_(?P<width>[\d\.]+)"
+        MATCH = re.search(searchString,filterName)
+        if MATCH is None:
+            raise ParseError(funcname+"(): filter is not an SED top hat filter.")
+        self.name = filterName
+        self.buildTransmissionCurve(float(MATCH.group('center')),float(MATCH.group('width')),\
+                                        transmissionSize=transmissionSize,edgesFraction=edgesFraction)
+        self.origin = "Galacticus source code"
+        self.description = "SED top hat filter centered on "+str(self.wavelengthCentral)+" Angstroms with width "+\
+            str( self.wavelengthWidth)+" Angstroms."
+        self.url = "None"
+        self.setVegaOffset(vBandFile=vBandFile,kRomberg=8,**kwargs)
+        return
+
+        
+class TopHat_v0(FilterBaseClass):
+    
     def __init__(self,filterName,VegaObj=None,VbandFilterFile=None,kRomberg=8,\
                      transmissionArraySize=1000,verbose=False,**kwargs):
         super(TopHat,self).__init__()
@@ -467,8 +525,9 @@ class GalacticusFilters(object):
     def load(self,filterName,path=None,store=False,**kwargs):                
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         if filterName not in self.filters.keys():        
-            if fnmatch.fnmatch(filterName,"*topHat*") or fnmatch.fnmatch(filterName,"*emissionLine*"):
-                FILTER = TopHat(filterName,**kwargs)
+            if fnmatch.fnmatch(filterName.lower(),"*tophat*") or fnmatch.fnmatch(filterName,"*emissionLine*"):
+                T = TopHat()
+                FILTER = T(filterName,**kwargs)                
             else:
                 if path is None:
                     filterFile = filterName+".xml"                    
