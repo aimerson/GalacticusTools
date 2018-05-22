@@ -41,7 +41,6 @@ class StarFormationRateClass(DatasetClass):
         self.sfr = None
         return
 
-
 def parseStellarMass(datasetName):
     funcname = sys._getframe().f_code.co_name
     searchString = "(?P<component>\w+)MassStellar"
