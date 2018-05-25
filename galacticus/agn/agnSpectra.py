@@ -4,6 +4,7 @@ import os,sys,re,shutil
 import subprocess
 import tempfile
 import urllib
+import datetime
 import pkg_resources
 import numpy as np
 from ..constants import speedOfLight,angstrom
@@ -135,6 +136,7 @@ class agnSpectralTables(object):
         attr["source"] = "Computed using agn_spectrum.c downloaded from "+self.codeURL
         attr["URL"] = "http://adsabs.harvard.edu/abs/2007ApJ...654..731H"
         attr["reference"] = "Hopkins et al. (2007)"
+        attr["creationTime"] = str(datetime.datetime.now())
         # Close file
         FILE.close()
         # Clear executable
