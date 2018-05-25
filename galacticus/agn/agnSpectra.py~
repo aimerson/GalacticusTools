@@ -4,6 +4,7 @@ import os,sys,re,shutil
 import subprocess
 import tempfile
 import urllib
+import datetime
 import pkg_resources
 import numpy as np
 from ..constants import speedOfLight,angstrom
@@ -135,15 +136,16 @@ class agnSpectralTables(object):
         attr["source"] = "Computed using agn_spectrum.c downloaded from "+self.codeURL
         attr["URL"] = "http://adsabs.harvard.edu/abs/2007ApJ...654..731H"
         attr["reference"] = "Hopkins et al. (2007)"
+        attr["creationTime"] = str(datetime.datetime.now())
         # Close file
         FILE.close()
         # Clear executable
         os.remove(exe)
         return
 
-    def readHopkinsSpectralTables(self):        
+    def readHopkinsSpectralTables(self,overwrite=False):        
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name                
-        if not os.path.exists(self.hdf5File):             
+        if not os.path.exists(self.hdf5File) or overwrite:             
             self.createHopkinsSpectralTables()
         SEDFILE = HDF5(self.hdf5File,'r')
         TABLE = agnSpectralTableClass()
@@ -154,12 +156,13 @@ class agnSpectralTables(object):
         SEDFILE.close()
         return TABLE
     
-
-    
-
-
-
-
-
-
+def parseAGNLuminosity(datasetName):
+    # Extract dataset name information
+    searchString = "^agnLuminosity:(?P<filterName>[^:]+)(?P<frame>:[^:]+)"+\
+        "(?P<redshiftString>:z(?P<redshift>[\d\.]+))(?P<absorption>:noAbsorption)?"+\
+        "(?P<alphaString>:alpha(?P<alpha>[0-9\-\+\.]+))?$"
+    MATCH = re.search(searchString,datasetName)
+    if not MATCH:
+        raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
+    return MATCH
 

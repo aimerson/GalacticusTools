@@ -73,6 +73,7 @@ class EmissionLineClass(LuminosityClass):
         return
 
 def parseEmissionLineLuminosity(datasetName):
+    funcname = sys._getframe().f_code.co_name
     # Extract dataset name information
     searchString = "^(?P<component>disk|spheroid|total)LineLuminosity:(?P<lineName>[^:]+)(?P<frame>:[^:]+)"+\
         "(?P<filterName>:[^:]+)?(?P<redshiftString>:z(?P<redshift>[\d\.]+))(?P<recent>:recent)?$"
