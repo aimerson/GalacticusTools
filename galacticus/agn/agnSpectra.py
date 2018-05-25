@@ -156,12 +156,13 @@ class agnSpectralTables(object):
         SEDFILE.close()
         return TABLE
     
-
-    
-
-
-
-
-
-
+def parseAGNLuminosity(datasetName):
+    # Extract dataset name information
+    searchString = "^agnLuminosity:(?P<filterName>[^:]+)(?P<frame>:[^:]+)"+\
+        "(?P<redshiftString>:z(?P<redshift>[\d\.]+))(?P<absorption>:noAbsorption)?"+\
+        "(?P<alphaString>:alpha(?P<alpha>[0-9\-\+\.]+))?$"
+    MATCH = re.search(searchString,datasetName)
+    if not MATCH:
+        raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
+    return MATCH
 
