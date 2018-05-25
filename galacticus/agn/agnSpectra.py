@@ -154,5 +154,3 @@ class agnSpectralTables(object):
         TABLE.sed = np.copy(np.array(SEDFILE.fileObj["/SED"]))                                                
         SEDFILE.close()
         return TABLE
-    
-k
