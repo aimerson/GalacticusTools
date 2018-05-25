@@ -1,0 +1,36 @@
+#! /usr/bin/env python
+
+import os,glob
+import subprocess
+import urllib
+import pkg_resources
+
+
+class agnSpectralTables(object):
+
+    def __init__(self):
+        self.hdf5File = pkg_resources.resource_filename(__name__,"data/blackHoles/AGN_SEDs_Hopkins2007.hdf5")
+        return
+
+    def installHopkinsCode(self,path):
+        agnPath = path+"/AGN_Spectrum/"
+        if not os.path.exists(agnPath):
+            os.makedirs(agnPath)        
+        agnCode = urllib.URLopener()
+        codeURL = "http://www.tapir.caltech.edu/~phopkins/Site/qlf_files/agn_spectrum.c"
+        codeFile = agnPath+"agn_spectrum.c"
+        codeFile.retrieve(codeURL,codeFile)
+        return
+
+    
+
+    
+
+    
+
+
+
+
+
+
+

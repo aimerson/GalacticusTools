@@ -56,14 +56,12 @@
     <lambda0 value="0.04326"/>
   </haloSpinDistributionMethod>
   <randomSpinResetMassFactor value="2.0"/>
-  <darkMatterHaloMassLossRateMethod value="zero"/>
   <accretionHaloMethod value="simple"/>
   <reionizationSuppressionRedshift value="10.5"/>
   <reionizationSuppressionVelocity value="35.0"/>
   <hotHaloMassDistributionMethod value="betaProfile"/>
   <hotHaloTemperatureProfileMethod value="virial"/>
   <hotHaloCoreRadiusOverVirialRadius value="0.3"/>
-  <hotHaloAngularMomentumAlwaysGrows value="true"/>
   <hotHaloAngularMomentumLossFraction value="0.3"/>
   <coolingSpecificAngularMomentumMethod value="constantRotation"/>
   <hotHaloOutflowReturnRate value="5.0"/>
@@ -71,16 +69,13 @@
   <coolingMeanAngularMomentumFrom value="hotGas"/>
   <coolingRotationVelocityFrom value="hotGas"/>
   <coolingRadiusMethod value="simple"/>
+  <coolingRateMethod value="whiteFrenk1991"/>
+  <coolingTimeMethod value="simple"/>
+  <coolingTimeAvailableAgeFactor value="0"/>
+  <coolingTimeAvailableMethod value="whiteFrenk1991"/>
+  <coolingTimeSimpleDegreesOfFreedom value="3"/>
   <starveSatellites value="false"/>
-  <coolingRateMethod value="whiteFrenk1991">
-    <velocityCutOff value="10000"/>
-  </coolingRateMethod>
-  <coolingTimeMethod value="simple">
-    <degreesOfFreedom value="3"/>
-  </coolingTimeMethod>
-  <coolingTimeAvailableMethod value="whiteFrenk1991">
-    <ageFactor value="0"/>
-  </coolingTimeAvailableMethod>
+  <zeroCoolingRateAboveVelocity value="10000"/>
   <hotHaloRamPressureStrippingMethod value="Font2008"/>
   <hotHaloRamPressureForceMethod value="Font2008"/>
   <hotHaloRamPressureStrippingTimescaleMethod value="ramPressureAcceleration"/>
@@ -102,8 +97,7 @@
   <starFormationRateSurfaceDensityDisksMethod value="KMT09"/>
   <molecularComplexClumpingFactorKMT09 value="5.0"/>
   <starFormationFrequencyKMT09 value="0.385"/>
-  <molecularFractionFastKMT09 value="false"/>
-  <assumeMonotonicSurfaceDensityKMT09 value="true"/>
+  <molecularFractionFastKMT09 value="true"/>
   <starFormationDiskMinimumTimescale value="0.001"/>
   <starFormationTimescaleSpheroidsMethod value="dynamicalTime"/>
   <starFormationSpheroidEfficiency value="0.04"/>
@@ -117,14 +111,12 @@
   <imfChabrierYieldInstantaneous value="0.035"/>
   <hotHaloExcessHeatDrivesOutflow value="true"/>
   <blackHoleHeatsHotHalo value="true"/>
-  <starFormationFeedbackDisksMethod value="powerLaw">
-    <velocityCharacteristic value="250.0"/>
-    <exponent value="3.5"/>
-  </starFormationFeedbackDisksMethod>
-  <starFormationFeedbackSpheroidsMethod value="powerLaw">
-    <velocityCharacteristic value="100.0"/>
-    <exponent value="3.5"/>
-  </starFormationFeedbackSpheroidsMethod>
+  <starFormationFeedbackDisksMethod value="powerLaw"/>
+  <starFormationFeedbackSpheroidsMethod value="powerLaw"/>
+  <diskOutflowVelocity value="250.0"/>
+  <spheroidOutflowVelocity value="100.0"/>
+  <diskOutflowExponent value="3.5"/>
+  <spheroidOutflowExponent value="3.5"/>
   <accretionDisksMethod value="switched">
     <accretionRateThinDiskMaximum value="0.30"/>
     <accretionRateThinDiskMinimum value="0.01"/>
@@ -165,16 +157,9 @@
   <timestepSimpleAbsolute value="1.0"/>
   <timestepSimpleRelative value="0.1"/>
   <mergerTreeOutputReferences value="false"/>
-  <odeAlgorithm value="BDF"/>
-  <odeLatentIntegratorType value="trapezoidal"/>
-  <odeLatentIntegratorOrder value="15"/>
-  <diskLuminositiesStellarInactive value="true"/>
-  <spheroidLuminositiesStellarInactive value="true"/>
-  <satelliteBoundMassIsInactive value="true"/>
-  <ageStatisticsStandardIsInactive value="true"/>
   <spheroidOutputStarFormationRate value="true"/>
   <diskOutputStarFormationRate value="true"/>
-  <mergerTreeReadFileName value="/nobackupp2/amerson/MergerTrees/MillenniumWMAP1/76000100.hdf5"/>
+  <mergerTreeReadFileName value="/nobackupNFS/sunglass/amerson/MergerTrees/MillenniumWMAP1/76000100.hdf5"/>
   <allTreesExistAtFinalTime value="false"/>
   <mergerTreeReadOutputTimeSnapTolerance value="0.0"/>
   <treeNodeMethodPosition value="preset"/>
@@ -200,6 +185,7 @@
     <outputMergerTrees value="true"/>
     <outputMergerReferences value="false"/>
   </mergerTreeOutput>
+  <blackHoleOutputAccretion value="true"/>
   <luminosityFilter value="SDSS_u SDSS_u SDSS_u SDSS_u SDSS_g SDSS_g SDSS_g SDSS_g SDSS_r SDSS_r SDSS_r SDSS_r SDSS_i SDSS_i SDSS_i SDSS_i SDSS_z SDSS_z SDSS_z SDSS_z Lyc Lyc Lyc Lyc HeliumContinuum HeliumContinuum HeliumContinuum HeliumContinuum OxygenContinuum OxygenContinuum OxygenContinuum OxygenContinuum sedTopHatArray_Chabrier_4000_20000_2000 sedTopHatArray_Chabrier_4000_20000_2000 sedTopHatArray_Chabrier_4000_20000_2000 sedTopHatArray_Chabrier_4000_20000_2000"/>
   <luminosityType value="rest rest observed observed rest rest observed observed rest rest observed observed rest rest observed observed rest rest observed observed rest rest observed observed rest rest observed observed rest rest observed observed rest rest observed observed"/>
   <luminosityRedshift value="all all all all all all all all all all all all all all all all all all all all all all all all all all all all all all all all all all all all"/>

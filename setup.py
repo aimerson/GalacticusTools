@@ -6,7 +6,7 @@ from setuptools import setup, find_packages
 
 datafiles = ['data/LuminosityFunctions/*.dat','data/Simulations/*.xml','data/stellarAstrophysics/Vega/*.xml',\
                  'data/stellarAstrophysics/hiiRegions/*.hdf5','data/dust/*/*.xml','data/dust/*/*.dat',\
-                 'data/filters/*.xml','data/powerSpectra/*.dat',\
+                 'data/blackHoles/*.hdf5','data/filters/*.xml','data/powerSpectra/*.dat',\
                  'data/exampleRuns/*.hdf5','data/exampleRuns/*.xml']
 
 
