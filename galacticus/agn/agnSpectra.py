@@ -141,9 +141,9 @@ class agnSpectralTables(object):
         os.remove(exe)
         return
 
-    def readHopkinsSpectralTables(self):        
+    def readHopkinsSpectralTables(self,overwrite=False):        
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name                
-        if not os.path.exists(self.hdf5File):             
+        if not os.path.exists(self.hdf5File) or overwrite:             
             self.createHopkinsSpectralTables()
         SEDFILE = HDF5(self.hdf5File,'r')
         TABLE = agnSpectralTableClass()
