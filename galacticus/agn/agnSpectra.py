@@ -167,3 +167,11 @@ def parseAGNLuminosity(datasetName):
         raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
     return MATCH
 
+
+class AGNLuminosityClass(LuminosityClass):
+
+    def __init__(self,datasetName=None,luminosity=None,\
+                     redshift=None,outputName=None):
+        super(AGNLuminosityClass,self).__init__(datasetName=datasetName,luminosity=luminosity,\
+                                                    redshift=redshift,outputName=outputName)
+        return

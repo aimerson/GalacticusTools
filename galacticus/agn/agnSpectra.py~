@@ -157,6 +157,7 @@ class agnSpectralTables(object):
         return TABLE
     
 def parseAGNLuminosity(datasetName):
+    funcname = sys._getframe().f_code.co_name
     # Extract dataset name information
     searchString = "^agnLuminosity:(?P<filterName>[^:]+)(?P<frame>:[^:]+)"+\
         "(?P<redshiftString>:z(?P<redshift>[\d\.]+))(?P<absorption>:noAbsorption)?"+\
