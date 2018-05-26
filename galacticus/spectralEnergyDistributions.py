@@ -254,6 +254,7 @@ class SEDClass(DatasetClass):
 
 
 def parseSED(datasetName):
+    funcname = sys._getframe().f_code.co_name
     searchString = "^(?P<component>disk|spheroid|total)SED:(?P<frame>[^:]+)"+\
         "(?P<emlines>:(?P<lineProfile>[^:_]+)_(?P<lineWidth>[^:]+))?"+\
         "(?P<snrString>:snr(?P<snr>[\d\.]+))?"+\
@@ -355,7 +356,7 @@ class GalacticusSED(object):
             SED.emissionLines = self.EmissionLines.getLineProfiles(SED.datasetName.group(0),SED.wavelength,\
                                                                       galaxyMask=SED.mask)
         else:
-            SED.emissonLines = np.zeros((np.count_nonzero(SED.mask),len(SED.wavelength)),dtype=float)
+            SED.emissionLines = np.zeros((np.count_nonzero(SED.mask),len(SED.wavelength)),dtype=float)
         return SED
 
     def ergPerSecond(self,sed,zeroCorrection=1.0e-50):
