@@ -26,28 +26,30 @@ def Generate_Random_Inclinations(N,degrees=True):
     return angles
 
 
-def getInclination(galHDF5Obj,z):
+def getInclination(galHDF5Obj,z,degrees=True):
     """
     getInclination: Generate a list of inclinations for the 
                     galaxies at redshift, z.
 
-    USAGE: inc = getInclination(galHDF5Obj,z,[overwrite],[returnDataset])
+    USAGE: inc = getInclination(galHDF5Obj,z,[degrees])
     
         Inputs
-
              galHDF5Obj    : Instance of GalacticusHDF5 file object.
              z             : Redshift of output to work with. 
-
-        Outputs
-   
+             degrees       : Return inclination in degrees (True) or radians (False).
+                             [Default = True]
+        Outputs   
             inc            : Numpy array of inclinations (if returnDataset=True).
     
     """
     out = galHDF5Obj.selectOutput(z)
     # Check if inclination already calculated
     if "inclination" in galHDF5Obj.availableDatasets(z) and not overwrite:
-        return np.array(out["nodeData/inclination"])
+        inclination = np.array(out["nodeData/inclination"])
+        if not degrees:
+            inclination *= (Pi/180.0)
+        return inclination
     N = len(np.array(out["nodeData/nodeIndex"]))
-    inclination = Generate_Random_Inclinations(N)
+    inclination = Generate_Random_Inclinations(N,degrees=degrees)
     return inclination
 

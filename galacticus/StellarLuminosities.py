@@ -78,7 +78,7 @@ class StellarLuminosities(object):
 
     def createStellarLuminosityClass(self,datasetName):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
-        # Create class to store dust optical depths information
+        # Create class to store luminosity information
         LUM = StellarLuminosityClass()
         LUM.datasetName = parseStellarLuminosity(datasetName)
         # Identify HDF5 output
