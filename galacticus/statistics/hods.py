@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-import sys
+import sys,fnmatch
 import numpy as np
 import warnings
 from ..utils.match_searchsorted import match
@@ -88,21 +88,24 @@ class HaloOccupationDistribution(object):
             print(funcname+"(): counting galaxies...")
         galaxies,bins = np.histogram(haloMass[mask],self.massBins,weights=weights[mask])
         self.galaxies += np.copy(galaxies.astype(float))
-        self.galaxies2 += np.copy(galaxies**2).astype(float)
+        #self.galaxies2 += np.copy(galaxies**2).astype(float)
+        self.galaxies2 += np.copy(np.sqrt(galaxies)).astype(float)
         # Count central galaxies
         if verbose:
             print(funcname+"(): counting central galaxies...")
         galaxies,bins = np.histogram(haloMass[np.logical_and(mask,CENTRALS)],self.massBins,\
                                      weights=weights[np.logical_and(mask,CENTRALS)])
         self.centrals += np.copy(galaxies.astype(float))
-        self.centrals2 += np.copy(galaxies**2).astype(float)
+        #self.centrals2 += np.copy(galaxies**2).astype(float)
+        self.centrals2 += np.copy(np.sqrt(galaxies)).astype(float)
         # Count satellite galaxies
         if verbose:
             print(funcname+"(): counting satellite galaxies...")
         galaxies,bins = np.histogram(haloMass[np.logical_and(mask,SATELLITES)],self.massBins,\
                                      weights=weights[np.logical_and(mask,SATELLITES)])
         self.satellites += np.copy(galaxies.astype(float))
-        self.satellites2 += np.copy(galaxies**2).astype(float)
+        #self.satellites2 += np.copy(galaxies**2).astype(float)
+        self.satellites2 += np.copy(np.sqrt(galaxies)).astype(float)
         return
 
     def addHalos(self,galaxies,massName="nodeMass200.0",weightHalos=False,verbose=False):
@@ -126,7 +129,7 @@ class HaloOccupationDistribution(object):
         if verbose:
             print(funcname+"(): located "+str(totalHostHalos)+" host halos...")
         hosts = getHostIndex(galaxies.nodeIsIsolated)
-        self.MASS = np.log10(np.copy(galaxies[massName][hosts]))
+        self.MASS = np.log10(np.copy(galaxies[massName][hosts]+1.0e-50))
         return
 
     def addHalosToHOD(self,mask=None,verbose=False):
@@ -163,7 +166,7 @@ class HaloOccupationDistribution(object):
         return
 
 
-    def computeHOD(self):
+    def computeHOD(self,errors="stddev"):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         np.place(self.halos,self.halos==0.0,1.0)
         dm = self.massBins[1] - self.massBins[0]
@@ -175,15 +178,30 @@ class HaloOccupationDistribution(object):
         hod.mass = np.copy(bins)
         mean = self.galaxies/self.halos
         hod.allGalaxies = np.copy(mean)
-        sigma = np.sqrt((self.galaxies2/self.halos)-mean**2)
+        if fnmatch.fnmatch(errors.lower(),"stddev"):
+            sigma = np.sqrt((self.galaxies2/self.halos)-mean**2)
+        elif fnmatch.fnmatch(errors.lower(),"poisson"):
+            sigma = np.sqrt(self.galaxies)/self.halos
+        else:
+            raise ValueError("Errors option not recognised! Options = 'stddev' or 'poisson'.")
         hod.allGalaxiesError = np.copy(sigma)
         mean = self.centrals/self.halos
         hod.centrals = np.copy(mean)
-        sigma = np.sqrt((self.centrals2/self.halos)-mean**2)
+        if fnmatch.fnmatch(errors.lower(),"stddev"):
+            sigma = np.sqrt((self.centrals2/self.halos)-mean**2)
+        elif fnmatch.fnmatch(errors.lower(),"poisson"):
+            sigma = np.sqrt(self.centrals)/self.halos
+        else:
+            raise ValueError("Errors option not recognised! Options = 'stddev' or 'poisson'.")
         hod.centralsError = np.copy(sigma)
         mean = self.satellites/self.halos
         hod.satellites = np.copy(mean)
-        sigma = np.sqrt((self.satellites2/self.halos)-mean**2)
+        if fnmatch.fnmatch(errors.lower(),"stddev"):
+            sigma = np.sqrt((self.satellites2/self.halos)-mean**2)
+        elif fnmatch.fnmatch(errors.lower(),"poisson"):
+            sigma = np.sqrt(self.satellites)/self.halos
+        else:
+            raise ValueError("Errors option not recognised! Options = 'stddev' or 'poisson'.")
         hod.satellitesError = np.copy(sigma)        
         return hod
 

@@ -3,6 +3,18 @@
 import sys
 import h5py
 import numpy as np
+import fnmatch
+
+def flattenNestedList(l):
+    return [item for sublist in l for item in sublist]
+
+def findMatchingItems(allItems,itemsToFind):
+    found = [fnmatch.filter(allItems,item) for item in itemsToFind]
+    return list(set(flattenNestedList(found)))
+
+def findMissingItems(allItems,itemsToSearch):
+    missing = [len(fnmatch.filter(allItems,item))==0 for item in itemsToSearch]
+    return [item for item, miss in zip(itemsToSearch, missing) if miss]
 
 def readonlyWrapper(func):
     def wrapper(self,*args,**kwargs):               
@@ -200,7 +212,24 @@ class HDF5(object):
         def _is_dataset(obj):
             return isinstance(self.fileObj[hdfdir+"/"+obj],h5py.Dataset)        
         return list(map(str,filter(_is_dataset,objs)))
-
+    
+    def findMatchingDatasets(self,hdfdir,searchItems,recursive=False,exit_if_missing=True):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        if recursive:
+            objs = self.lsGroup(hdfdir,recursive=recursive)                     
+        else:
+            objs = self.lsDatasets(hdfdir)           
+        matches = findMatchingItems(objs,searchItems)        
+        if exit_if_missing:
+            missing = findMissingItems(matches,searchItems)
+            #missing = list(set(matches).difference(objs))
+            if len(missing) > 0:
+                dashed = "-"*10
+                err = dashed+"\nERROR! "+funcname+"(): No matches found for:"+\
+                    hdfdir+":\n     "+"\n     ".join(missing)+"\n"+dashed
+                print(err)
+                raise KeyError(funcname+"(): Some required keys cannot be found in '"+hdfdir+"'!")
+        return matches
 
     def readDatasets(self,hdfdir,recursive=False,required=None,exit_if_missing=True):
         """
@@ -237,14 +266,8 @@ class HDF5(object):
             else:
                 objs = self.lsDatasets(hdfdir)   
             if required is not None:                
-                missing = list(set(required).difference(objs))
-                if len(missing) > 0:
-                    dashed = "-"*10
-                    err = dashed+"\n"+funcname+"(): Following keys are missing from "+\
-                        hdfdir+":\n     "+"\n     ".join(missing)+"\n"+dashed
-                    print(err)
-                    raise KeyError(funcname+"(): Some required keys cannot be found in '"+hdfdir+"'!")
-                objs = list(set(objs).intersection(required))                
+                objs = self.findMatchingDatasets(hdfdir,required,recursive=recursive,\
+                                                    exit_if_missing=exit_if_missing)
             # ii) Store in dictionary
             def _store_dataset(obj):
                 data[str(obj)] = np.array(self.fileObj[hdfdir+"/"+obj])
