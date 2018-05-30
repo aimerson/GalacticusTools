@@ -74,6 +74,13 @@ class GalacticusHDF5(HDF5):
         return
 
     def availableDatasets(self,z):
+        """
+        availableDatasets(): Returns a list of galaxy properties available in snapshot output 
+                             closest to specified redshift.
+                             
+        USAGE:  datasets = GalacticusHDF5.availableDatasets(z)
+
+        """
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         out = self.selectOutput(z)
         if out is None:
@@ -81,6 +88,19 @@ class GalacticusHDF5(HDF5):
         return map(str,out["nodeData"].keys())
 
     def countGalaxies(self,z=None):
+        """
+        countGalaxies(): Count number of galaxies stored either in the Galacticus HDF5, or just in
+                         a single redshift snapshot (seaerches for nearest snapshot closest in
+                         redshift).
+
+        USAGE:   ngals = GalacticusHDF5.countGalaxies([z])
+
+                Inputs:
+                      z   : redshift value to query (default = None)
+               Outputs:
+                    ngals : integer count of number of galaxies
+        
+        """
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         if self.outputs is None:
             return 0
@@ -92,6 +112,17 @@ class GalacticusHDF5(HDF5):
         return np.sum(galaxies)
 
     def countGalaxiesAtRedshift(self,z):
+        """
+        countGalaxiesAtRedshift(): Count galaxies stored in snapshot nearest to specified redshift.
+
+        USAGE:  ngals = GalacticusHDF5.countGalaxiesAtRedshift(z)
+
+                Inputs:
+                      z   : redshift value to query
+               Outputs:
+                    ngals : integer count of number of galaxies
+        
+        """
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         ngals = 0
         OUT = self.selectOutput(z)
@@ -104,14 +135,53 @@ class GalacticusHDF5(HDF5):
         return ngals
 
     def datasetExists(self,datasetName,z):
+        """
+        datasetExists(): Query whether specified dataset exists in snapshot with redshift closest
+                         to specified value.
+
+        USAGE: exists = GalacticusHDF5.datasetExists(datasetName,z)
+
+                Inputs:
+                   datasetName : name of dataset to search for
+                      z        : redshift value to query
+               Outputs:
+                    exists     : logical indicating whether specified dataset is present
+               
+        """
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         return len(fnmatch.filter(self.availableDatasets(z),datasetName))>0
 
     def getOutputRedshift(self,outputName):        
-        i = int(np.argwhere(self.outputs.name=="Output"+out.replace("Output","")))
+        """
+        getOutputRedshift(): Return redshift corresponding to specified output name.
+
+        USAGE:  z = GalacticusHDF5.getOutputRedshift(outputName)
+        
+               Inputs:
+                     outputName : string with name of output (e.g. Output1)
+               Outputs:
+                          z     : redshift corresponding to specified output.
+
+        """
+        i = int(np.argwhere(self.outputs.name=="Output"+outputName.replace("Output","")))
         return self.outputs.z[i]
 
     def getRedshiftString(self,z):
+        """
+        getRedshiftString(): Return the redshift string used in dataset names from snapshot nearest in
+                             redshift to specified value.
+                             
+        USAGE:  zString = GalacticusHDF5.getRedshiftString(z)
+
+                Inputs:  
+                      z     : Redshift to query.
+               Outputs:
+                    zString : String containing redshift information used in dataset names.
+
+        For example, for a snapshot with redshift z = 1.4, this function would return a string similar to
+        'z1.400', which could then be used to query/construct dataset names.
+        
+        """
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         return fnmatch.filter(fnmatch.filter(self.availableDatasets(z),"*z[0-9].[0-9]*")[0].split(":"),"z*")[0]
     
@@ -158,7 +228,14 @@ class GalacticusHDF5(HDF5):
         iselect = np.argmin(np.fabs(self.outputs.z-z))
         return self.outputs.z[iselect]
 
-
+    def nearestOutputName(self,z):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        if self.outputs is None:
+            return None
+        # Select epoch closest to specified redshift
+        iselect = np.argmin(np.fabs(self.outputs.z-z))
+        return self.outputs.name[iselect]
+        
     def readGalaxiesOLD(self,z,props=None,SIunits=False):                
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Select epoch closest to specified redshift

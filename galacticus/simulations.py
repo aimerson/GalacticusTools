@@ -6,6 +6,33 @@ import pkg_resources
 import xml.etree.ElementTree as ET
 from .cosmology import Cosmology
 
+
+def locateSimulationParameterFile(simulation):
+    funcname = sys._getframe().f_code.co_name
+    simfile = None        
+    available = "Millennium Millennium2 MS-W7".split()
+    # Millennium Simulation
+    if fnmatch.fnmatch(simulation.lower(),"millennium") or \
+            fnmatch.fnmatch(simulation.lower(),"ms-w1"):
+        simfile = pkg_resources.resource_filename(__name__,"data/Simulations/millennium.xml")
+    # Millennium 2 Simulation
+    if fnmatch.fnmatch(simulation.lower(),"millennium2"):
+        simfile = pkg_resources.resource_filename(__name__,"data/Simulations/millennium2.xml")
+    # MS-W7 simulation
+    if fnmatch.fnmatch(simulation.lower(),"millgas") or \
+            fnmatch.fnmatch(simulation.lower(),"ms-w7"):
+        simfile = pkg_resources.resource_filename(__name__,"data/Simulations/ms-w7.xml")
+    # Planck 256 Mpc/h simulation 
+    if fnmatch.fnmatch(simulation.lower(),"p*256*"):
+        simfile = pkg_resources.resource_filename(__name__,"data/Simulations/planck256.xml")
+    # ERROR if simulation not available
+    if simfile is None:
+        raise ValueError(funcname+"(): Simulation not recognised! Available simulations are: "+\
+                             "\n            "+",".join(available))
+    return simfile
+
+
+
 class Simulation(object):
     
     def __init__(self,simulation,verbose=False,radiation=False):
@@ -14,7 +41,7 @@ class Simulation(object):
         self.verbose = verbose
         
         # Load xml file of simulation specifications
-        self.xmlFile = locate_simulation_file(simulation)
+        self.xmlFile = locateSimulationParameterFile(simulation)
         xmlStruct = ET.parse(self.xmlFile)
         xmlRoot = xmlStruct.getroot()
         self.name = xmlRoot.attrib["name"]
@@ -128,6 +155,33 @@ class Simulation(object):
         return PK
 
 
+    def setCosmologyParameters(self,cosmologyFunctionsMethod="matterLambda",cosmologyParametersMethod="simple",\
+                               cosmologicalMassVarianceMethod="filteredPower"):
+        params = []
+        # Set cosmology parameters
+        params.append(("cosmologyFunctionsMethod",cosmologyFunctionsMethod))
+        params.append(("cosmologyParametersMethod",cosmologicalParametersMethod))
+        params.append(("HubbleConstant",self.h0*100,"cosmologyParametersMethod"))
+        params.append(("OmegaMatter",self.omega0,"cosmologyParametersMethod"))
+        params.append(("OmegaDarkEnergy",self.lambda0,"cosmologyParametersMethod"))
+        params.append(("OmegaBaryon",self.omegaB,"cosmologyParametersMethod"))
+        params.append(("temperatureCMB",self.temperatureCMB,"cosmologyParametersMethod"))
+        params.append(("cosmologicalMassVarianceMethod",cosmologicalMassVarianceMethod))
+        params.append(("sigma_8",self.sigma8,"cosmologicalMassVarianceMethod"))
+        return params
+
+
+    def setPowerSpectrumParameters(self,powerSpectrumPrimordialMethod="powerLaw",wavenumberReference="1",\
+                                   running="0",powerSpectrumPrimordialTransferredMethod="simple"):
+        params = []
+        params.append(("powerSpectrumPrimordialMethod",powerSpectrumPrimordialMethod))
+        params.append(("index",self.ns,"powerSpectrumPrimordialMethod"))
+        params.append(("wavenumberReference",wavenumberReference,"powerSpectrumPrimordialMethod"))
+        params.append(("running",running,"powerSpectrumPrimordialMethod"))
+        params.append(("powerSpectrumPrimordialTransferredMethod",powerSpectrumPrimordialTransferredMethod))
+        return params
+
+
         
     def set_parameters(self,cosmologicalParametersMethod="simple",\
                            powerSpectrumPrimordialMethod="powerLaw",wavenumberReference=1,running=0,\
@@ -160,29 +214,4 @@ class Simulation(object):
         return params
 
         
-
-def locate_simulation_file(simulation):
-    funcname = sys._getframe().f_code.co_name
-    simfile = None        
-    available = "Millennium Millennium2 MS-W7".split()
-    # Millennium Simulation
-    if fnmatch.fnmatch(simulation.lower(),"millennium") or \
-            fnmatch.fnmatch(simulation.lower(),"ms-w1"):
-        simfile = pkg_resources.resource_filename(__name__,"data/Simulations/millennium.xml")
-    # Millennium 2 Simulation
-    if fnmatch.fnmatch(simulation.lower(),"millennium2"):
-        simfile = pkg_resources.resource_filename(__name__,"data/Simulations/millennium2.xml")
-    # MS-W7 simulation
-    if fnmatch.fnmatch(simulation.lower(),"millgas") or \
-            fnmatch.fnmatch(simulation.lower(),"ms-w7"):
-        simfile = pkg_resources.resource_filename(__name__,"data/Simulations/ms-w7.xml")
-    # Planck 256 Mpc/h simulation 
-    if fnmatch.fnmatch(simulation.lower(),"p*256*"):
-        simfile = pkg_resources.resource_filename(__name__,"data/Simulations/planck256.xml")
-    # ERROR if simulation not available
-    if simfile is None:
-        raise ValueError(funcname+"(): Simulation not recognised! Available simulations are: "+\
-                             "\n            "+",".join(available))
-    return simfile
-
 

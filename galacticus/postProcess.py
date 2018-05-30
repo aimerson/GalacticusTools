@@ -1,15 +1,17 @@
 #! /usr/bin/env python
 
-import sys,os,fnmatch
+import sys,os,fnmatch,re
 import numpy as np
 from .io import GalacticusHDF5
 from .EmissionLines import GalacticusEmissionLine,ContaminateEmissionLine
+from .IonizingContinuua import IonizingContinuua
 from .Luminosities import StellarLuminosities
 from .Inclination import getInclination
 from .Stars import GalacticusStellarMass,GalacticusStarFormationRate
 from .dust.Ferrara1999 import dustAtlas
 from .dust.CharlotFall2000 import CharlotFall2000
 from .dust.screens import dustScreen
+
 
 class processGalacticusHDF5(GalacticusHDF5):
         
@@ -23,6 +25,7 @@ class processGalacticusHDF5(GalacticusHDF5):
         self.overwrite = overwrite
         # Initialise classes for galaxy properties
         self.emissionLines = GalacticusEmissionLine(self)
+        self.ionizingContinuua = IonizingContinuua(self)
         self.contaminateLines = ContaminateEmissionLine(self)
         self.stellarLuminosities = StellarLuminosities(self)
         self.stellarMass = GalacticusStellarMass(self)
@@ -62,8 +65,9 @@ class processGalacticusHDF5(GalacticusHDF5):
             self.processStarFormationRate(datasetName,z)            
         if fnmatch.fnmatch(datasetName,"inclination"):
             self.processInclination(datasetName,z)            
+        if fnmatch.fnmatch(datasetName,"*ContinuumLuminosity*"):
+            self.processIonizingContinuum(datasetName,z)
         return
-
 
     def processInclination(self,datasetName,z):
         if self.datasetExists(datasetName,z) and not self.overwrite:
@@ -71,8 +75,7 @@ class processGalacticusHDF5(GalacticusHDF5):
         inclination = getInclination(self,z)
         self.writeDatasetToFile(datasetName,z,inclination)
         return
-        
-        
+                
     def processStellarMass(self,datasetName,z):
         if self.datasetExists(datasetName,z) and not self.overwrite:
             return
@@ -91,6 +94,20 @@ class processGalacticusHDF5(GalacticusHDF5):
             stellarMass = self.starFormationRate.getStarFormationRate(datasetName,z)
             # Write to file 
             self.writeDatasetToFile(datasetName,z,stellarMass,attrs={"unitsInSI":self.starFormationRate.unitsInSI})
+        return
+
+    def processIonizingContinuum(self,datasetName,z):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        if self.datasetExists(datasetName,z) and not self.overwrite:
+            return
+        # Check if require dust attenuation
+        if "dust" in datasetName:                        
+            luminosityName = self.ionizingContinuua.getStellarLuminosityName(datasetName)
+            self.processDataset(luminosityName,z)
+        # Get luminosity
+        luminosity = self.ionizingContinuua.getIonizingLuminosity(datasetName,z=z)
+        # Write to file
+        self.writeDatasetToFile(datasetName,z,luminosity)
         return
 
     def processEmissionLine(self,datasetName,z):
@@ -122,9 +139,9 @@ class processGalacticusHDF5(GalacticusHDF5):
             # Process dust attenuation
             self.processDustAttenuation(datasetName,z)
         else:
-            self.emissionLines.resetLineInformation()
-            luminosity = self.emissionLines.getLineLuminosity(datasetName,z=z)
-            self.writeDatasetToFile(datasetName,z,luminosity,attrs={"unitsInSI":self.emissionLines.unitsInSI})
+            #self.emissionLines.resetLineInformation()
+            EMLINE = self.emissionLines.getLineLuminosity(datasetName,z=z)            
+            self.writeDatasetToFile(datasetName,z,EMLINE.luminosity,attrs={"unitsInSI":self.emissionLines.unitsInSI})
         # Process contamination
         if len(contaminants)>0:
             luminosity = self.contaminateLines.getLineLuminosity(contaminatedName,z=z)
@@ -154,6 +171,7 @@ class processGalacticusHDF5(GalacticusHDF5):
         return
 
     def processBulgeToTotalRatio(self,datasetName,z):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         if self.datasetExists(datasetName,z) and not self.overwrite:
             return
         # Construct names of separate stellar luminosities to process
@@ -174,14 +192,25 @@ class processGalacticusHDF5(GalacticusHDF5):
         # Get dust attenuated luminosity
         if fnmatch.fnmatch(datasetName,"*dustAtlas*"):
             self.processInclination("inclination",z)
-            luminosity = self.DUSTATLAS.getAttenuatedLuminosity(datasetName,z=z,**kwargs)
+            DUST = self.DUSTATLAS.getAttenuatedLuminosity(datasetName,z=z,**kwargs)
         elif fnmatch.fnmatch(datasetName,"*dustCharlotFall*"):
-            luminosity = self.DUSTCF2000.getAttenuatedLuminosity(datasetName,z=z)
+            DUST = self.DUSTCF2000.getAttenuatedLuminosity(datasetName,z=z)
         elif fnmatch.fnmatch(datasetName,"*dustScreen*"):
-            luminosity = self.DUSTSCREEN.getAttenuatedLuminosity(datasetName,z=z,Rv=None)
+            DUST = self.DUSTSCREEN.getAttenuatedLuminosity(datasetName,z=z,Rv=None)
+        # Write to file
+        self.writeDatasetToFile(DUST.datasetName.group(0),z,DUST.attenuatedLuminosity)
+        return
+        
+    def processIonizingContinuum(self,datasetName,z):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        if self.datasetExists(datasetName,z) and not self.overwrite:
+            return
+        # Check if require dust attenuation
+        if "dust" in datasetName:                        
+            luminosityName = self.ionizingContinuua.getStellarLuminosityName(datasetName)
+            self.processDataset(luminosityName,z)
+        # Get luminosity
+        luminosity = self.ionizingContinuua.getIonizingLuminosity(datasetName,z=z)
         # Write to file
         self.writeDatasetToFile(datasetName,z,luminosity)
         return
-
-
-        

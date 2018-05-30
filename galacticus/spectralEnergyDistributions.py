@@ -5,7 +5,9 @@ import numpy as np
 from scipy.interpolate import interp1d
 from scipy.stats import norm
 from .io import GalacticusHDF5
-from .EmissionLines import GalacticusEmissionLine,GalacticusEmissionLines
+from .galaxyProperties import DatasetClass
+from .EmissionLines import GalacticusEmissionLine
+from .StellarLuminosities import StellarLuminosities,parseStellarLuminosity
 from .Luminosities import ergPerSecond
 from .constants import erg,luminosityAB,luminositySolar,jansky,kilo
 from .constants import angstrom,megaParsec,Pi,speedOfLight,centi
@@ -49,6 +51,25 @@ def interpolateSED(wavelengths,seds,newWavelength,**kwargs):
 
 
 
+class topHatArrayClass(DatasetClass):
+    
+    def __init__(self,datasetName=None,redshift=None,outputName=None,filterNames=None,luminosities=None,wavelengths=None):
+        super(topHatArrayClass,self).__init__(datasetName=datasetName,redshift=redshift,outputName=outputName)
+        self.filterNames = filterNames
+        self.luminosities = luminosities
+        self.wavelengths = wavelengths
+        return
+    
+    def reset(self):
+        self.datasetName = None
+        self.redshift = None
+        self.outputName = None
+        self.filterNames = None
+        self.luminosities = None
+        self.wavelengths = None
+        return
+
+    
 class sedTopHatArray(object):
     
     def __init__(self,galHDF5Obj,verbose=False):
@@ -59,7 +80,6 @@ class sedTopHatArray(object):
         
             INPUTS:
             galHDF5Obj : GalacticusHDF5 object
-            z             : redshift
             verbose       : Print additional information (T/F, default=F)
 
             OUTPUTS:
@@ -67,53 +87,56 @@ class sedTopHatArray(object):
 
         """
         classname = self.__class__.__name__
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
         self.galHDF5Obj = galHDF5Obj
-        # Initialise variables to store top hat information
-        self.redshift = None
-        self.topHats = None
-        self.filters = None        
-        self._filterOrder = None
-        self.wavelengths = None
+        self.verbose = verbose
+        self.STELLAR = StellarLuminosities(self.galHDF5Obj)
         return
 
+    
+    def createSEDTopHatArrayClass(self,z,frame,component='total',dust=None,recent=False):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        # Initialize class
+        TOPHATS = topHatArrayClass()
+        # Create dataset name
+        zString = self.galHDF5Obj.getRedshiftString(z)
+        name = component.lower()+"LuminositiesStellar:sedTopHat_9999_9999:"+frame.lower()+":"+zString
+        if dust is not None:
+            if not dust.startswith(":"):
+                dust = ":" + dust
+            name = name + dust
+        if recent:
+            name = name + ":recent"
+        TOPHATS.datasetName = parseStellarLuminosity(name)
+        # Identify HDF5 output
+        TOPHATS.outputName = self.galHDF5Obj.nearestOutputName(z)
+        # Set redshift
+        HDF5OUT = self.galHDF5Obj.selectOutput(z)
+        if "lightconeRedshift" in HDF5OUT.keys():
+            TOPHATS.redshift = np.array(HDF5OUT["nodeData/lightconeRedshift"])
+        else:
+            redshift = self.galHDF5Obj.nearestRedshift(z)
+            ngals = self.galHDF5Obj.countGalaxiesAtRedshift(z)
+            TOPHATS.redshift = np.ones(ngals,dtype=float)*redshift
+        return TOPHATS
 
-    def reset(self):
-        self.redshift = None
-        self.topHats = None
-        self.filters = None        
-        self._filterOrder = None
-        self.wavelengths = None
-        return
 
-    def setHDF5Output(self,z):
-        self.redshift = z
-        # Store list of all possible top hat filters in specified output of HDF5 file
-        self.topHats = fnmatch.filter(self.galHDF5Obj.availableDatasets(self.redshift),"*LuminositiesStellar:sedTopHat*")	
-        # Get list of filter wavelengths and widths
-        regexString = "^(?P<component>disk|spheroid|total)LuminositiesStellar:"+\
-                       "sedTopHat_([\d\.]+)_([\d\.]+)"+\
-                       ":(?P<frame>[^:]+)"+\
-                       "(:z(?P<redshift>[\d\.]+))"+\
-                       "(?P<recent>:recent)?"+\
-                       "(?P<dust>:dust[^:]+)?$"
-        MATCH = re.search(regexString,self.topHats[0])
-        recent = MATCH.group('recent')
-        if not recent:
-            recent = ""
-        dust = MATCH.group('dust')
-        if not dust:
-            dust = ""            
-        searchString = MATCH.group('component')+"LuminositiesStellar:sedTopHat_*_*:"+MATCH.group('frame')+":z"+MATCH.group('redshift')+recent+dust
-        prefix = searchString.split(":")[0] + ":sedTopHat_"
-        suffix = ":"+":".join(searchString.split(":")[2:])
-        topHats = " ".join(fnmatch.filter(self.topHats,searchString)).replace(prefix,"").replace(suffix,"")
-        self.filters = [(f.split("_")[0],f.split("_")[1]) for f in topHats.split()]
-        # Get order of filters in increaasing wavelength
-        self._filterOrder = np.argsort([float(f[0]) for f in self.filters])
-        # Store wavelengths
-        self.wavelengths = np.array([float(f[0]) for f in self.filters])[self._filterOrder]
-        return
+    def findTopHatFilters(self,TOPHATS):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        search = TOPHATS.datasetName.group(0).replace("sedTopHat_9999_9999","sedTopHat_*_*")
+        z = float(TOPHATS.datasetName.group('redshift'))
+        if fnmatch.fnmatch(TOPHATS.datasetName.group('component'),"total"):
+            search = search.replace("total","disk")
+        topHats = fnmatch.filter(self.STELLAR.availableLuminosities(z),search)
+        topHats = np.array([name.replace("disk","total") for name in topHats])
+        # Sort by central wavelength
+        filterNames = np.unique([name.split(":")[1] for name in topHats])
+        centralWavelength = np.array([float(name.split("_")[1]) for name in filterNames])
+        isort = np.argsort(centralWavelength)
+        TOPHATS.filterNames = np.copy(topHats[isort])
+        TOPHATS.wavelengths = np.copy(centralWavelength[isort])        
+        return TOPHATS
+
 
     def getLuminosity(self,filterName,selectionMask=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
@@ -139,35 +162,109 @@ class sedTopHatArray(object):
             luminosity = luminosity[selectionMask]
         return luminosity
 
-    def getLuminosities(self,component,frame,dust="",recent="",selectionMask=None):
+
+    def getAvailableWavelengths(self,z,frame,component="total",dust=None,recent=False):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Build top hat array class
+        TOPHATS = self.createSEDTopHatArrayClass(z,frame,component=component,dust=dust,recent=recent)
+        TOPHATS = self.findTopHatFilters(TOPHATS)
+        return TOPHATS.wavelengths
+
+
+    def setLuminosities(self,z,frame,component='total',dust=None,recent=False,selectionMask=None):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Build top hat array class
+        TOPHATS = self.createSEDTopHatArrayClass(z,frame,component=component,dust=dust,recent=recent)
+        TOPHATS = self.findTopHatFilters(TOPHATS)
+        # Set selection mask if not already set
+        if selectionMask is None:
+            selectionMask = np.ones(len(TOPHATS.redshift),dtype=bool)
+        else:
+            if selectionMask.shape != TOPHATS.redshift.shape:
+                raise KeyError(funcname+"(): length of selection mask does not equal number of galaxies.")
+        # Extract luminosities
+        luminosities = [self.STELLAR.getLuminosity(name)[selectionMask] for name in TOPHATS.filterNames]
+        TOPHATS.luminosities = np.stack(np.copy(luminosities),axis=1)
+        del luminosities
+        return TOPHATS
+
+        
+    def getLuminosities(self,z,frame,component='total',dust=None,recent=False,selectionMask=None):
         """
         sedTopHatArray.getLuminosities: Return luminosities for top hat filter set.
 
-        USAGE:  luminosities = sedTopHatArray.getLuminosities(component,frame,[dust],[recent],[selectionMask])
+        USAGE:  luminosities = sedTopHatArray.getLuminosities(z,frame,[component],[dust],[recent],[selectionMask])
 
              INPUTS:
-             component       : Component of galaxy ('disk', 'spheroid', or 'total')
+             z               : Redshift of snapshot to extract luminosities from.
              frame           : Frame of reference ('rest' or 'observed')
-             dust            : Dust information for filter name (e.g. ':dustAtlas')
-             recent          : Consider only recent star formation. Specify as recent=':recent'.
+             component       : Component of galaxy ('disk', 'spheroid', or 'total') [Default='total'] 
+             dust            : Dust information for filter name (e.g. ':dustAtlasClouds') [Default = None]
+             recent          : Consider only recent star formation (True/False). [Default=False]
              selectionMask   : Logical mask to select subset of galaxies.
 
              OUTPUTS:
              luminosities    : 2D array of luminosities of size (nfilters x ngalaxies).
         
         """
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        searchString = component+"LuminositiesStellar:sedTopHat_*_*:"+frame+":"+self.galHDF5Obj.getRedshiftString(self.redshift)+dust+recent
-        if fnmatch.fnmatch(component,"total"):
-            luminosities = self.getLuminosities("disk",frame,dust=dust,recent=recent,selectionMask=selectionMask)+\
-                           self.getLuminosities("spheroid",frame,dust=dust,recent=recent,selectionMask=selectionMask)
-        else:                        
-            filters = np.array(fnmatch.filter(self.topHats,searchString))[self._filterOrder]
-            luminosities = [self.getLuminosity(filterName,selectionMask=selectionMask)\
-                           for filterName in filters]
-            luminosities = np.stack(np.copy(luminosities),axis=1)
-        return luminosities
-        
+        TOPHATS = self.setLuminosities(z,frame,component=component,dust=dust,recent=recent,selectionMask=selectionMask)
+        return TOPHATS.luminosities
+    
+
+
+
+class SEDClass(DatasetClass):
+    
+    def __init__(self,datasetName=None,redshift=None,outputName=None,wavelength=None,continuum=None,\
+                     emissionLines=None,sed=None,mask=None):
+        classname = self.__class__.__name__
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        super(SEDClass,self).__init__(datasetName=datasetName,redshift=redshift,outputName=outputName)
+        self.wavelength = wavelength
+        self.continuum = continuum
+        self.emissionLines = emissionLines
+        self.sed = sed
+        self.mask = mask
+        return
+
+    def reset(self):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        self.datasetName = None
+        self.redshift = None
+        self.outputName = None
+        self.wavelength = None
+        self.continuum = None
+        self.emissionLines = None
+        self.sed = None
+        self.mask = None
+        return
+
+    def updateWavelengthInterval(self,wavelengthInterval):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        minWavelength = self.wavelengths.min()
+        maxWavelength = self.wavelengths.max()    
+        nbins = len(np.arange(minWavelength,maxWavelength,wavelengthInterval))
+        newWavelengths = np.linspace(minWavelength,maxWavelength,nbins+1)
+        self.sed = np.copy(interpolateSED(np.copy(self.wavelengths),np.copy(self.sed),\
+                                      newWavelengths,axis=1))
+        self.wavelengths = np.copy(newWavelengths)
+        return
+
+
+
+
+def parseSED(datasetName):
+    funcname = sys._getframe().f_code.co_name
+    searchString = "^(?P<component>disk|spheroid|total)SED:(?P<frame>[^:]+)"+\
+        "(?P<emlines>:(?P<lineProfile>[^:_]+)_(?P<lineWidth>[^:]+))?"+\
+        "(?P<snrString>:snr(?P<snr>[\d\.]+))?"+\
+        "(?P<redshiftString>:z(?P<redshift>[\d\.]+))"+\
+        "(?P<recent>:recent)?(?P<dust>:dust[^:]+)?"
+    MATCH = re.search(searchString,datasetName)
+    # Check dataset name corresponds to an SED
+    if not MATCH:
+        raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
+    return MATCH
 
 
 class GalacticusSED(object):
@@ -179,156 +276,150 @@ class GalacticusSED(object):
         # Store GalacticusHDF5 object
         self.galHDF5Obj = galHDF5Obj
         # Initialise top hat array object
-        self.topHatArray = sedTopHatArray(self.galHDF5Obj)
+        self.TOPHATS = sedTopHatArray(self.galHDF5Obj)
         # Initialise emission lines object
         self.EmissionLines = EmissionLineProfiles(self.galHDF5Obj)
-        # Initialise variables to store HDF5 output information
-        self.hdf5Output = None
-        self.hdf5Redshift = None
-        self.haveLightconeRedshifts = None
-        self.totalNumberGalaxies = 0
-        # Initialise variables to store SED and galaxy information
-        self.datasetName = None
-        self.wavelengths = None
-        self.galaxyRedshift = None
-        self.galaxySED = None
-        self.galaxyMask = None
         return
             
-    def resetHDF5Output(self):
-        self.topHatArray.reset()
-        self.redshift = None
-        self.hdf5Output = None
-        self.redshiftString = None
-        self.haveLightconeRedshifts = None
-        self.totalNumberGalaxies = 0
-        return
-
-    def setHDF5Output(self,z):
-        self.resetHDF5Output()
-        self.redshift = self.galHDF5Obj.nearestRedshift(z)
-        self.hdf5Output = self.galHDF5Obj.selectOutput(self.redshift)
-        self.topHatArray.setHDF5Output(self.redshift)
-        self.totalNumberGalaxies = self.galHDF5Obj.countGalaxiesAtRedshift(float(self.redshift))
-        if self.totalNumberGalaxies > 0:
-            self.haveLightconeRedshifts = self.galHDF5Obj.datasetExists("lightconeRedshift",self.redshift)        
-            if self.haveLightconeRedshifts:
-                self.galaxyRedshift = np.array(self.hdf5Output["nodeData/lightconeRedshift"])
-            else:
-                self.galaxyRedshift = np.ones(self.totalNumberGalaxies,dtype=float)*float(self.redshift)
-        return
-
-    def resetSED(self):
-        self.wavelengths = None
-        self.galaxyRedshift = None
-        self.galaxySED = None
-        self.galaxyMask = None
-        return
-
-    def resetDatasetName(self):
-        self.datasetName = None
-        return
-        
-    def initialiseSED(self,wavelengths,z=None,galaxyMask=None):
-        if z is not None:
-            self.setHDF5Output(z)
-        self.wavelengths = wavelengths
-        if galaxyMask is None:
-            self.galaxyMask = np.ones(self.totalNumberGalaxies,dtype=bool)
+    def createSEDClass(self,datasetName,wavelengths,galaxyMask=None):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        SED = SEDClass()
+        SED.datasetName = parseSED(datasetName)
+        # Identify HDF5 output
+        SED.outputName = self.galHDF5Obj.nearestOutputName(float(SED.datasetName.group('redshift')))
+        # Set redshift
+        HDF5OUT = self.galHDF5Obj.selectOutput(float(SED.datasetName.group('redshift')))
+        if "lightconeRedshift" in HDF5OUT.keys():
+            SED.redshift = np.array(HDF5OUT["nodeData/lightconeRedshift"])
         else:
-            self.galaxyMask = galaxyMask
-        self.galaxySED = np.zeros((np.count_nonzero(self.galaxyMask),len(self.wavelengths)),dtype=float)
-        return
-        
-    def setDatasetName(self,datasetName):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        searchString = "^(?P<component>disk|spheroid|total)SED:"+\
-                       "(?P<frame>[^:]+)"+\
-                       "(?P<emlines>:(?P<lineProfile>[^:_]+)_(?P<lineWidth>[^:]+))?"+\
-                       "(?P<snrString>:snr(?P<snr>[\d\.]+))?"+\
-                       "(?P<redshiftString>:z(?P<redshift>[\d\.]+))"+\
-                       "(?P<recent>:recent)?(?P<dust>:dust[^:]+)?"
-        self.datasetName = re.search(searchString,datasetName)
-        # Check dataset name corresponds to an SED
-        if not self.datasetName:
-            raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
-        return
+            z = self.galHDF5Obj.nearestRedshift(float(SED.datasetName.group('redshift')))
+            ngals = self.galHDF5Obj.countGalaxiesAtRedshift(z)
+            SED.redshift = np.ones(ngals,dtype=float)*z
+        # Store wavelengths
+        SED.wavelength = wavelengths
+        # Store mask and initialize SED array
+        if galaxyMask is None:
+            galaxyMask = np.ones(len(SED.redshift),dtype=bool)
+        SED.mask = np.copy(galaxyMask)
+        SED.sed = np.zeros((np.count_nonzero(SED.mask),len(SED.wavelength)),dtype=float)
+        return SED
 
-    def addContinuumNoise(self,wavelengths,luminosities,SNR):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+    def getAvailableWavelengths(self,datasetName):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name   
+        # Construct SED class to extract dataset name components
+        SED = SEDClass()
+        SED.datasetName = parseSED(datasetName)
+        # Extract minimum and maximum wavelength
+        z = float(SED.datasetName.group('redshift'))
+        frame = SED.datasetName.group('frame')
+        component = SED.datasetName.group('component')
+        dust = SED.datasetName.group('dust')
+        recent = SED.datasetName.group('recent') is not None
+        wavelengths = self.TOPHATS.getAvailableWavelengths(z,frame,component=component,\
+                                                               dust=dust,recent=recent)
+        return wavelengths
+
+    def addContinuumNoise(self,SED):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        if SED.datasetName.group('snr') is None:
+            return SED
+        # Get S/N ratio to use
+        SNR = float(SED.datasetName.group('snr'))
         # Get Poisson error on count rate of photons
-        energy = speedOfLight*plancksConstant/np.stack([wavelengths]*luminosities.shape[0])*angstrom
-        counts = luminosities*luminosityAB/energy
+        energy = speedOfLight*plancksConstant/np.stack([SED.wavelength]*SED.continuum.shape[0])*angstrom
+        counts = SED.continuum*luminosityAB/energy
         # Perturb counts and convert back to luminosities
         counts = norm.rvs(loc=counts,scale=counts/SNR)
-        return counts*energy/luminosityAB
-        
-    def getContinuumSED(self,**kwargs):
+        SED.continuum = np.copy(counts*energy/luminosityAB)
+        return SED
+
+    def setContinuumSED(self,SED,**kwargs):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        # Set luminosities for top hat filter array
+        z = float(SED.datasetName.group('redshift'))
+        frame = SED.datasetName.group('frame')
+        component = SED.datasetName.group('component')
+        dust = SED.datasetName.group('dust')
+        recent = SED.datasetName.group('recent') is not None
+        TOPHATS = self.TOPHATS.setLuminosities(z,frame,component=component,dust=None,\
+                                                   recent=False,selectionMask=SED.mask)
+        # Interpolate to get continuum SED
+        SED.continuum = interpolateSED(TOPHATS.wavelengths,TOPHATS.luminosities,\
+                                           SED.wavelength,axis=1,**kwargs)
+        # Add in continuum noise
+        SED = self.addContinuumNoise(SED)
+        return SED
+
+    def setEmissionLineProfiles(self,SED):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        if SED.datasetName.group('emlines') is not None:
+            SED.emissionLines = self.EmissionLines.getLineProfiles(SED.datasetName.group(0),SED.wavelength,\
+                                                                      galaxyMask=SED.mask)
+        else:
+            SED.emissionLines = np.zeros((np.count_nonzero(SED.mask),len(SED.wavelength)),dtype=float)
+        return SED
+
+    def ergPerSecond(self,sed,zeroCorrection=1.0e-50):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        # Extract necessary information
-        component = self.datasetName.group('component')
-        frame = self.datasetName.group('frame')        
-        snr = self.datasetName.group('snr')
-        redshift = self.datasetName.group('redshift')
-        dust = self.datasetName.group('dust')
-        if dust is None:
-            dust = ""
-        recent = self.datasetName.group('recent')
-        if recent is None:
-            recent = ""
-        # Compute continuum SED
-        sed = interpolateSED(self.topHatArray.wavelengths,
-                             self.topHatArray.getLuminosities(component,frame,dust=dust,\
-                                                              recent=recent,selectionMask=self.galaxyMask),\
-                             self.wavelengths,axis=1,**kwargs)
-        # Add noise?
-        if snr is not None:
-            sed = self.addContinuumNoise(self.wavelengths,sed,float(snr))    
+        sed = np.log10(sed+zeroCorrection)
+        sed += np.log10(luminosityAB)
+        sed -= np.log10(erg)
+        sed = 10.0**sed
         return sed
 
-    def updateResolution(self,wavelengthInterval):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
-        minWavelength = self.wavelengths.min()
-        maxWavelength = self.wavelengths.max()    
-        newWavelengths = np.linspace(minWavelength,maxWavelength,len(np.arange(minWavelength,maxWavelength,wavelengthInterval))+1)    
-        self.sed = interpolateSED(self.wavelengths,self.sed,newWavelengths,axis=1)
-        self.wavelengths = newWavelengths
-        return
-    
-    def ergPerSecond(self):
+    def convertToMicroJanskies(self,z,sed):
+        sed = self.ergPerSecond(sed)
+        comDistance = self.galHDF5Obj.cosmology.comoving_distance(z)*megaParsec/centi
+        comDistance = np.repeat(comDistance,sed.shape[1]).reshape(sed.shape)
+        sed /= 4.0*Pi*comDistance**2
+        sed /= jansky
+        sed *= 1.0e6
+        return sed
+
+    def computeTotalSED(self,SED):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        self.galaxySED = np.log10(self.galaxySED)
-        self.galaxySED += np.log10(luminosityAB)
-        self.galaxySED -= np.log10(erg)
-        self.galaxySED = 10.0**self.galaxySED
+        SED.continuum = self.convertToMicroJanskies(SED.redshift[SED.mask],SED.continuum)
+        SED.emissionLines = self.convertToMicroJanskies(SED.redshift[SED.mask],SED.emissionLines)
+        SED.sed = SED.continuum + SED.emissionLines
+        return SED
+    
+    def buildSED(self,datasetName,wavelengths,galaxyMask=None,**kwargs):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        # Create class to store SED information
+        SED = self.createSEDClass(datasetName,wavelengths,galaxyMask=galaxyMask)
+        # Get continuum luminosity
+        SED = self.setContinuumSED(SED,**kwargs)
+        # Introduce emission lines
+        SED = self.setEmissionLineProfiles(SED)
+        # Compute the total SED
+        SED = self.computeTotalSED(SED)
+        return SED
+        
+    def getSED(self,datasetName,wavelengths,galaxyMask=None,**kwargs):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        SED = self.buildSED(datasetName,wavelengths,galaxyMask=galaxyyMask,**kwargs)        
+        return SED.wavelength,SED.sed
+
+
+
+class LineProfilesClass(DatasetClass):
+
+    def __init__(self,datasetName=None,redshift=None,outputName=None,wavelengths=None,luminosities=None,mask=None):
+        super(LineProfilesClass,self).__init__(datasetName=datasetName,redshift=redshift,outputName=outputName)
+        self.wavelengths = wavelengths
+        self.luminosities = luminosities
+        self.mask = mask
         return
 
-    def buildSED(self,datasetName,wavelengths,z=None,galaxyMask=None,**kwargs):
-        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
-        # Set dataset name
-        self.setDatasetName(datasetName)
-        # Initialise SED        
-        self.initialiseSED(wavelengths,z=z,galaxyMask=galaxyMask)
-        # Get continuum luminosity
-        self.galaxySED = self.getContinuumSED(**kwargs)
-        # Introduce emission lines
-        if self.datasetName.group('emlines'):
-            self.EmissionLines.reset()
-            self.EmissionLines.buildLineProfiles(datasetName,self.wavelengths,z=self.redshift,galaxyMask=self.galaxyMask)
-            self.galaxySED += self.EmissionLines.profileSum
-        # Convert units to microJanskys
-        self.ergPerSecond()
-        comDistance = self.galHDF5Obj.cosmology.comoving_distance(self.redshift)*megaParsec/centi
-        self.galaxySED /= 4.0*Pi*comDistance**2
-        self.galaxySED /= jansky
-        self.galaxySED *= 1.0e6
-        ## Compute a statistic if specified
-        #if statistic is not None:
-        #    sed = sedStatistic(sed,axis=0,statistic=statistic)
+    def reset(self):
+        self.datasetName = None
+        self.redshift = None
+        self.outputName = None
+        self.wavelengths = None
+        self.luminosities = None
+        self.mask = None
         return
-        
-    def getSED(self):
-        return self.wavelengths,self.galaxySED
+
 
 
 class EmissionLineProfiles(object):
@@ -341,194 +432,176 @@ class EmissionLineProfiles(object):
         self.galHDF5Obj = galHDF5Obj        
         # Create emission lines object
         self.EmissionLines = GalacticusEmissionLine(self.galHDF5Obj,**kwargs)                
-        # Initialise HDF5 object variables
-        self.redshift = None
-        self.hdf5Output = None
-        # Initialise variables to store SED and addtional galaxy specifications        
-        self.datasetName = None
-        self.sedWavelengths = None
-        self.profileSum = None
-        self.galaxyMask = None
-        self.galaxyRedshift = None        
         return
 
-    def reset(self):
-        self.datasetName = None
-        self.sedWavelengths = None
-        self.profileSum = None
-        self.galaxyMask = None
-        self.galaxyRedshift = None        
-        return
-
-    def resetHDF5Output(self):
-         self.redshift = None
-         self.hdf5Output = None
-         return
-
-    def setHDF5Output(self,z):
-        # Store redshift
-        self.redshift = self.galHDF5Obj.nearestRedshift(z)
-        # Store redshift output
-        self.hdf5Output = self.galHDF5Obj.selectOutput(float(self.redshift))
-        # Set redshifts of galaxies
-        if self.galHDF5Obj.datasetExists("lightconeRedshift",self.redshift):
-            self.galaxyRedshift = np.array(self.hdf5Output["nodeData/lightconeRedshift"])
-        else:
-            self.galaxyRedshift = np.ones(self.galHDF5Obj.countGalaxiesAtRedshift(self.redshift))*self.redshift
-        return
-
-    def setDatasetName(self,datasetName):
+    def createLineProfilesClass(self,datasetName,wavelengths,galaxyMask=None):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
-        searchString = "^(?P<component>disk|spheroid|total)SED:"+\
-                       "(?P<frame>[^:]+)"+\
-                       "(?P<emlines>:(?P<lineProfile>[^:_]+)_(?P<lineWidth>[^:]+))?"+\
-                       "(?P<snrString>:snr(?P<snr>[\d\.]+))?"+\
-                       "(?P<redshiftString>:z(?P<redshift>[\d\.]+))"+\
-                       "(?P<recent>:recent)?(?P<dust>:dust[^:]+)?"
-        self.datasetName = re.search(searchString,datasetName)
-        # Check dataset name corresponds to an SED
-        if not self.datasetName:
-            raise ParseError(funcname+"(): Cannot parse '"+datasetName+"'!")
-        return
-
-    def setSedSpecifications(self,wavelengths,galaxyMask=None):
+        LINES = LineProfilesClass()
+        LINES.datasetName = parseSED(datasetName)
+        # Identify HDF5 output
+        LINES.outputName = self.galHDF5Obj.nearestOutputName(float(LINES.datasetName.group('redshift')))
+        # Set redshift
+        HDF5OUT = self.galHDF5Obj.selectOutput(float(LINES.datasetName.group('redshift')))
+        if "lightconeRedshift" in HDF5OUT["nodeData"].keys():
+            LINES.redshift = np.array(HDF5OUT["nodeData/lightconeRedshift"])
+        else:
+            z = self.galHDF5Obj.nearestRedshift(float(LINES.datasetName.group('redshift')))
+            ngals = self.galHDF5Obj.countGalaxiesAtRedshift(z)
+            LINES.redshift = np.ones(ngals,dtype=float)*z
         # Store wavelengths
-        self.sedWavelengths = wavelengths
-        # Store selection mask to apply to galaxies
+        LINES.wavelengths = np.copy(wavelengths)
+        # Store mask and initialize SED array
         if galaxyMask is None:
-            self.galaxyMask = self.np.ones(self.galHDF5.countGalaxiesAtRedshift(self.redshift),astype=bool)
-        else:                
-            self.galaxyMask = galaxyMask             
-        self.profileSum = np.zeros((np.sum(self.galaxyMask),len(self.sedWavelengths)),dtype=np.float64)
-        return
-
-    def buildLineProfiles(self,datasetName,wavelengths,z=None,galaxyMask=None):
-        self.reset()
-        self.setDatasetName(datasetName)
-        self.setHDF5Output(z)
-        self.setSedSpecifications(wavelengths,galaxyMask=galaxyMask)        
-        self.sumLineProfiles()
-        return 
+            galaxyMask = np.ones(len(LINES.redshift),dtype=bool)
+        LINES.mask = np.copy(galaxyMask)
+        LINES.luminosities = np.zeros((np.count_nonzero(LINES.mask),len(LINES.wavelengths)),dtype=float)
+        return LINES
 
     
-    def sumLineProfiles(self):
+    def setLineProfiles(self,datasetName,wavelengths,galaxyMask=None):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        LINES = self.createLineProfilesClass(datasetName,wavelengths,galaxyMask=galaxyMask)
+        LINES = self.sumLineProfiles(LINES)
+        return LINES
+
+    
+    def getLineProfiles(self,datasetName,wavelengths,galaxyMask=None):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        LINES = self.setLineProfiles(datasetName,wavelengths,galaxyMask=galaxyMask)
+        return LINES.luminosities
+
+    
+    def sumLineProfiles(self,LINES):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Sum profiles
-        dummy = [self.addLine(name) for name in self.EmissionLines.getLineNames()]
+        dummy = [self.addLine(LINES,lineName) for lineName in self.EmissionLines.getLineNames()]
         # Return sum
-        frequency = speedOfLight/np.stack([self.sedWavelengths]*self.profileSum.shape[0])*angstrom
-        self.profileSum /= frequency
-        return 
+        frequency = speedOfLight/np.stack([LINES.wavelengths]*LINES.luminosities.shape[0])*angstrom
+        LINES.luminosities /= frequency
+        return LINES
 
 
-    def addLine(self,lineName):
+    def addLine(self,LINES,lineName):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Extract dataset information
-        component = self.datasetName.group('component')
-        frame = self.datasetName.group('frame')
-        lineProfile = self.datasetName.group('lineProfile')
-        lineWidth = self.datasetName.group('lineWidth')
-        redshift = self.datasetName.group('redshift')
-        dust = self.datasetName.group('dust')
+        component = LINES.datasetName.group('component')
+        frame = LINES.datasetName.group('frame')
+        lineProfile = LINES.datasetName.group('lineProfile')
+        lineWidth = LINES.datasetName.group('lineWidth')
+        redshift = LINES.datasetName.group('redshift')
+        dust = LINES.datasetName.group('dust')
         if not dust:
             dust = ""
-        recent = self.datasetName.group('recent')
+        recent = LINES.datasetName.group('recent')
         if not recent:
             recent = ""
         # Get observed wavelength of line 
         lineWavelength = self.EmissionLines.getWavelength(lineName)
         if fnmatch.fnmatch(frame,"observed"):
-            lineWavelength *= (1.0+self.galaxyRedshift)
+            lineWavelength *= (1.0+LINES.redshift)
         else:
-            lineWavelength = np.ones_like(self.galaxyRedshift)*lineWavelength
-        lineWavelength = lineWavelength[self.galaxyMask]
+            lineWavelength = np.ones_like(LINES.redshift)*lineWavelength
+        lineWavelength = lineWavelength[LINES.mask]
         # Get line luminosity
         lineDatasetName = component+"LineLuminosity:"+lineName+":"+frame+":z"+redshift+recent+dust
-        if lineDatasetName not in self.hdf5Output["nodeData"].keys():
-            print("WARNING! "+funcname+"(): Cannot locate '"+lineDatasetName+"' for inclusion in SED. Will be skipped.")
-            return 
-        lineLuminosity = np.array(self.hdf5Output["nodeData/"+lineDatasetName])[self.galaxyMask]           
+        lineLuminosity = self.EmissionLines.getLineLuminosity(lineDatasetName)[LINES.mask]
         np.place(lineLuminosity,lineLuminosity<0.0,0.0)
         # Compute FWHM (use fixed line width in km/s)
-        FWHM = self.getFWHM(lineName,lineWidth)
+        FWHM = self.getFWHM(LINES,lineName,lineWidth)
         # Compute line profile
         if fnmatch.fnmatch(lineProfile.lower(),"gaus*"):
-            self.profileSum += self.gaussian(lineWavelength,lineLuminosity,FWHM)
+            LINES.luminosities += self.gaussian(LINES.wavelengths,lineWavelength,lineLuminosity,FWHM)
         elif fnmatch.fnmatch(lineProfile.lower(),"voigt*"):
-            self.profileSum += self.cauchy(lineWavelength,lineLuminosity,FWHM)
+            LINES.luminosities += self.cauchy(LINES.wavelengths,lineWavelength,lineLuminosity,FWHM)
         else:
             raise ValueError(funcname+"(): line profile must be Gaussian or Voigt! Other profiles not yet implemented!")
-        return 
+        return LINES
 
-
-    def getApproximateVelocityDispersion(self,scaleVelocityRatio=0.1):
-        """
+    
+    def getBaryonicBulgeToTotalRatio(self,z,emptyHalos=999.9):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        HDF5OUT = self.galHDF5Obj.selectOutput(z)
+        # Determine spheroid-to-total mass ratio
+        baryonicSpheroidMass = np.copy(np.array(HDF5OUT["nodeData/spheroidMassStellar"])) + \
+            np.copy(np.array(HDF5OUT["nodeData/spheroidMassGas"])) 
+        baryonicDiskMass = np.copy(np.array(HDF5OUT["nodeData/diskMassStellar"])) + \
+            np.copy(np.array(HDF5OUT["nodeData/diskMassGas"])) 
+        totalBaryonicMass = baryonicSpheroidMass + baryonicDiskMass
+        mask = totalBaryonicMass == 0.0
+        np.place(totalBaryonicMass,mask,1.0)
+        np.place(baryonicSpheroidMass,mask,emptyHalos)
+        return baryonicSpheroidMass/totalBaryonicMass
         
-        diskVelocityDispersion = diskVelocity * SQRT(sin(inclination)**2+(scaleVelocityRatio*cos(inclination))**2)
 
+
+    def getApproximateVelocityDispersion(self,z,scaleVelocityRatio=0.1,minVelocityDipserion=0.001):
+        """
+        diskVelocityDispersion = diskVelocity * SQRT(sin(inclination)**2+(scaleVelocityRatio*cos(inclination))**2)
         """
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Select HDF5 output
+        HDF5OUT = self.galHDF5Obj.selectOutput(z)
         # Approximate spheroid velocity dispersion using spheroid 'rotation velocity'
-        approximateVelocityDispersion = np.copy(np.array(self.hdf5Output["nodeData/spheroidVelocity"]))
+        approximateVelocityDispersion = np.copy(np.array(HDF5OUT["nodeData/spheroidVelocity"]))
         # Determine spheroid-to-total mass ratio
-        baryonicSpheroidMass = np.copy(np.array(self.hdf5Output["nodeData/spheroidMassStellar"])) + \
-            np.copy(np.array(self.hdf5Output["nodeData/spheroidMassGas"]))
-        baryonicDiskMass = np.copy(np.array(self.hdf5Output["nodeData/diskMassStellar"])) + \
-            np.copy(np.array(self.hdf5Output["nodeData/diskMassGas"]))
-        baryonicSpheroidToTotalRatio = baryonicSpheroidMass/(baryonicSpheroidMass+baryonicDiskMass)
+        emptyHalos = 999.9
+        baryonicSpheroidToTotalRatio = self.getBaryonicBulgeToTotalRatio(z,emptyHalos=emptyHalos)
+        # Fort any empty halos not removed by mask, set velocity dispersion to specified minium value
+        mask = baryonicSpheroidToTotalRatio == emptyHalos
+        np.place(approximateVelocityDispersion,mask,minVelocityDipserion)
         # Check if any disk-dominated galaxies in dataset and replace corresponding velocities
         diskDominated = baryonicSpheroidToTotalRatio<0.5
         if any(diskDominated):
             # Approximate disk velocity dispersion using combiantion of disk rotational velocity
             # and disk vertical velocity (computed as fraction of rotation velocity)
-            diskVelocity = np.copy(np.array(self.hdf5Output["nodeData/diskVelocity"]))
-            inclination = getInclination(self.galHDF5Obj,float(self.redshift))*Pi/180.0
+            diskVelocity = np.copy(np.array(HDF5OUT["nodeData/diskVelocity"]))            
+            inclination = getInclination(self.galHDF5Obj,z)
             diskVelocity *= np.sqrt(np.sin(inclination)**2+(scaleVelocityRatio*np.cos(inclination))**2)            
             np.place(approximateVelocityDispersion,diskDominated,diskVelocity[diskDominated])
-        return approximateVelocityDispersion[self.galaxyMask]
+        return approximateVelocityDispersion
 
 
-    def getFWHM(self,lineName,lineWidth):
+    def getFWHM(self,LINES,lineName,lineWidth):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Extract rest wavelength
         restWavelength = self.EmissionLines.getWavelength(lineName)
         # Compute FWHM        
         if fnmatch.fnmatch(lineWidth.lower(),"fixedwidth*"):                        
-            widthVelocity = np.ones_like(self.profileSum)*float(lineWidth.replace("fixedWidth",""))
+            widthVelocity = np.ones_like(LINES.luminosities)*float(lineWidth.replace("fixedWidth",""))
         elif lineWidth.lower() == "velocityapprox":
-            widthVelocity = self.getApproximateVelocityDispersion(scaleVelocityRatio=0.1)
-            widthVelocity = np.stack([widthVelocity]*len(self.sedWavelengths),axis=1).reshape(len(widthVelocity),-1)
+            widthVelocity = self.getApproximateVelocityDispersion(float(LINES.datasetName.group('redshift')),scaleVelocityRatio=0.1)
+            widthVelocity = np.stack([widthVelocity]*len(LINES.wavelengths),axis=1).reshape(len(widthVelocity),-1)
         else:
             raise ValueError(funcname+"(): line width method must be 'fixed'! Other methods not yet implemented!")
         c = speedOfLight/kilo
-        FWHM = restWavelength*(widthVelocity/c)            
+        FWHM = restWavelength*(widthVelocity/c)    
         return FWHM
     
 
-    def gaussian(self,lineWavelength,lineLuminosity,FWHM):
+    def gaussian(self,sedWavelengths,lineWavelength,lineLuminosity,FWHM):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Compute sigma for Gaussian
         sigma = FWHM/(2.0*np.sqrt(2.0*np.log(2.0)))
         # Compute amplitude for Gaussian
-        amplitude = np.stack([lineLuminosity]*len(self.sedWavelengths),axis=1).reshape(len(lineLuminosity),-1)                
+        amplitude = np.stack([lineLuminosity]*len(sedWavelengths),axis=1).reshape(len(lineLuminosity),-1)                
         amplitude /= (sigma*np.sqrt(2.0*Pi))        
         # Compute luminosity
-        wavelengths = np.concatenate([self.sedWavelengths]*len(lineLuminosity)).reshape(-1,len(self.sedWavelengths))
-        lineWavelengths = np.stack([lineWavelength]*len(self.sedWavelengths),axis=1).reshape(len(lineLuminosity),-1)                
+        wavelengths = np.concatenate([sedWavelengths]*len(lineLuminosity)).reshape(-1,len(sedWavelengths))
+        lineWavelengths = np.stack([lineWavelength]*len(sedWavelengths),axis=1).reshape(len(lineLuminosity),-1)                
         luminosity = amplitude*np.exp(-((wavelengths-lineWavelengths)**2)/(2.0*(sigma**2)))
         return luminosity
 
 
-    def voigt(self,lineWavelength,lineLuminosity,FWHM):
+    def voigt(self,sedWavelengths,lineWavelength,lineLuminosity,FWHM):
         funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
         # Compute sigma for Gaussian
         gamma = FWHM/2.0
         # Compute amplitude for Voigt profile
-        amplitude = np.stack([lineLuminosity]*len(self.sedWavelengths),axis=1).reshape(len(lineLuminosity),-1)                
+        amplitude = np.stack([lineLuminosity]*len(sedWavelengths),axis=1).reshape(len(lineLuminosity),-1)                
         amplitude /= Pi*gamma
         # Compute luminosity
-        wavelengths = np.concatenate([self.sedWavelengths]*len(lineLuminosity)).reshape(-1,len(self.sedWavelengths))
-        lineWavelengths = np.stack([lineWavelength]*len(self.sedWavelengths),axis=1).reshape(len(lineLuminosity),-1)                    
+        wavelengths = np.concatenate([sedWavelengths]*len(lineLuminosity)).reshape(-1,len(sedWavelengths))
+        lineWavelengths = np.stack([lineWavelength]*len(sedWavelengths),axis=1).reshape(len(lineLuminosity),-1)                    
         luminosity = amplitude*(gamma**2)/(((wavelengths-lineWavelengths)**2)+gamma**2)
         return luminosity
 

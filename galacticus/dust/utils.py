@@ -3,8 +3,9 @@
 import sys,os,re,fnmatch
 import numpy as np
 from ..io import GalacticusHDF5
+from ..Luminosities import LuminosityClass
 from ..constants import Pi,Parsec,massAtomic,massSolar,massFractionHydrogen,mega
-from ..EmissionLines import getLineNames,GalacticusEmissionLines
+from ..EmissionLines import getLineNames,emissionLineBase
 from ..Filters import GalacticusFilters
 
 
@@ -37,7 +38,7 @@ class DustProperties(object):
         self.opticalDepthNormalization = (1.0/self.opticalDepthToMagnitudes)*(self.AV_to_EBV/self.NH_to_EBV)
         self.opticalDepthNormalization *= (massFractionHydrogen/massAtomic)*(massSolar/(Parsec*hecto)**2)/self.localISMMetallicity
         # Create objects to store filter and emission line information
-        self.emissionLinesClass = GalacticusEmissionLines()
+        self.emissionLinesClass = emissionLineBase()
         self.filtersDatabase = GalacticusFilters()
         return
 
@@ -80,3 +81,61 @@ class DustProperties(object):
         zeros = np.zeros_like(gasMetalsSurfaceDensityCentral,dtype=gasMetalMass.dtype)
         gasMetalsSurfaceDensityCentral = np.maximum(gasMetalsSurfaceDensityCentral,zeros)
         return gasMetalsSurfaceDensityCentral
+
+
+class DustClass(LuminosityClass):
+
+    def __init__(self,datasetName=None,redshift=None,outputName=None,luminosity=None,\
+                     opticalDepthISM=None,opticalDepthClouds=None):
+        classname = self.__class__.__name__
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        super(DustClass,self).__init__(datasetName=datasetName,luminosity=luminosity,\
+                                           redshift=redshift,outputName=outputName)
+        self.opticalDepthISM = opticalDepthISM
+        self.opticalDepthClouds = opticalDepthClouds
+        return
+
+    def reset(self):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        self.datasetName = None
+        self.redshift = None
+        self.outputName = None
+        self.luminosity = None
+        self.opticalDepthISM = None
+        self.opticalDepthClouds = None
+        return
+
+    def checkOpticalDepths(self):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # Check optical depths have been assigned values.
+        if self.opticalDepthISM is None:
+            raise ValueError(funcname+"(): ISM optical depth has not been assigned.")
+        if self.opticalDepthClouds is None:
+            raise ValueError(funcname+"(): clouds optical depth has not been assigned.")
+        return
+
+    def attenuate(self,continuumLuminosity,cloudsLuminosity=None):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        # If no clouds luminosity has been provided, simply assume not considering molecular cloud attenuation.
+        if cloudsLuminosity is None:
+            cloudsLuminosity = np.zeros_like(continuumLuminosity)
+            if self.opticalDepthClouds is None:
+                self.opticalDepthClouds = 0.0
+        # Check luminosity arrays are the same shape.
+        if continuumLuminosity.shape != cloudsLuminosity.shape:
+            raise ValueError(funcname+"(): luminosity arrays do not have the same shape.")
+        # Check optical depths have been assigned values.
+        self.checkOpticalDepths()
+        # Check that if optical depths are arrays that they are same
+        # size as luminosities.
+        if np.ndim(self.opticalDepthISM)>0:
+            if continuumLuminosity.shape != self.opticalDepthISM.shape:
+                raise ValueError(funcname+"(): array of ISM optical depths has different shape to luminosity array.")
+        if np.ndim(self.opticalDepthClouds)>0:
+            if continuumLuminosity.shape != self.opticalDepthClouds.shape:
+                raise ValueError(funcname+"(): array of clouds optical depths has different shape to luminosity array.")
+        # Compute attenuation.
+        attenuationISM = np.exp(-self.opticalDepthISM)
+        attenuationClouds = np.exp(-self.opticalDepthClouds)
+        result = ((continuumLuminosity-cloudsLuminosity) + cloudsLuminosity*attenuationClouds)*attenuationISM
+        return result

@@ -1,0 +1,158 @@
+#! /usr/bin/env python
+
+import os,sys,re,shutil
+import subprocess
+import tempfile
+import urllib
+import datetime
+import pkg_resources
+import numpy as np
+from ..constants import speedOfLight,angstrom
+from ..utils.progress import Progress
+from ..hdf5 import HDF5
+
+
+class agnSpectralTableClass(object):
+    
+    def __init__(self):
+        self.file = None
+        self.bolometricLuminosity = None
+        self.wavelength = None
+        self.sed = None
+        return
+
+    
+class agnSpectralTables(object):
+
+    def __init__(self,verbose=True):
+        classname = self.__class__.__name__
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        self.hdf5File = pkg_resources.resource_filename('galacticus',"data/blackHoles/AGN_SEDs_Hopkins2007.hdf5")
+        self.verbose = verbose
+        self.codeURL = "http://www.tapir.caltech.edu/~phopkins/Site/qlf_files/agn_spectrum.c"
+        self.sourcePath = pkg_resources.resource_filename('galacticus',"aux/externalCode/hopkins2007/agn_spectrum.c")
+        return
+
+    def getHopkinsCode(self):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name
+        if self.verbose:
+            print(funcname+"(): getting source code for Hopkins et al. (2007) AGN spectrum calculation.")
+        path = self.sourcePath.replace("agn_spectrum.c","")
+        if not os.path.exists(path):
+            os.makedirs(path)        
+        agnCode = urllib.URLopener()
+        codeFile = path+"/agn_spectrum.c"        
+        agnCode.retrieve(self.codeURL,codeFile)
+        if not os.path.exists(codeFile):
+            raise RuntimeError(funcname+"(): failed to download source code from "+codeURL+".")
+        return
+
+    def installHopkinsCode(self):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        path = pkg_resources.resource_filename('galacticus',"/") + "aux/externalCode/hopkins2007/"
+        sourceCode = self.sourcePath
+        exe = sourceCode.replace(".c",".exe")
+        # Build executable if not found
+        if not os.path.exists(exe):
+            # Get source code if not found
+            if not os.path.exists(sourceCode):
+                self.getHopkinsCode()
+            # Install code
+            if self.verbose:
+                print(funcname+"(): installing code for Hopkins et al. (2007) AGN spectrum calculation.")
+            cmd = "gcc "+sourceCode+" -o "+exe+" -lm"
+            subprocess.call(cmd.split())
+            if not os.path.exists(exe):
+                raise RuntimeError(funcname+"(): failed to install AGN spectrum code.")
+        return exe
+       
+    def runHopkinsCode(self,exe,bolometricLuminosity):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        cmd = exe + " " +str(bolometricLuminosity)
+        result = subprocess.check_output(cmd.split()).split("\n")
+        wavelength = []
+        sed = []
+        for line in result:
+            line = line.strip(' \t\n\r')
+            if re.match(r"^\d+.*$",line):
+                cols = line.split()
+                frequency = float(cols[0])
+                nuLnuSolar = float(cols[1])
+                if frequency > 0.0:
+                    wavelength.append(speedOfLight/(10.0**frequency)/angstrom)
+                    sed.append((10.0**nuLnuSolar)/(10.0**frequency))
+        output = np.zeros(len(wavelength),dtype=[("wavelength",float),("sed",float)]).view(np.recarray)
+        output.wavelength = np.copy(np.array(wavelength)[::-1])
+        output.sed = np.copy(np.array(sed)[::-1])
+        return output
+
+    def createHopkinsSpectralTables(self,hdf5File=None,bolometricLuminosity=None):
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name        
+        if self.verbose:
+            print(funcname+"(): creating Hopkins et al. (2007) AGN SED tables...")
+        # Get executable for Hopkins et al. (2007) code
+        exe = self.installHopkinsCode()
+        # Create class to store tablulated SEDs
+        TABLE = agnSpectralTableClass()
+        # Store bolometric luminosities
+        if bolometricLuminosity is None:
+            bolometricLuminosity = np.linspace(6.0,28.0,200)
+        TABLE.bolometricLuminosity = np.copy(bolometricLuminosity)
+        # Create and open HDF5 file
+        if hdf5File is None:
+            hdf5File = self.hdf5File
+        outputPath = "/".join(hdf5File.split("/")[:-1]) + "/"
+        if not os.path.exists(outputPath):
+            os.makedirs(outputPath)
+        FILE = HDF5(hdf5File,'w')
+        # Write bolometric luminosities to file
+        FILE.addDataset("/","bolometricLuminosity",TABLE.bolometricLuminosity)
+        attr = {"units":"solar luminosities","unitsInSI":3.827e33}
+        FILE.addAttributes("/bolometricLuminosity",attr)
+        # Loop over luminosities computing SEDs
+        PROG = Progress(len(TABLE.bolometricLuminosity))
+        for i,luminosity in enumerate(TABLE.bolometricLuminosity):            
+            output = self.runHopkinsCode(exe,luminosity)
+            if i == 0:
+                # Create SED array
+                sedShape = (len(output["sed"]),len(TABLE.bolometricLuminosity)) 
+                TABLE.sed = np.zeros(sedShape,dtype='float')
+                # Store wavelengths and write to file
+                TABLE.wavelength = np.copy(output["wavelength"])
+                FILE.addDataset("/","wavelength",TABLE.wavelength)
+                attr = {"units":"Angstroms (A)","unitsInSI":angstrom}
+                FILE.addAttributes("/wavelength",attr)
+            PROG.increment()
+            if self.verbose:
+                PROG.print_status_line()
+            TABLE.sed[:,i] = np.copy(output["sed"])
+        # Write SEDs to file
+        FILE.addDataset("/","SED",TABLE.sed,maxshape=TABLE.sed.shape)
+        attr = {"units":"solar luminosities per Hz","unitsInSI":3.827e33}
+        FILE.addAttributes("/SED",attr)
+        # Write file attributes
+        attr = {}
+        attr["source"] = "Computed using agn_spectrum.c downloaded from "+self.codeURL
+        attr["URL"] = "http://adsabs.harvard.edu/abs/2007ApJ...654..731H"
+        attr["reference"] = "Hopkins et al. (2007)"
+        attr["creationTime"] = str(datetime.datetime.now())
+        # Close file
+        FILE.close()
+        # Clear executable
+        os.remove(exe)
+        return
+
+    def readHopkinsSpectralTables(self,overwrite=False):        
+        funcname = self.__class__.__name__+"."+sys._getframe().f_code.co_name                
+        if not os.path.exists(self.hdf5File) or overwrite:             
+            self.createHopkinsSpectralTables()
+        SEDFILE = HDF5(self.hdf5File,'r')
+        TABLE = agnSpectralTableClass()
+        TABLE.file = self.hdf5File
+        TABLE.wavelength = np.copy(np.array(SEDFILE.fileObj["/wavelength"]))
+        TABLE.bolometricLuminosity = np.copy(np.array(SEDFILE.fileObj["/bolometricLuminosity"]))
+        TABLE.sed = np.copy(np.array(SEDFILE.fileObj["/SED"]))                                                
+        SEDFILE.close()
+        return TABLE
+    
+
